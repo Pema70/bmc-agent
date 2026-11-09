@@ -100,7 +100,7 @@ model BmcVariant {
 - `src/lib/schemas/bmc.ts`:
   - `BlockKey` (9 kluczy ze spec §4);
   - `BmcEntry` (1–500 znaków, przycinanie);
-  - `BmcState = z.record(BlockKey, z.array(BmcEntry).max(30))` z limitem łącznym 150 wpisów (D5). Do sprawdzenia, czy w Zod 4 rekord wymaga wszystkich 9 kluczy;
+  - `BmcState = z.record(BlockKey, z.array(BmcEntry).max(MAX_ENTRIES_PER_BLOCK))` z regułą `.refine` na limit łączny `MAX_ENTRIES_TOTAL` (D5: `MAX_ENTRIES_PER_BLOCK = 30`, `MAX_ENTRIES_TOTAL = 150`, stałe eksportowane z `src/lib/schemas/bmc.ts`). Do sprawdzenia, czy w Zod 4 rekord wymaga wszystkich 9 kluczy;
   - `emptyBmcState()`;
   - polskie nazwy i krótkie opisy bloków do UI.
 - `src/lib/db/variants.ts`:
@@ -140,7 +140,7 @@ model BmcVariant {
 | D2 | Jeden wariant główny na projekt | **Częściowy indeks unikalny** w bazie (dopisany do SQL migracji, jeśli Prisma nie obsługuje go natywnie). Po dopisaniu sprawdzić, czy kolejne `migrate dev` nie próbuje go usunąć i nie zgłasza rozjazdu schematu; jeśli tak, zgłosić użytkownikowi. |
 | D3 | Zapis płótna | **Jawny przycisk „Zapisz”** całego stanu z `version`. |
 | D4 | Wpisy w bloku | **Zwykłe stringi**, zgodnie ze spec §4. |
-| D5 | Limity wpisów | **30 wpisów na blok** i **150 wpisów łącznie** w stanie. Przy 500 znakach na wpis to najwyżej ok. 75 tys. znaków, czyli rozsądny rozmiar kontekstu dla agenta w kroku 3. Bez limitu łącznego byłoby 9 × 30 = 270 wpisów. |
+| D5 | Limity wpisów | **30 wpisów na blok** i **150 wpisów łącznie** w stanie. Przy 500 znakach na wpis to najwyżej ok. 75 tys. znaków, czyli rozsądny rozmiar kontekstu dla agenta w kroku 3. Bez limitu łącznego byłoby 9 × 30 = 270 wpisów. **Wartość 150 zaakceptowana przez użytkownika 2026-11-09.** |
 | D6 | Edycja i usuwanie projektu | **Edycja nazwy i opisu (OWNER) w PR 2a.** Usuwanie projektu w `docs/zadania.md`. |
 | D7 | Testy komponentów React | **Bez testów komponentów i bez nowych zależności.** Testujemy logikę (schematy, uprawnienia, zapytania, akcje). |
 
