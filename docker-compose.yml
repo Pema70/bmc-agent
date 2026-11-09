@@ -8,8 +8,9 @@ services:
       POSTGRES_PASSWORD: bmc
       POSTGRES_DB: bmc_dev
     ports:
-      # 5433 na hoście, żeby nie kolidować z lokalnie zainstalowanym Postgresem na 5432.
-      - "5433:5432"
+      # Tylko localhost (baza niedostępna z sieci lokalnej). 5433, żeby nie kolidować
+      # z lokalnie zainstalowanym Postgresem na 5432.
+      - "127.0.0.1:5433:5432"
     volumes:
       # Od Postgres 18 obraz trzyma dane w /var/lib/postgresql/<wersja>/docker.
       - bmc_db_data:/var/lib/postgresql
