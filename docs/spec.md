@@ -17,6 +17,7 @@ Aplikacja webowa z agentem AI wspierającym analizę, tworzenie i ocenę modeli 
 | Analiza wpływu zmian | Jakościowa (opis tekstowy i lista dotkniętych bloków). **DO ZDECYDOWANIA:** czy dodajemy proste parametry liczbowe (koszty, przychody). Domyślnie: nie. |
 | Praca zespołowa | Asynchroniczna: zapis w Postgres, odświeżanie stanu, role. Ochrona przed nadpisaniem przez pole `version` (optymistyczne blokowanie). |
 | Język | Interfejs i odpowiedzi agenta po polsku. |
+| Uwierzytelnianie | `next-auth@4.24.15` (Auth.js v4), provider Credentials (e-mail i hasło), sesja JWT. **Uzasadnienie:** Auth.js v5 w chwili decyzji (2026-11) był wciąż w becie (`5.0.0-beta.32`), a projekt używa tylko stabilnych wersji; v4 oficjalnie wspiera Next 16. **Migracja na v5:** cały kod serwerowy czyta sesję wyłącznie przez `getSession()` / `requireSession()` w `src/lib/auth/session.ts`, a `next-auth` importują tylko `src/lib/auth/options.ts`, route handler `/api/auth/[...nextauth]` i komponenty formularzy (`signIn`/`signOut`). Sekret w zmiennej `AUTH_SECRET` (nazwa z v5, v4 też ją czyta). |
 
 ## 3. Przepływ użytkownika
 
@@ -185,7 +186,7 @@ Wszystkie argumenty i wyniki są walidowane schematami Zod.
 
 ## 11. Bezpieczeństwo i koszty
 
-- Hasła hashowane (bcrypt lub argon2). Sesje przez Auth.js.
+- Hasła hashowane bcryptem (`bcryptjs`, koszt 12). Hasło: 8–72 znaki i najwyżej 72 bajty w UTF-8 (limit bcrypt). E-mail zapisywany i porównywany małymi literami. Sesje przez Auth.js (patrz „Uwierzytelnianie” w sekcji 2).
 - Klucze API tylko po stronie serwera, w zmiennych środowiskowych.
 - Limity: liczba zapytań do agenta na użytkownika na godzinę, maksymalna liczba tokenów na zapytanie.
 - Walidacja Zod wszystkich wejść (formularze, argumenty narzędzi, odpowiedzi LLM). Odpowiedź LLM niezgodna ze schematem nie może trafić do bazy.
