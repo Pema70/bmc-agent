@@ -15,7 +15,7 @@ Aplikacja webowa z agentem AI do tworzenia, analizy i oceny modeli biznesowych (
 
 ```bash
 npm install                 # uruchamia też prisma generate
-cp .env.example .env
+cp .env.example .env       # uzupełnij AUTH_SECRET (polecenie w .env.example)
 docker compose up -d db     # Postgres 18 na porcie hosta 5433
 npx prisma migrate dev      # migracje
 npm run dev                 # http://localhost:3000
