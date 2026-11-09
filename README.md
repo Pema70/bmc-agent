@@ -9,14 +9,19 @@ Aplikacja webowa z agentem AI do tworzenia, analizy i oceny modeli biznesowych (
 
 - Node.js 22 lub nowszy
 - npm
+- Docker (lokalny PostgreSQL)
 
 ## Uruchomienie
 
 ```bash
-npm install
+npm install                 # uruchamia też prisma generate
 cp .env.example .env
-npm run dev          # http://localhost:3000
+docker compose up -d db     # Postgres 18 na porcie hosta 5433
+npx prisma migrate dev      # migracje
+npm run dev                 # http://localhost:3000
 ```
+
+Kontener bazy wystawia port **5433**, żeby nie kolidować z lokalnie zainstalowanym Postgresem na 5432.
 
 ## Komendy
 

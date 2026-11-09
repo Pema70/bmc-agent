@@ -49,13 +49,16 @@ const BmcState = z.record(BlockKey, z.array(z.string().min(1).max(500)));
 
 Szkic do doprecyzowania podczas implementacji. Każda zmiana schematu wymaga zgody użytkownika.
 
+Prisma ORM 7 łączy się z bazą wyłącznie przez driver adapter: używamy `@prisma/adapter-pg` (wersja przypięta identycznie jak `prisma` i `@prisma/client`).
+
 ```prisma
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  password  String   // hash (bcrypt/argon2), nigdy jawny tekst
-  members   ProjectMember[]
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String   // hash bcrypt (bcryptjs), nigdy jawny tekst
+  createdAt    DateTime @default(now())
+  members      ProjectMember[]
 }
 
 model Project {
