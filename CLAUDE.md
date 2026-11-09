@@ -98,3 +98,4 @@ docs/                # spec.md i dokumentacja
 - Nie commituj sekretów, plików `.env`, dumpów bazy.
 - Nie modyfikuj wygenerowanych migracji, które już trafiły na `main`.
 - Nie refaktoryzuj kodu niezwiązanego z bieżącym zadaniem.
+- Nie usuwaj niczego bez zgody użytkownika: stashy, gałęzi (poza lokalną gałęzią zmergowanego PR, gdy użytkownik o to poprosił), plików, kontenerów, wolumenów ani danych w bazie. Jeśli coś wygląda na zbędne, napisz, co to jest i dlaczego można to usunąć, i poczekaj na odpowiedź.
