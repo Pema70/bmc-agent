@@ -1,0 +1,23 @@
+# Lokalna baza deweloperska. Dane logowania tylko na potrzeby dev, zgodne z .env.example.
+services:
+  db:
+    image: postgres:18.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bmc
+      POSTGRES_PASSWORD: bmc
+      POSTGRES_DB: bmc_dev
+    ports:
+      # 5433 na hoście, żeby nie kolidować z lokalnie zainstalowanym Postgresem na 5432.
+      - "5433:5432"
+    volumes:
+      # Od Postgres 18 obraz trzyma dane w /var/lib/postgresql/<wersja>/docker.
+      - bmc_db_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bmc -d bmc_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  bmc_db_data:
