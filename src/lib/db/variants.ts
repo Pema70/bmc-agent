@@ -32,6 +32,11 @@ export async function getMainVariant(projectId: string): Promise<MainVariant | n
   return { ...variant, state: parsed.data };
 }
 
+export async function getVariantProjectId(variantId: string): Promise<string | null> {
+  const variant = await prisma.bmcVariant.findUnique({ where: { id: variantId }, select: { projectId: true } });
+  return variant?.projectId ?? null;
+}
+
 export type SaveVariantResult =
   | { ok: true; version: number }
   | { ok: false; error: "VALIDATION"; message: string }
