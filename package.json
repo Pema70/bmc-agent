@@ -13,8 +13,10 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@ai-sdk/google": "4.0.106",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
+    "ai": "7.0.154",
     "bcryptjs": "^3.0.3",
     "next": "16.4.5",
     "next-auth": "4.24.15",
