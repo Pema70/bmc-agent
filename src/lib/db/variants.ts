@@ -37,6 +37,26 @@ export async function getVariantProjectId(variantId: string): Promise<string | n
   return variant?.projectId ?? null;
 }
 
+/** Wariant tylko wtedy, gdy należy do wskazanego projektu (jedno zapytanie po id i projectId). */
+export async function getVariantForProject(
+  projectId: string,
+  variantId: string,
+): Promise<{ id: string; version: number; state: BmcState } | null> {
+  const variant = await prisma.bmcVariant.findFirst({
+    where: { id: variantId, projectId },
+    select: { id: true, version: true, state: true },
+  });
+  if (!variant) {
+    return null;
+  }
+
+  const parsed = BmcState.safeParse(variant.state);
+  if (!parsed.success) {
+    throw new Error(`Niepoprawny stan BMC w wariancie ${variant.id}: ${z.prettifyError(parsed.error)}`);
+  }
+  return { id: variant.id, version: variant.version, state: parsed.data };
+}
+
 export type SaveVariantResult =
   | { ok: true; version: number }
   | { ok: false; error: "VALIDATION"; message: string }
