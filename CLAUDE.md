@@ -58,6 +58,7 @@ docs/                # spec.md i dokumentacja
 - Typy wyprowadzaj ze schematów Zod (`z.infer`), nie duplikuj ich ręcznie.
 - Server Actions: zwykłe mutacje (zapis projektu, zaproszenia, akceptacja zmiany). Streaming czatu: route handler `/api/chat`.
 - Każda Server Action i route handler: najpierw sprawdź sesję i uprawnienia do projektu, potem waliduj wejście Zod.
+- Nie ma middleware, więc ochrona tras nie jest automatyczna. Każda strona serwerowa, Server Action i route handler musi wywołać getSession() lub requireSession() z src/lib/auth/session.ts i sprawdzić uprawnienia do zasobu (projektu).
 - Komponenty funkcyjne, hooki, brak klas. Tailwind zamiast własnego CSS.
 - Brak `any`. Błędy obsługuj jawnie, nie połykaj wyjątków.
 - Komentarze tylko tam, gdzie kod nie tłumaczy się sam.
