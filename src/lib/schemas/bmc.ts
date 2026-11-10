@@ -40,6 +40,15 @@ export const BmcState = z
   });
 export type BmcState = z.infer<typeof BmcState>;
 
+// Identyfikator z klienta: tylko kształt, przynależność do projektu sprawdza baza.
+export const VariantId = z.string().trim().min(1).max(64);
+
+export const SaveCanvasInput = z.object({
+  version: z.number().int().min(1),
+  state: BmcState,
+});
+export type SaveCanvasInput = z.infer<typeof SaveCanvasInput>;
+
 export function countEntries(state: Record<BlockKey, readonly string[]>): number {
   return BLOCK_KEYS.reduce((total, key) => total + state[key].length, 0);
 }

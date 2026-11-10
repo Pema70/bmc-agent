@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findFirst, updateMany } = vi.hoisted(() => ({ findFirst: vi.fn(), updateMany: vi.fn() }));
+const { findFirst, findUnique, updateMany } = vi.hoisted(() => ({
+  findFirst: vi.fn(),
+  findUnique: vi.fn(),
+  updateMany: vi.fn(),
+}));
 
-vi.mock("@/lib/db/client", () => ({ prisma: { bmcVariant: { findFirst, updateMany } } }));
+vi.mock("@/lib/db/client", () => ({ prisma: { bmcVariant: { findFirst, findUnique, updateMany } } }));
 
-import { getMainVariant, saveVariantState } from "@/lib/db/variants";
+import { getMainVariant, getVariantProjectId, saveVariantState } from "@/lib/db/variants";
 import { emptyBmcState } from "@/lib/schemas/bmc";
 
 beforeEach(() => {
@@ -37,6 +41,16 @@ describe("getMainVariant", () => {
     findFirst.mockResolvedValue({ id: "v1", name: "W", version: 1, updatedAt, state: "uszkodzony" });
 
     await expect(getMainVariant("p1")).rejects.toThrow("Niepoprawny stan BMC w wariancie v1");
+  });
+});
+
+describe("getVariantProjectId", () => {
+  it("zwraca projekt wariantu albo null", async () => {
+    findUnique.mockResolvedValueOnce({ projectId: "p1" }).mockResolvedValueOnce(null);
+
+    expect(await getVariantProjectId("v1")).toBe("p1");
+    expect(await getVariantProjectId("v404")).toBeNull();
+    expect(findUnique).toHaveBeenCalledWith({ where: { id: "v1" }, select: { projectId: true } });
   });
 });
 

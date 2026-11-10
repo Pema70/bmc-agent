@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { updateProjectAction } from "@/app/projekty/actions";
 import { BmcCanvas } from "@/components/bmc/bmc-canvas";
+import { CanvasEditor } from "@/components/bmc/canvas-editor";
 import { ProjectForm } from "@/components/projects/project-form";
 import { hasRole, requireProjectRole } from "@/lib/auth/permissions";
 import { getProject } from "@/lib/db/projects";
@@ -25,6 +26,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
   const variant = await getMainVariant(access.projectId);
   const canEdit = hasRole(access.role, "OWNER");
+  const canEditCanvas = hasRole(access.role, "EDITOR");
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-6 py-16">
@@ -47,7 +49,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         <h2 id="canvas-heading" className="text-lg font-semibold">
           {variant ? variant.name : "Business Model Canvas"}
         </h2>
-        {variant ? (
+        {variant && canEditCanvas ? (
+          <CanvasEditor
+            key={variant.id}
+            projectId={access.projectId}
+            variantId={variant.id}
+            initialVersion={variant.version}
+            initialState={variant.state}
+          />
+        ) : variant ? (
           <BmcCanvas state={variant.state} />
         ) : (
           <p className="text-zinc-600 dark:text-zinc-400">
