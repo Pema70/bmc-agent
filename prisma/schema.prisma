@@ -7,6 +7,13 @@ datasource db {
   provider = "postgresql"
 }
 
+enum LlmCallStatus {
+  OK
+  ERROR
+  SCHEMA_ERROR
+  PROVIDER_RATE_LIMIT
+}
+
 enum Role {
   OWNER
   EDITOR
@@ -20,6 +27,7 @@ model User {
   passwordHash String
   createdAt    DateTime        @default(now())
   members      ProjectMember[]
+  llmCalls     LlmCallLog[]
 }
 
 model Project {
@@ -30,6 +38,7 @@ model Project {
   updatedAt   DateTime        @updatedAt
   members     ProjectMember[]
   variants    BmcVariant[]
+  llmCalls    LlmCallLog[]
 }
 
 model ProjectMember {
@@ -58,5 +67,28 @@ model BmcVariant {
   updatedAt DateTime @updatedAt
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
+  @@index([projectId])
+}
+
+model LlmCallLog {
+  id            String        @id @default(cuid())
+  projectId     String?
+  userId        String?
+  operation     String // "chat"; w krokach 4-6 np. "evaluate_bmc"
+  provider      String // google | openai | anthropic
+  model         String // identyfikator modelu u dostawcy
+  promptVersion String
+  durationMs    Int
+  inputTokens   Int?
+  outputTokens  Int?
+  costUsd       Decimal?      @db.Decimal(12, 6)
+  stepCount     Int?
+  status        LlmCallStatus
+  errorCode     String? // kod HTTP lub typ błędu, bez treści promptu i bez kluczy
+  createdAt     DateTime      @default(now())
+  project       Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user          User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
   @@index([projectId])
 }

@@ -60,6 +60,7 @@ docs/                # spec.md i dokumentacja
 - Każda Server Action i route handler: najpierw sprawdź sesję i uprawnienia do projektu, potem waliduj wejście Zod.
 - Nie ma middleware, więc ochrona tras nie jest automatyczna. Każda strona serwerowa, Server Action i route handler musi wywołać getSession() lub requireSession() z src/lib/auth/session.ts i sprawdzić uprawnienia do zasobu (projektu).
 - Komponenty funkcyjne, hooki, brak klas. Tailwind zamiast własnego CSS.
+- Treść czatu, propozycji agenta i wpisów BMC renderuj wyłącznie jako zwykły tekst (węzły tekstowe React). Bez `dangerouslySetInnerHTML` i bez renderowania HTML/Markdown z treści od użytkownika lub modelu.
 - Brak `any`. Błędy obsługuj jawnie, nie połykaj wyjątków.
 - Komentarze tylko tam, gdzie kod nie tłumaczy się sam.
 - Teksty interfejsu i odpowiedzi agenta: po polsku.
