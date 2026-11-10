@@ -66,6 +66,8 @@ model Project {
   id          String   @id @default(cuid())
   name        String
   description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   members     ProjectMember[]
   variants    BmcVariant[]
   attachments Attachment[]
@@ -76,7 +78,9 @@ model ProjectMember {
   projectId String
   userId    String
   role      Role     // OWNER | EDITOR | VIEWER
+  createdAt DateTime @default(now())
   @@id([projectId, userId])
+  @@index([userId])
 }
 
 model BmcVariant {
