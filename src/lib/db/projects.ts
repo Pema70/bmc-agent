@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db/client";
+import { MAIN_VARIANT_NAME } from "@/lib/db/variants";
+import { emptyBmcState } from "@/lib/schemas/bmc";
 import type { ProjectInput, ProjectRole } from "@/lib/schemas/project";
 
 export type ProjectSummary = {
@@ -39,12 +41,14 @@ export async function getProject(
 }
 
 export async function createProject(userId: string, input: ProjectInput): Promise<{ id: string }> {
-  // Zagnieżdżony zapis Prisma wykonuje się w jednej transakcji: projekt nie powstanie bez właściciela.
+  // Zagnieżdżony zapis Prisma wykonuje się w jednej transakcji:
+  // projekt nie powstanie bez właściciela i bez wariantu głównego.
   return prisma.project.create({
     data: {
       name: input.name,
       description: input.description,
       members: { create: { userId, role: "OWNER" } },
+      variants: { create: { name: MAIN_VARIANT_NAME, isMain: true, state: emptyBmcState() } },
     },
     select: { id: true },
   });
