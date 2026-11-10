@@ -16,18 +16,24 @@ vi.mock("@/lib/db/client", () => ({
 }));
 
 import { createProject, getProjectRole, listProjectsForUser, updateProjectDetails } from "@/lib/db/projects";
+import { emptyBmcState } from "@/lib/schemas/bmc";
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("createProject", () => {
-  it("tworzy projekt razem z członkostwem OWNER dla twórcy", async () => {
+  it("tworzy projekt razem z członkostwem OWNER i pustym wariantem głównym", async () => {
     projectCreate.mockResolvedValue({ id: "p1" });
 
     expect(await createProject("u1", { name: "Kawiarnia", description: "" })).toEqual({ id: "p1" });
     expect(projectCreate).toHaveBeenCalledWith({
-      data: { name: "Kawiarnia", description: "", members: { create: { userId: "u1", role: "OWNER" } } },
+      data: {
+        name: "Kawiarnia",
+        description: "",
+        members: { create: { userId: "u1", role: "OWNER" } },
+        variants: { create: { name: "Wariant główny", isMain: true, state: emptyBmcState() } },
+      },
       select: { id: true },
     });
   });

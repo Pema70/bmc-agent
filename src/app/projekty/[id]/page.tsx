@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { updateProjectAction } from "@/app/projekty/actions";
+import { BmcCanvas } from "@/components/bmc/bmc-canvas";
 import { ProjectForm } from "@/components/projects/project-form";
 import { hasRole, requireProjectRole } from "@/lib/auth/permissions";
 import { getProject } from "@/lib/db/projects";
+import { getMainVariant } from "@/lib/db/variants";
 import { PROJECT_ROLE_LABELS } from "@/lib/schemas/project";
 
 export const metadata: Metadata = { title: "Projekt" };
@@ -21,10 +23,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     notFound();
   }
 
+  const variant = await getMainVariant(access.projectId);
   const canEdit = hasRole(access.role, "OWNER");
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-10 px-6 py-16">
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-6 py-16">
       <header className="flex flex-col gap-2">
         <Link href="/projekty" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
           ← Wszystkie projekty
@@ -39,6 +42,19 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           <p className="text-zinc-500">Brak opisu.</p>
         )}
       </header>
+
+      <section className="flex flex-col gap-4" aria-labelledby="canvas-heading">
+        <h2 id="canvas-heading" className="text-lg font-semibold">
+          {variant ? variant.name : "Business Model Canvas"}
+        </h2>
+        {variant ? (
+          <BmcCanvas state={variant.state} />
+        ) : (
+          <p className="text-zinc-600 dark:text-zinc-400">
+            Ten projekt nie ma jeszcze wariantu głównego. Powstał przed dodaniem płótna BMC.
+          </p>
+        )}
+      </section>
 
       {canEdit ? (
         <section className="flex flex-col gap-4">

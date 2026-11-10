@@ -29,6 +29,7 @@ model Project {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   members     ProjectMember[]
+  variants    BmcVariant[]
 }
 
 model ProjectMember {
@@ -41,4 +42,21 @@ model ProjectMember {
 
   @@id([projectId, userId])
   @@index([userId])
+}
+
+// Najwyżej jeden wariant główny na projekt: częściowy indeks unikalny
+// "BmcVariant_projectId_main_key" ON ("projectId") WHERE "isMain" jest dopisany
+// ręcznie do SQL migracji bmc_variant (Prisma 7.10 obsługuje takie indeksy tylko w preview).
+model BmcVariant {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  isMain    Boolean  @default(false)
+  state     Json // BmcState, walidowany Zod przy zapisie i odczycie
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }

@@ -90,7 +90,11 @@ model BmcVariant {
   isMain    Boolean  @default(false)
   state     Json     // BmcState (walidowany Zod przy zapisie i odczycie)
   version   Int      @default(1) // optymistyczne blokowanie
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@index([projectId])
+  // + częściowy indeks unikalny ("projectId") WHERE "isMain", dopisany ręcznie do SQL migracji (D2)
 }
 
 model Proposal {          // propozycje zmian od agenta
