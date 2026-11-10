@@ -15,6 +15,12 @@ Rzeczy świadomie odłożone. Każda pozycja to osobny, mały PR po uzgodnieniu 
 - **Ręczny indeks częściowy `BmcVariant_projectId_main_key` (D2).** Dopisany ręcznie do SQL migracji `bmc_variant`, bo Prisma 7.10 obsługuje indeksy częściowe tylko w preview (`partialIndexes`). Gdy funkcja będzie stabilna, przenieść go do `schema.prisma` i sprawdzić, że `migrate diff` jest pusty.
 - **Uzupełnienie wariantów głównych przy wdrożeniu produkcyjnym.** Projekty utworzone przed PR 2b nie mają wariantu głównego (na dev to tylko dane testowe). Przed pierwszym wdrożeniem produkcyjnym, jeśli takie projekty będą istnieć, dodać jednorazowe uzupełnienie pustego „Wariantu głównego”.
 
+## Edytor BMC
+
+- **Ostrzeżenie przy nawigacji wewnątrz aplikacji.** Znane ograniczenie z PR 2c: `beforeunload` łapie tylko zamknięcie karty, odświeżenie i wpisanie adresu. Nie łapie nawigacji wewnątrz aplikacji, więc kliknięcie np. „← Wszystkie projekty” przy niezapisanych zmianach gubi je bez ostrzeżenia. Ostrzeżenie dla linków wewnętrznych (przechwytywanie nawigacji App Routera) to osobna, większa zmiana.
+
 ## Dokumentacja i narzędzia
+
+- **Ujednolicenie końców linii (`.gitattributes`).** Na Windows Git zamienia LF na CRLF, przez co np. `prisma/migrations/migration_lock.toml` pokazuje się jako zmieniony mimo pustego `git diff`. Dodać `.gitattributes` (np. `* text=auto eol=lf`) i sprawdzić, że nie zmienia sum kontrolnych zastosowanych migracji.
 
 - **Aktualizacja sekcji „Komendy” w `CLAUDE.md`** do faktycznych skryptów z `package.json` (np. `typecheck` to `next typegen && tsc --noEmit`, `test:watch`, `postinstall: prisma generate`, port bazy 5433).
