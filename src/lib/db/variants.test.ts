@@ -8,7 +8,7 @@ const { findFirst, findUnique, updateMany } = vi.hoisted(() => ({
 
 vi.mock("@/lib/db/client", () => ({ prisma: { bmcVariant: { findFirst, findUnique, updateMany } } }));
 
-import { getMainVariant, getVariantProjectId, saveVariantState } from "@/lib/db/variants";
+import { getMainVariant, getVariantForProject, getVariantProjectId, saveVariantState } from "@/lib/db/variants";
 import { emptyBmcState } from "@/lib/schemas/bmc";
 
 beforeEach(() => {
@@ -77,5 +77,27 @@ describe("saveVariantState", () => {
 
     expect(result).toMatchObject({ ok: false, error: "VALIDATION" });
     expect(updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("getVariantForProject", () => {
+  it("szuka wariantu po id i projectId jednym zapytaniem", async () => {
+    const state = { ...emptyBmcState(), channels: ["Sklep online"] };
+    findFirst.mockResolvedValue({ id: "v1", version: 4, state });
+
+    expect(await getVariantForProject("p1", "v1")).toEqual({ id: "v1", version: 4, state });
+    expect(findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "v1", projectId: "p1" } }));
+  });
+
+  it("zwraca null dla wariantu z innego projektu", async () => {
+    findFirst.mockResolvedValue(null);
+
+    expect(await getVariantForProject("p1", "v-obcy")).toBeNull();
+  });
+
+  it("rzuca jawny błąd dla uszkodzonego stanu", async () => {
+    findFirst.mockResolvedValue({ id: "v1", version: 1, state: { channels: "nie lista" } });
+
+    await expect(getVariantForProject("p1", "v1")).rejects.toThrow("Niepoprawny stan BMC");
   });
 });

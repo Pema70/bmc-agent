@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CHAT_MESSAGE_MAX_CHARS } from "@/lib/schemas/chat";
 
 // Pusta zmienna (np. `MAX_STEPS=` w .env) liczy się jak brak, żeby zadziałała wartość domyślna.
 const envInt = (defaultValue: number, min: number, max: number) =>
@@ -13,7 +14,7 @@ const LimitsEnv = z.object({
   CHAT_MAX_REQUESTS_PER_HOUR: envInt(30, 1, 10_000),
   CHAT_MAX_TOKENS_PER_DAY: envInt(200_000, 1_000, 100_000_000),
   LLM_MAX_OUTPUT_TOKENS: envInt(2000, 100, 32_000),
-  CHAT_MAX_MESSAGE_CHARS: envInt(4000, 1, 20_000),
+  CHAT_MAX_MESSAGE_CHARS: envInt(CHAT_MESSAGE_MAX_CHARS, 1, 20_000),
   CHAT_HISTORY_LIMIT: envInt(30, 1, 200),
   MAX_PENDING_PROPOSALS: envInt(20, 1, 200),
 });
