@@ -25,4 +25,8 @@ Rzeczy świadomie odłożone. Każda pozycja to osobny, mały PR po uzgodnieniu 
 
 - **Ujednolicenie końców linii (`.gitattributes`).** Na Windows Git zamienia LF na CRLF, przez co np. `prisma/migrations/migration_lock.toml` pokazuje się jako zmieniony mimo pustego `git diff`. Dodać `.gitattributes` (np. `* text=auto eol=lf`) i sprawdzić, że nie zmienia sum kontrolnych zastosowanych migracji.
 
-- **Aktualizacja sekcji „Komendy” w `CLAUDE.md`** do faktycznych skryptów z `package.json` (np. `typecheck` to `next typegen && tsc --noEmit`, `test:watch`, `postinstall: prisma generate`, port bazy 5433).
+- **Aktualizacja sekcji „Komendy” w `CLAUDE.md`** do faktycznych skryptów z `package.json` (np. `typecheck` to `next typegen && tsc --noEmit`, `test:watch`, `postinstall: prisma generate`, port bazy 5433). Zrobione w PR `docs/porzadki-po-kroku-3`.
+
+## Agent AI
+
+- **Agent dopytuje zbyt często i w kółko.** Zauważone po kroku 3 przy ręcznych próbach. Do poprawy w prompcie systemowym (`src/lib/ai/prompts`, podbić `PROMPT_VERSION`): najwyżej jedno lub dwa pytania naraz, bez powtarzania pytań, na które użytkownik już odpowiedział, a po dwóch turach pytań agent ma zaproponować wpisy z jawnie podanymi założeniami (`propose_block_change`) zamiast dopytywać dalej. Pomiar przed i po zmianie: liczba wywołań `ask_clarification` na rozmowę (oraz liczba tur pytań z rzędu) na stałym zestawie kilku scenariuszy rozmów, uruchamianym ręcznie tym samym modelem; wyniki zapisać do porównania w rozdziale testowym pracy. Testy automatyczne nadal tylko na mockach.
