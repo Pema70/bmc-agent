@@ -42,6 +42,11 @@ export function useVariantWorkspace(): VariantWorkspaceValue {
   return value;
 }
 
+/** Jak useVariantWorkspace, ale poza dostawcą (np. VIEWER) zwraca null zamiast rzucać wyjątek. */
+export function useOptionalVariantWorkspace(): VariantWorkspaceValue | null {
+  return useContext(WorkspaceContext);
+}
+
 export type VariantWorkspaceProviderProps = {
   projectId: string;
   variantId: string;
