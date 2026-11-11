@@ -7,15 +7,19 @@ import { BmcCanvas } from "@/components/bmc/bmc-canvas";
 import { CanvasEditor } from "@/components/bmc/canvas-editor";
 import { VariantWorkspaceProvider, type VariantWorkspaceProviderProps } from "@/components/bmc/variant-workspace";
 import { AgentChat } from "@/components/chat/agent-chat";
+import { EvaluationPanel } from "@/components/evaluation/evaluation-panel";
 import { ProjectForm } from "@/components/projects/project-form";
 import { hasRole, requireProjectRole } from "@/lib/auth/permissions";
 import { loadAiLimits } from "@/lib/ai/config";
 import { listChatMessages } from "@/lib/db/chat";
+import { listEvaluationsForVariant } from "@/lib/db/evaluations";
 import { listProposalsForVariant } from "@/lib/db/proposals";
 import { getProject } from "@/lib/db/projects";
 import { getMainVariant } from "@/lib/db/variants";
 import { PROJECT_ROLE_LABELS } from "@/lib/schemas/project";
 import type { ProposalItem } from "@/lib/schemas/proposal";
+
+const EVALUATIONS_SHOWN = 20;
 
 export const metadata: Metadata = { title: "Projekt" };
 
@@ -60,6 +64,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     rationale: proposal.rationale,
     status: proposal.status,
   }));
+  // Odczyt ocen dla każdego członka (VIEWER i wyżej): rola sprawdzona wyżej, zapytanie po projectId I variantId,
+  // lista bez migawki stanu, a uszkodzony wiersz jest pokazywany jako wiersz z błędem.
+  const evaluations = variant ? await listEvaluationsForVariant(access.projectId, variant.id, EVALUATIONS_SHOWN) : [];
   const workspaceProvider =
     variant && canEditCanvas
       ? {
@@ -113,6 +120,16 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             />
           ) : null}
         </div>
+        {variant ? (
+          <EvaluationPanel
+            key={variant.id}
+            projectId={access.projectId}
+            variantId={variant.id}
+            canEvaluate={canEditCanvas}
+            currentVersion={variant.version}
+            initialItems={evaluations}
+          />
+        ) : null}
       </Workspace>
 
       {canEdit ? (

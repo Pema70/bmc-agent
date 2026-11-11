@@ -18,7 +18,7 @@ vi.mock("@/lib/ai/models", () => ({ getChatModel: mocks.getChatModel }));
 vi.mock("@/lib/ai/log", () => ({ logLlmCall: mocks.logLlmCall }));
 vi.mock("@/lib/db/evaluations", () => ({ createEvaluation: mocks.createEvaluation }));
 
-import { isEvaluable, runEvaluation, TOO_EMPTY_MESSAGE } from "@/lib/ai/evaluate";
+import { isEvaluable, runEvaluation, SAVE_FAILED_MESSAGE, TOO_EMPTY_MESSAGE } from "@/lib/ai/evaluate";
 import { EVALUATE_PROMPT_VERSION, buildEvaluatePrompt } from "@/lib/ai/prompts/evaluate";
 import { emptyBmcState, type BmcState } from "@/lib/schemas/bmc";
 
@@ -276,7 +276,8 @@ describe("runEvaluation", () => {
 
     const result = await runEvaluation(ctx);
 
-    expect(result).toMatchObject({ ok: false, error: "SAVE_FAILED" });
+    expect(result).toEqual({ ok: false, error: "SAVE_FAILED", message: SAVE_FAILED_MESSAGE });
+    expect(SAVE_FAILED_MESSAGE).toBe("Model odpowiedział, ale nie udało się zapisać oceny. Spróbuj ponownie");
   });
 
   it("złośliwy wpis zostaje w bloku danych w prompcie wysłanym do modelu", async () => {

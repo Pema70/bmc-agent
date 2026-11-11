@@ -46,7 +46,8 @@ export type RunEvaluationResult =
 export const TOO_EMPTY_MESSAGE = `Model jest jeszcze zbyt pusty do oceny. Dodaj co najmniej ${EVALUATION_MIN_ENTRIES} wpisów w co najmniej ${EVALUATION_MIN_NON_EMPTY_BLOCKS} blokach.`;
 const CONFIG_MESSAGE = "Agent jest źle skonfigurowany (model lub klucz API). Sprawdź konfigurację serwera.";
 const SCHEMA_MESSAGE = "Model zwrócił odpowiedź w niewłaściwym formacie, więc ocena nie została zapisana. Spróbuj ponownie.";
-const SAVE_MESSAGE = "Nie udało się zapisać oceny. Spróbuj ponownie.";
+// Model odpowiedział (zużył zapytanie z limitu), więc ponowienie liczy się do limitów.
+export const SAVE_FAILED_MESSAGE = "Model odpowiedział, ale nie udało się zapisać oceny. Spróbuj ponownie";
 
 /** Czy model ma dość treści, żeby ocena miała sens (D5). Czysta funkcja. */
 export function isEvaluable(state: BmcState): boolean {
@@ -180,6 +181,6 @@ export async function runEvaluation(ctx: RunEvaluationContext): Promise<RunEvalu
     return { ok: true, evaluation };
   } catch (error) {
     console.error("[evaluate] Nie udało się zapisać oceny:", error instanceof Error ? error.message : "nieznany błąd");
-    return { ok: false, error: "SAVE_FAILED", message: SAVE_MESSAGE };
+    return { ok: false, error: "SAVE_FAILED", message: SAVE_FAILED_MESSAGE };
   }
 }
