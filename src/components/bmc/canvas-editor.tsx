@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { saveCanvasAction } from "@/app/projekty/[id]/actions";
 import { BLOCK_CARD, BLOCK_PLACEMENT, CANVAS_GRID } from "@/components/bmc/layout";
+import { useVariantWorkspace } from "@/components/bmc/variant-workspace";
+import { ProposalCard } from "@/components/chat/proposal-card";
+import { proposalDiffForBlock, type BlockDiff } from "@/lib/bmc/diff";
 import {
   addEntry,
   countChanges,
@@ -23,13 +26,6 @@ import {
   type BmcState,
 } from "@/lib/schemas/bmc";
 
-type CanvasEditorProps = {
-  projectId: string;
-  variantId: string;
-  initialVersion: number;
-  initialState: BmcState;
-};
-
 type SaveStatus = { kind: "saved" | "error" | "conflict"; message: string } | null;
 
 const inputClass =
@@ -37,16 +33,41 @@ const inputClass =
 const smallButtonClass =
   "rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800";
 
-export function CanvasEditor({ projectId, variantId, initialVersion, initialState }: CanvasEditorProps) {
-  const [saved, setSaved] = useState<BmcState>(initialState);
-  const [current, setCurrent] = useState<BmcState>(initialState);
-  const [version, setVersion] = useState(initialVersion);
+export function CanvasEditor() {
+  // Wersja, stan zapisany na serwerze i propozycje są wspólne z czatem (VariantWorkspaceProvider).
+  const workspace = useVariantWorkspace();
+  const { projectId, variantId, version, serverState: saved, adoptRevision, setDirty, onSaved } = workspace;
+
+  const [current, setCurrent] = useState<BmcState>(saved);
   const [status, setStatus] = useState<SaveStatus>(null);
   const [pending, startTransition] = useTransition();
+  const [adoptedRevision, setAdoptedRevision] = useState(adoptRevision);
 
+  // Po akceptacji propozycji przejmujemy zwrócony stan bez przeładowania strony. Akceptacja jest
+  // zablokowana przy niezapisanych zmianach, a na czas żądania edytor jest zablokowany (locked),
+  // więc lokalne zmiany nie giną.
+  if (adoptedRevision !== adoptRevision) {
+    setAdoptedRevision(adoptRevision);
+    setCurrent(saved);
+    setStatus(null);
+  }
+
+  const locked = workspace.busy?.kind === "accept";
   const changes = countChanges(saved, current);
   const dirty = changes > 0;
   const total = countEntries(current);
+
+  // Oczekujące propozycje w kolejności powstawania (rekordy z bazy pochodzą od najstarszej).
+  const pendingProposals = useMemo(
+    () => Object.values(workspace.proposals).filter((proposal) => proposal.status === "PENDING"),
+    [workspace.proposals],
+  );
+
+  useEffect(() => {
+    setDirty(dirty);
+  }, [dirty, setDirty]);
+
+  useEffect(() => () => setDirty(false), [setDirty]);
 
   useEffect(() => {
     if (!dirty) {
@@ -78,8 +99,7 @@ export function CanvasEditor({ projectId, variantId, initialVersion, initialStat
       try {
         const result = await saveCanvasAction(projectId, variantId, version, stateToSave);
         if (result.ok) {
-          setSaved(result.state);
-          setVersion(result.version);
+          onSaved(result.version, result.state);
           setStatus({ kind: "saved", message: "Zapisano zmiany." });
           return;
         }
@@ -90,6 +110,14 @@ export function CanvasEditor({ projectId, variantId, initialVersion, initialStat
         setStatus({ kind: "error", message: "Nie udało się zapisać. Sprawdź połączenie i spróbuj ponownie." });
       }
     });
+  }
+
+  function handleRevert() {
+    if (!dirty || !window.confirm("Cofnąć wszystkie niezapisane zmiany?")) {
+      return;
+    }
+    setCurrent(saved);
+    setStatus(null);
   }
 
   return (
@@ -105,11 +133,24 @@ export function CanvasEditor({ projectId, variantId, initialVersion, initialStat
         <span aria-live="polite">
           Niezapisane zmiany: <strong>{changes}</strong>
         </span>
+        {pendingProposals.length > 0 ? (
+          <span aria-live="polite">
+            Propozycje AI do rozpatrzenia: <strong>{pendingProposals.length}</strong>
+          </span>
+        ) : null}
+        <button
+          type="button"
+          onClick={handleRevert}
+          disabled={!dirty || pending || locked}
+          className={`ml-auto ${smallButtonClass} px-3 py-2 text-sm`}
+        >
+          Cofnij zmiany
+        </button>
         <button
           type="button"
           onClick={handleSave}
-          disabled={!dirty || pending}
-          className="ml-auto rounded-md bg-zinc-900 px-4 py-2 font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          disabled={!dirty || pending || locked}
+          className="rounded-md bg-zinc-900 px-4 py-2 font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
         >
           {pending ? "Zapisywanie…" : "Zapisz"}
         </button>
@@ -131,6 +172,8 @@ export function CanvasEditor({ projectId, variantId, initialVersion, initialStat
             entries={current[key]}
             remainingBlock={remainingInBlock(current, key)}
             remainingTotal={remainingTotal(current)}
+            diff={proposalDiffForBlock(current, key, pendingProposals)}
+            locked={locked}
             onAdd={(text) => apply(addEntry(current, key, text))}
             onUpdate={(index, text) => apply(updateEntry(current, key, index, text))}
             onRemove={(index) => apply(removeEntry(current, key, index))}
@@ -146,6 +189,9 @@ type BlockEditorProps = {
   entries: string[];
   remainingBlock: number;
   remainingTotal: number;
+  diff: BlockDiff;
+  // Na czas stosowania propozycji edycja jest zablokowana.
+  locked: boolean;
   onAdd: (text: string) => string | null;
   onUpdate: (index: number, text: string) => string | null;
   onRemove: (index: number) => string | null;
@@ -156,6 +202,8 @@ function BlockEditor({
   entries,
   remainingBlock,
   remainingTotal,
+  diff,
+  locked,
   onAdd,
   onUpdate,
   onRemove,
@@ -165,7 +213,9 @@ function BlockEditor({
   const [editText, setEditText] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const canAdd = remainingBlock > 0 && remainingTotal > 0;
+  const canAdd = remainingBlock > 0 && remainingTotal > 0 && !locked;
+  const proposalCount =
+    diff.additions.length + diff.stale.length + diff.entries.reduce((sum, entry) => sum + entry.proposals.length, 0);
   const headingId = `block-${blockKey}`;
   const errorId = `block-${blockKey}-error`;
 
@@ -217,6 +267,11 @@ function BlockEditor({
             {entries.length}/{MAX_ENTRIES_PER_BLOCK}
           </span>
         </div>
+        {proposalCount > 0 ? (
+          <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+            Propozycje AI w bloku: {proposalCount}
+          </p>
+        ) : null}
         <p className="text-xs text-zinc-500">{BLOCK_INFO[blockKey].description}</p>
       </header>
 
@@ -254,29 +309,59 @@ function BlockEditor({
                 </form>
               </li>
             ) : (
-              <li key={index} className="group flex items-start gap-1">
-                <span className="min-w-0 flex-1 break-words before:mr-1 before:content-['•']">{entry}</span>
-                <button
-                  type="button"
-                  onClick={() => startEditing(index)}
-                  aria-label={`Edytuj wpis: ${entry}`}
-                  className="shrink-0 text-xs text-zinc-500 hover:underline"
-                >
-                  Edytuj
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRemove(index)}
-                  aria-label={`Usuń wpis: ${entry}`}
-                  className="shrink-0 text-xs text-red-600 hover:underline"
-                >
-                  Usuń
-                </button>
+              <li key={index} className="flex flex-col gap-1">
+                <div className="group flex items-start gap-1">
+                  <span
+                    className={`min-w-0 flex-1 break-words before:mr-1 before:content-['•'] ${
+                      diff.entries[index]?.status !== "unchanged"
+                        ? "rounded bg-red-100 px-1 text-red-900 line-through dark:bg-red-950/50 dark:text-red-200"
+                        : ""
+                    }`}
+                  >
+                    {entry}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => startEditing(index)}
+                    disabled={locked}
+                    aria-label={`Edytuj wpis: ${entry}`}
+                    className="shrink-0 text-xs text-zinc-500 hover:underline disabled:opacity-50"
+                  >
+                    Edytuj
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(index)}
+                    disabled={locked}
+                    aria-label={`Usuń wpis: ${entry}`}
+                    className="shrink-0 text-xs text-red-600 hover:underline disabled:opacity-50"
+                  >
+                    Usuń
+                  </button>
+                </div>
+                {diff.entries[index]?.proposals.map((proposal) => (
+                  <ProposalCard key={proposal.id} proposal={proposal} status={proposal.status} compact />
+                ))}
               </li>
             ),
           )}
         </ul>
       )}
+
+      {diff.additions.length > 0 || diff.stale.length > 0 ? (
+        <ul className="flex flex-col gap-2">
+          {diff.additions.map((proposal) => (
+            <li key={proposal.id}>
+              <ProposalCard proposal={proposal} status={proposal.status} compact />
+            </li>
+          ))}
+          {diff.stale.map(({ proposal }) => (
+            <li key={proposal.id}>
+              <ProposalCard proposal={proposal} status={proposal.status} compact />
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       <form onSubmit={handleAdd} className="mt-auto flex gap-1">
         <input

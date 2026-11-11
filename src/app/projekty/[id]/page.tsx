@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { updateProjectAction } from "@/app/projekty/actions";
 import { BmcCanvas } from "@/components/bmc/bmc-canvas";
 import { CanvasEditor } from "@/components/bmc/canvas-editor";
+import { VariantWorkspaceProvider, type VariantWorkspaceProviderProps } from "@/components/bmc/variant-workspace";
 import { AgentChat } from "@/components/chat/agent-chat";
 import { ProjectForm } from "@/components/projects/project-form";
 import { hasRole, requireProjectRole } from "@/lib/auth/permissions";
@@ -13,8 +15,20 @@ import { listProposalsForVariant } from "@/lib/db/proposals";
 import { getProject } from "@/lib/db/projects";
 import { getMainVariant } from "@/lib/db/variants";
 import { PROJECT_ROLE_LABELS } from "@/lib/schemas/project";
+import type { ProposalItem } from "@/lib/schemas/proposal";
 
 export const metadata: Metadata = { title: "Projekt" };
+
+// Płótno i czat dzielą wersję, stan i propozycje wariantu tylko tam, gdzie oba istnieją (EDITOR i wyżej).
+function Workspace({
+  provider,
+  children,
+}: {
+  provider: Omit<VariantWorkspaceProviderProps, "children"> | null;
+  children: ReactNode;
+}) {
+  return provider ? <VariantWorkspaceProvider {...provider}>{children}</VariantWorkspaceProvider> : <>{children}</>;
+}
 
 export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -36,7 +50,26 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     variant && canEditCanvas ? await listChatMessages(access.projectId, loadAiLimits().historyLimit) : null;
 
   const proposals = variant && canEditCanvas ? await listProposalsForVariant(access.projectId, variant.id, 200) : [];
-  const proposalStatuses = Object.fromEntries(proposals.map((proposal) => [proposal.id, proposal.status]));
+  // Z bazy od najnowszej; interfejs potrzebuje kolejności powstawania.
+  const initialProposals: ProposalItem[] = [...proposals].reverse().map((proposal) => ({
+    id: proposal.id,
+    blockKey: proposal.blockKey,
+    operation: proposal.operation,
+    before: proposal.before,
+    after: proposal.after,
+    rationale: proposal.rationale,
+    status: proposal.status,
+  }));
+  const workspaceProvider =
+    variant && canEditCanvas
+      ? {
+          projectId: access.projectId,
+          variantId: variant.id,
+          initialVersion: variant.version,
+          initialState: variant.state,
+          initialProposals,
+        }
+      : null;
 
   return (
     <main className="mx-auto flex w-full max-w-[96rem] flex-1 flex-col gap-10 px-6 py-16">
@@ -55,38 +88,32 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         )}
       </header>
 
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <section className="flex min-w-0 flex-col gap-4" aria-labelledby="canvas-heading">
-          <h2 id="canvas-heading" className="text-lg font-semibold">
-            {variant ? variant.name : "Business Model Canvas"}
-          </h2>
-          {variant && canEditCanvas ? (
-            <CanvasEditor
+      <Workspace key={variant?.id ?? "brak"} provider={workspaceProvider}>
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <section className="flex min-w-0 flex-col gap-4" aria-labelledby="canvas-heading">
+            <h2 id="canvas-heading" className="text-lg font-semibold">
+              {variant ? variant.name : "Business Model Canvas"}
+            </h2>
+            {variant && canEditCanvas ? (
+              <CanvasEditor />
+            ) : variant ? (
+              <BmcCanvas state={variant.state} />
+            ) : (
+              <p className="text-zinc-600 dark:text-zinc-400">
+                Ten projekt nie ma jeszcze wariantu głównego. Powstał przed dodaniem płótna BMC.
+              </p>
+            )}
+          </section>
+          {variant && chatMessages ? (
+            <AgentChat
               key={variant.id}
               projectId={access.projectId}
               variantId={variant.id}
-              initialVersion={variant.version}
-              initialState={variant.state}
+              initialMessages={chatMessages}
             />
-          ) : variant ? (
-            <BmcCanvas state={variant.state} />
-          ) : (
-            <p className="text-zinc-600 dark:text-zinc-400">
-              Ten projekt nie ma jeszcze wariantu głównego. Powstał przed dodaniem płótna BMC.
-            </p>
-          )}
-        </section>
-        {variant && chatMessages ? (
-          <AgentChat
-            variantVersion={variant.version}
-            proposalStatuses={proposalStatuses}
-            key={variant.id}
-            projectId={access.projectId}
-            variantId={variant.id}
-            initialMessages={chatMessages}
-          />
-        ) : null}
-      </div>
+          ) : null}
+        </div>
+      </Workspace>
 
       {canEdit ? (
         <section className="flex flex-col gap-4">
