@@ -15,17 +15,21 @@ Webowa aplikacja z agentem AI do tworzenia, analizy i oceny modeli biznesowych (
 
 ## Komendy
 
-Dostosuj, gdy skrypty zaczną istnieć. Zawsze używaj tych komend zamiast własnych wariantów.
+Zgodne ze skryptami w `package.json`. Zawsze używaj tych komend zamiast własnych wariantów.
 
 ```
-docker compose up -d db     # lokalny Postgres
-npm run dev                 # serwer deweloperski
-npm run build               # build produkcyjny
-npm run lint                # ESLint
-npm run typecheck           # tsc --noEmit
-npm test                    # testy jednostkowe
-npx prisma migrate dev      # migracje
+docker compose up -d db                 # lokalny Postgres (127.0.0.1:5433)
+npm run dev                             # serwer deweloperski
+npm run build                           # build produkcyjny
+npm run start                           # serwer produkcyjny (po build)
+npm run lint                            # ESLint
+npm run typecheck                       # next typegen && tsc --noEmit
+npm test                                # testy jednostkowe (vitest run)
+npm run test:watch                      # testy w trybie obserwowania
+npx --no-install prisma migrate dev     # migracje (potem: npx --no-install prisma generate)
 ```
+
+`npm install` uruchamia `postinstall` (`prisma generate`). Prisma 7 nie generuje klienta po `migrate dev`, więc po migracji uruchom `prisma generate` ręcznie. Wygenerowany klient (`src/generated/prisma`) jest w `.gitignore`.
 
 Przed otwarciem PR muszą przechodzić: `lint`, `typecheck`, `test`, `build`.
 
