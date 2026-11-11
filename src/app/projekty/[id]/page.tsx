@@ -9,6 +9,7 @@ import { ProjectForm } from "@/components/projects/project-form";
 import { hasRole, requireProjectRole } from "@/lib/auth/permissions";
 import { loadAiLimits } from "@/lib/ai/config";
 import { listChatMessages } from "@/lib/db/chat";
+import { listProposalsForVariant } from "@/lib/db/proposals";
 import { getProject } from "@/lib/db/projects";
 import { getMainVariant } from "@/lib/db/variants";
 import { PROJECT_ROLE_LABELS } from "@/lib/schemas/project";
@@ -33,6 +34,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   // Czat tylko dla EDITOR i wyżej (D10); historię czytamy dopiero po sprawdzeniu roli.
   const chatMessages =
     variant && canEditCanvas ? await listChatMessages(access.projectId, loadAiLimits().historyLimit) : null;
+
+  const proposals = variant && canEditCanvas ? await listProposalsForVariant(access.projectId, variant.id, 200) : [];
+  const proposalStatuses = Object.fromEntries(proposals.map((proposal) => [proposal.id, proposal.status]));
 
   return (
     <main className="mx-auto flex w-full max-w-[96rem] flex-1 flex-col gap-10 px-6 py-16">
@@ -74,6 +78,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </section>
         {variant && chatMessages ? (
           <AgentChat
+            variantVersion={variant.version}
+            proposalStatuses={proposalStatuses}
             key={variant.id}
             projectId={access.projectId}
             variantId={variant.id}

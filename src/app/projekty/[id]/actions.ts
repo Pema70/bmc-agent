@@ -3,11 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireProjectRole } from "@/lib/auth/permissions";
+import { VERSION_CONFLICT_MESSAGE } from "@/lib/bmc/messages";
 import { getVariantProjectId, saveVariantState } from "@/lib/db/variants";
 import { SaveCanvasInput, VariantId, type BmcState } from "@/lib/schemas/bmc";
-
-const VERSION_CONFLICT_MESSAGE =
-  "Ktoś w międzyczasie zmienił ten model. Odśwież stronę, aby zobaczyć aktualną wersję.";
 
 export type SaveCanvasResult =
   | { ok: true; version: number; state: BmcState }
