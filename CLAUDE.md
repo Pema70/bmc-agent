@@ -11,7 +11,7 @@ Webowa aplikacja z agentem AI do tworzenia, analizy i oceny modeli biznesowych (
 - Vercel AI SDK: tool calling i streaming (bez LangChain)
 - Zod: walidacja wszystkich danych wejściowych, argumentów narzędzi i odpowiedzi LLM
 - @react-pdf/renderer (PDF), `docx` (DOCX)
-- Recharts (wykresy)
+- Własny komponent SVG (wykres radarowy, bez biblioteki wykresów)
 
 ## Komendy
 
