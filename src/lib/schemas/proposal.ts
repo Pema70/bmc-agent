@@ -94,3 +94,6 @@ export const ResolveProposalInput = z.object({
   proposalId: ProposalId,
   version: z.number().int().min(1),
 });
+
+// Propozycja z bieżącym statusem: tak widzi ją interfejs (czat i diff w blokach płótna).
+export type ProposalItem = ProposalView & { status: ProposalStatus };
