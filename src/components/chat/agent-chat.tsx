@@ -3,18 +3,15 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useVariantWorkspace } from "@/components/bmc/variant-workspace";
 import { ProposalCard } from "@/components/chat/proposal-card";
 import { CHAT_MESSAGE_MAX_CHARS, type ChatUIMessage } from "@/lib/schemas/chat";
-import type { ProposalStatus } from "@/lib/schemas/proposal";
+import type { ProposalView } from "@/lib/schemas/proposal";
 
 type AgentChatProps = {
   projectId: string;
   variantId: string;
   initialMessages: ChatUIMessage[];
-  // Wersja wariantu z ładowania strony (zmienia się po akceptacji propozycji w tym panelu).
-  variantVersion: number;
-  // Statusy ostatnich propozycji wariantu z bazy (klucz: id propozycji).
-  proposalStatuses: Record<string, ProposalStatus>;
 };
 
 const GENERIC_ERROR = "Nie udało się uzyskać odpowiedzi od agenta. Spróbuj ponownie.";
@@ -35,7 +32,10 @@ function errorText(error: Error | undefined): string | null {
   return error.message && error.message.length <= 300 ? error.message : GENERIC_ERROR;
 }
 
-export function AgentChat({ projectId, variantId, initialMessages, variantVersion, proposalStatuses }: AgentChatProps) {
+export function AgentChat({ projectId, variantId, initialMessages }: AgentChatProps) {
+  // Wersja, stan i propozycje wariantu są wspólne z edytorem płótna (VariantWorkspaceProvider).
+  const workspace = useVariantWorkspace();
+  const { registerProposals } = workspace;
   const transport = useMemo(
     () =>
       new DefaultChatTransport<ChatUIMessage>({
@@ -57,8 +57,6 @@ export function AgentChat({ projectId, variantId, initialMessages, variantVersio
   });
 
   const [input, setInput] = useState("");
-  const [statuses, setStatuses] = useState<Record<string, ProposalStatus>>(proposalStatuses);
-  const [version, setVersion] = useState(variantVersion);
   // Propozycje z wiadomości dołączonych w tej sesji są świeże (PENDING), starsze znamy z bazy.
   const [initialIds] = useState(() => new Set(initialMessages.map((message) => message.id)));
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -68,6 +66,24 @@ export function AgentChat({ projectId, variantId, initialMessages, variantVersio
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages, status]);
+
+  // Nowe propozycje z tej sesji trafiają do wspólnego stanu, więc od razu widać je jako diff w blokach.
+  useEffect(() => {
+    const fresh: ProposalView[] = [];
+    for (const message of messages) {
+      if (initialIds.has(message.id)) {
+        continue;
+      }
+      for (const part of message.parts) {
+        if (part.type === "tool-propose_block_change" && part.state === "output-available" && part.output.ok) {
+          fresh.push(part.output.proposal);
+        }
+      }
+    }
+    if (fresh.length > 0) {
+      registerProposals(fresh);
+    }
+  }, [messages, initialIds, registerProposals]);
 
   function send(text: string) {
     const trimmed = text.trim();
@@ -91,13 +107,6 @@ export function AgentChat({ projectId, variantId, initialMessages, variantVersio
   }
 
   const lastMessageId = messages[messages.length - 1]?.id;
-
-  function onResolved(proposalId: string, status: ProposalStatus, newVersion?: number) {
-    setStatuses((current) => ({ ...current, [proposalId]: status }));
-    if (newVersion !== undefined) {
-      setVersion(newVersion);
-    }
-  }
 
   return (
     <section
@@ -178,11 +187,10 @@ export function AgentChat({ projectId, variantId, initialMessages, variantVersio
                         <ProposalCard
                           key={part.output.proposal.id}
                           proposal={part.output.proposal}
-                          status={statuses[part.output.proposal.id] ?? (initialIds.has(message.id) ? undefined : "PENDING")}
-                          projectId={projectId}
-                          variantId={variantId}
-                          version={version}
-                          onResolved={onResolved}
+                          status={
+                            workspace.proposals[part.output.proposal.id]?.status ??
+                            (initialIds.has(message.id) ? undefined : "PENDING")
+                          }
                         />
                       ) : null;
                     case "output-error":
