@@ -97,6 +97,7 @@ docs/                # spec.md i dokumentacja
 ## Czego nie robić
 
 - Nie dodawaj LangChain ani podobnych frameworków.
+- Nie używaj `npx` z pakietami spoza `node_modules` (pobiera i uruchamia świeży kod bez wiedzy użytkownika). Używaj `npm run <skrypt>` albo `npx --no-install <pakiet>` dla narzędzi z `devDependencies`. Narzędzie, którego nie ma w projekcie, wymaga zgody użytkownika jak każda nowa zależność.
 - Nie commituj sekretów, plików `.env`, dumpów bazy.
 - Nie modyfikuj wygenerowanych migracji, które już trafiły na `main`.
 - Nie edytuj migracji Prisma, które zostały już zastosowane w bazie (zmienia to sumę kontrolną i wymusza reset). Zmiany robimy nową migracją.

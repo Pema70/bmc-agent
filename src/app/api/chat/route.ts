@@ -15,17 +15,14 @@ import { checkUserLimits } from "@/lib/ai/limits";
 import { logLlmCall, type TokenUsage } from "@/lib/ai/log";
 import { getChatModel } from "@/lib/ai/models";
 import { PROMPT_VERSION, buildSystemPrompt } from "@/lib/ai/prompts/system";
-import { chatTools } from "@/lib/ai/tools/ask-clarification";
+import { createChatTools } from "@/lib/ai/tools";
 import { getProjectAccess } from "@/lib/auth/permissions";
 import { listChatMessages, newChatMessageId, saveChatMessage } from "@/lib/db/chat";
 import { getProject } from "@/lib/db/projects";
 import { getVariantForProject } from "@/lib/db/variants";
-import { ClarificationInput, chatRequestSchema, type ChatUIMessage } from "@/lib/schemas/chat";
+import { chatRequestSchema, chatValidationTools, type ChatUIMessage } from "@/lib/schemas/chat";
 
 const MAX_RETRIES = 2;
-const STREAM_VALIDATION_TOOLS = {
-  ask_clarification: { inputSchema: ClarificationInput, outputSchema: ClarificationInput },
-};
 
 function jsonError(status: number, error: string, message: string, headers?: Record<string, string>): Response {
   return Response.json({ error, message }, { status, headers });
@@ -123,7 +120,15 @@ export async function POST(req: Request): Promise<Response> {
   const assistantId = newChatMessageId();
   const startedAt = Date.now();
 
-  // 7. Wywołanie modelu.
+  // 7. Wywołanie modelu. Narzędzie propozycji dostaje kontekst wyłącznie z serwera.
+  const chatTools = createChatTools({
+    projectId,
+    variantId: variant.id,
+    userId,
+    version: variant.version,
+    state: variant.state,
+    maxPending: limits.maxPendingProposals,
+  });
   const result = streamText({
     model: resolved.model,
     system: buildSystemPrompt(project, variant.state),
@@ -169,7 +174,7 @@ export async function POST(req: Request): Promise<Response> {
 
     const validated = await safeValidateUIMessages<ChatUIMessage>({
       messages: [responseMessage],
-      tools: STREAM_VALIDATION_TOOLS,
+      tools: chatValidationTools,
     });
     if (!validated.success) {
       console.error("[chat] Odpowiedź modelu niezgodna ze schematem, nie zapisano.");

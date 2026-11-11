@@ -1,6 +1,6 @@
 import { createIdGenerator, safeValidateUIMessages } from "ai";
 import { prisma } from "@/lib/db/client";
-import { ChatPartsJson, ClarificationInput, type ChatUIMessage } from "@/lib/schemas/chat";
+import { ChatPartsJson, chatValidationTools, type ChatUIMessage } from "@/lib/schemas/chat";
 
 // Id wiadomości generuje wyłącznie serwer. Typ "brandowany" sprawia, że do zapisu nie da się
 // przekazać zwykłego stringa (np. id z żądania klienta), tylko wynik newChatMessageId().
@@ -11,10 +11,6 @@ const generateId = createIdGenerator({ prefix: "msg", size: 24 });
 export function newChatMessageId(): ChatMessageId {
   return generateId() as ChatMessageId;
 }
-
-const validationTools = {
-  ask_clarification: { inputSchema: ClarificationInput, outputSchema: ClarificationInput },
-};
 
 /**
  * Historia wspólnego wątku projektu (D2): zawsze filtrowana po projectId, od najstarszej do najnowszej.
@@ -35,7 +31,7 @@ export async function listChatMessages(projectId: string, limit: number): Promis
     .reverse()
     .map((row) => ({ id: row.id, role: row.role === "USER" ? "user" : "assistant", parts: row.parts }));
 
-  const validated = await safeValidateUIMessages<ChatUIMessage>({ messages: candidates, tools: validationTools });
+  const validated = await safeValidateUIMessages<ChatUIMessage>({ messages: candidates, tools: chatValidationTools });
   if (!validated.success) {
     throw new Error(`Niepoprawna historia czatu projektu ${projectId}: ${validated.error.message}`);
   }

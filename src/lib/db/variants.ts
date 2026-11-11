@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/client";
+import type { PrismaClient } from "@/generated/prisma/client";
 import { BmcState } from "@/lib/schemas/bmc";
 
 export const MAIN_VARIANT_NAME = "Wariant główny";
@@ -57,6 +58,24 @@ export async function getVariantForProject(
   return { id: variant.id, version: variant.version, state: parsed.data };
 }
 
+/**
+ * Optymistyczne blokowanie: zapis przechodzi tylko wtedy, gdy nikt nie zmienił wersji w międzyczasie.
+ * Przyjmuje klienta (także transakcyjnego), żeby akceptacja propozycji mogła zapisać stan
+ * i zmienić status propozycji w jednej transakcji. Zwraca liczbę zmienionych wierszy (0 = konflikt).
+ */
+export async function writeVariantStateIfVersion(
+  client: Pick<PrismaClient, "bmcVariant">,
+  variantId: string,
+  expectedVersion: number,
+  state: BmcState,
+): Promise<number> {
+  const { count } = await client.bmcVariant.updateMany({
+    where: { id: variantId, version: expectedVersion },
+    data: { state, version: { increment: 1 } },
+  });
+  return count;
+}
+
 export type SaveVariantResult =
   | { ok: true; version: number }
   | { ok: false; error: "VALIDATION"; message: string }
@@ -72,10 +91,6 @@ export async function saveVariantState(
     return { ok: false, error: "VALIDATION", message: z.prettifyError(parsed.error) };
   }
 
-  // Optymistyczne blokowanie: zapis przechodzi tylko wtedy, gdy nikt nie zmienił wersji w międzyczasie.
-  const { count } = await prisma.bmcVariant.updateMany({
-    where: { id: variantId, version: expectedVersion },
-    data: { state: parsed.data, version: { increment: 1 } },
-  });
+  const count = await writeVariantStateIfVersion(prisma, variantId, expectedVersion, parsed.data);
   return count === 0 ? { ok: false, error: "VERSION_CONFLICT" } : { ok: true, version: expectedVersion + 1 };
 }

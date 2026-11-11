@@ -2,6 +2,11 @@ import type { UIDataTypes, UIMessage } from "ai";
 import { z } from "zod";
 import { VariantId } from "@/lib/schemas/bmc";
 import { ProjectId } from "@/lib/schemas/project";
+import {
+  ProposeBlockChangeInput,
+  ProposeBlockChangeOutput,
+  type ProposeBlockChangeToolInput,
+} from "@/lib/schemas/proposal";
 
 // Domyślny limit długości wiadomości; serwer egzekwuje wartość z CHAT_MAX_MESSAGE_CHARS (src/lib/ai/config.ts).
 export const CHAT_MESSAGE_MAX_CHARS = 4000;
@@ -44,6 +49,13 @@ export type ClarificationInput = z.infer<typeof ClarificationInput>;
 // Typy narzędzi dla UI (współdzielone z komponentem klienckim bez importu kodu serwerowego).
 export type ChatTools = {
   ask_clarification: { input: ClarificationInput; output: ClarificationInput };
+  propose_block_change: { input: ProposeBlockChangeToolInput; output: ProposeBlockChangeOutput };
+};
+
+// Schematy narzędzi do walidacji zapisanych wiadomości (historia z bazy, odpowiedź przed zapisem).
+export const chatValidationTools = {
+  ask_clarification: { inputSchema: ClarificationInput, outputSchema: ClarificationInput },
+  propose_block_change: { inputSchema: ProposeBlockChangeInput, outputSchema: ProposeBlockChangeOutput },
 };
 export type ChatUIMessage = UIMessage<unknown, UIDataTypes, ChatTools>;
 

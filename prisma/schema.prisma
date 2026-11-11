@@ -19,6 +19,18 @@ enum ChatRole {
   ASSISTANT
 }
 
+enum ProposalStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum ProposalOperation {
+  ADD
+  EDIT
+  REMOVE
+}
+
 enum Role {
   OWNER
   EDITOR
@@ -26,14 +38,16 @@ enum Role {
 }
 
 model User {
-  id           String          @id @default(cuid())
-  email        String          @unique
-  name         String?
-  passwordHash String
-  createdAt    DateTime        @default(now())
-  members      ProjectMember[]
-  llmCalls     LlmCallLog[]
-  chatMessages ChatMessage[]
+  id                String          @id @default(cuid())
+  email             String          @unique
+  name              String?
+  passwordHash      String
+  createdAt         DateTime        @default(now())
+  members           ProjectMember[]
+  llmCalls          LlmCallLog[]
+  chatMessages      ChatMessage[]
+  proposalsCreated  Proposal[]      @relation("ProposalCreatedBy")
+  proposalsResolved Proposal[]      @relation("ProposalResolvedBy")
 }
 
 model Project {
@@ -64,15 +78,16 @@ model ProjectMember {
 // "BmcVariant_projectId_main_key" ON ("projectId") WHERE "isMain" jest dopisany
 // ręcznie do SQL migracji bmc_variant (Prisma 7.10 obsługuje takie indeksy tylko w preview).
 model BmcVariant {
-  id        String   @id @default(cuid())
+  id        String     @id @default(cuid())
   projectId String
   name      String
-  isMain    Boolean  @default(false)
+  isMain    Boolean    @default(false)
   state     Json // BmcState, walidowany Zod przy zapisie i odczycie
-  version   Int      @default(1)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  version   Int        @default(1)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  proposals Proposal[]
 
   @@index([projectId])
 }
@@ -112,4 +127,26 @@ model ChatMessage {
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([projectId, createdAt])
+}
+
+// Propozycja zmiany od agenta (human-in-the-loop). Stan BMC zmienia się dopiero po akceptacji.
+model Proposal {
+  id           String            @id @default(cuid())
+  variantId    String
+  blockKey     String // BlockKey, walidowany Zod przy zapisie i odczycie
+  operation    ProposalOperation
+  before       String? // ADD: null; EDIT/REMOVE: dokładny tekst istniejącego wpisu
+  after        String? // REMOVE: null; ADD/EDIT: nowy wpis
+  rationale    String
+  status       ProposalStatus    @default(PENDING)
+  baseVersion  Int // version wariantu w chwili propozycji
+  createdById  String? // użytkownik, w którego rozmowie powstała propozycja
+  resolvedById String? // kto zaakceptował lub odrzucił
+  resolvedAt   DateTime?
+  createdAt    DateTime          @default(now())
+  variant      BmcVariant        @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  createdBy    User?             @relation("ProposalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  resolvedBy   User?             @relation("ProposalResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([variantId, status])
 }

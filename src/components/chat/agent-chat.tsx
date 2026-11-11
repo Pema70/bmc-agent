@@ -3,12 +3,18 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { ProposalCard } from "@/components/chat/proposal-card";
 import { CHAT_MESSAGE_MAX_CHARS, type ChatUIMessage } from "@/lib/schemas/chat";
+import type { ProposalStatus } from "@/lib/schemas/proposal";
 
 type AgentChatProps = {
   projectId: string;
   variantId: string;
   initialMessages: ChatUIMessage[];
+  // Wersja wariantu z ładowania strony (zmienia się po akceptacji propozycji w tym panelu).
+  variantVersion: number;
+  // Statusy ostatnich propozycji wariantu z bazy (klucz: id propozycji).
+  proposalStatuses: Record<string, ProposalStatus>;
 };
 
 const GENERIC_ERROR = "Nie udało się uzyskać odpowiedzi od agenta. Spróbuj ponownie.";
@@ -29,7 +35,7 @@ function errorText(error: Error | undefined): string | null {
   return error.message && error.message.length <= 300 ? error.message : GENERIC_ERROR;
 }
 
-export function AgentChat({ projectId, variantId, initialMessages }: AgentChatProps) {
+export function AgentChat({ projectId, variantId, initialMessages, variantVersion, proposalStatuses }: AgentChatProps) {
   const transport = useMemo(
     () =>
       new DefaultChatTransport<ChatUIMessage>({
@@ -51,6 +57,10 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
   });
 
   const [input, setInput] = useState("");
+  const [statuses, setStatuses] = useState<Record<string, ProposalStatus>>(proposalStatuses);
+  const [version, setVersion] = useState(variantVersion);
+  // Propozycje z wiadomości dołączonych w tej sesji są świeże (PENDING), starsze znamy z bazy.
+  const [initialIds] = useState(() => new Set(initialMessages.map((message) => message.id)));
   const bottomRef = useRef<HTMLDivElement>(null);
   const busy = status === "submitted" || status === "streaming";
   const errorMessage = errorText(error);
@@ -81,6 +91,13 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
   }
 
   const lastMessageId = messages[messages.length - 1]?.id;
+
+  function onResolved(proposalId: string, status: ProposalStatus, newVersion?: number) {
+    setStatuses((current) => ({ ...current, [proposalId]: status }));
+    if (newVersion !== undefined) {
+      setVersion(newVersion);
+    }
+  }
 
   return (
     <section
@@ -150,6 +167,34 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
                       return (
                         <p key={index} className="text-zinc-500">
                           Agent formułuje pytanie…
+                        </p>
+                      );
+                  }
+                }
+                if (part.type === "tool-propose_block_change") {
+                  switch (part.state) {
+                    case "output-available":
+                      return part.output.ok ? (
+                        <ProposalCard
+                          key={part.output.proposal.id}
+                          proposal={part.output.proposal}
+                          status={statuses[part.output.proposal.id] ?? (initialIds.has(message.id) ? undefined : "PENDING")}
+                          projectId={projectId}
+                          variantId={variantId}
+                          version={version}
+                          onResolved={onResolved}
+                        />
+                      ) : null;
+                    case "output-error":
+                      return (
+                        <p key={index} className="text-red-700 dark:text-red-400">
+                          Agent przygotował niepoprawną propozycję. Napisz, co chcesz zrobić dalej.
+                        </p>
+                      );
+                    default:
+                      return (
+                        <p key={index} className="text-zinc-500">
+                          Agent przygotowuje propozycję…
                         </p>
                       );
                   }

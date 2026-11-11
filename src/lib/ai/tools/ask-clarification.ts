@@ -10,5 +10,3 @@ export const askClarificationTool = tool({
   inputSchema: ClarificationInput,
   execute: async (input) => input,
 });
-
-export const chatTools = { ask_clarification: askClarificationTool };

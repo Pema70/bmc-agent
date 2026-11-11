@@ -131,3 +131,30 @@ describe("saveChatMessage", () => {
     expect(create).not.toHaveBeenCalled();
   });
 });
+
+describe("listChatMessages: części propose_block_change", () => {
+  const proposal = { id: "pr1", blockKey: "channels", operation: "add", before: null, after: "Targi", rationale: "r" };
+  const toolPart = (output: unknown) => ({
+    type: "tool-propose_block_change",
+    toolCallId: "c1",
+    state: "output-available",
+    input: { blockKey: "channels", operation: "add", after: "Targi", rationale: "r" },
+    output,
+  });
+
+  it("przyjmuje poprawny wynik narzędzia z propozycją", async () => {
+    findMany.mockResolvedValue([{ id: "m1", role: "ASSISTANT", parts: [toolPart({ ok: true, proposal })] }]);
+
+    const messages = await listChatMessages("p1", 30);
+
+    expect(messages[0].parts[0]).toMatchObject({ type: "tool-propose_block_change", output: { ok: true } });
+  });
+
+  it("odrzuca wynik narzędzia niezgodny ze schematem (np. propozycja bez id)", async () => {
+    findMany.mockResolvedValue([
+      { id: "m1", role: "ASSISTANT", parts: [toolPart({ ok: true, proposal: { ...proposal, id: undefined } })] },
+    ]);
+
+    await expect(listChatMessages("p1", 30)).rejects.toThrow("Niepoprawna historia czatu");
+  });
+});

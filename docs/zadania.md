@@ -19,6 +19,8 @@ Rzeczy świadomie odłożone. Każda pozycja to osobny, mały PR po uzgodnieniu 
 
 - **Ostrzeżenie przy nawigacji wewnątrz aplikacji.** Znane ograniczenie z PR 2c: `beforeunload` łapie tylko zamknięcie karty, odświeżenie i wpisanie adresu. Nie łapie nawigacji wewnątrz aplikacji, więc kliknięcie np. „← Wszystkie projekty” przy niezapisanych zmianach gubi je bez ostrzeżenia. Ostrzeżenie dla linków wewnętrznych (przechwytywanie nawigacji App Routera) to osobna, większa zmiana.
 
+- **Duplikaty wpisów w bloku a propozycje agenta.** Wpisy to zwykłe stringi (spec §4, D4), więc użytkownik może ręcznie wpisać dwa identyczne wpisy w jednym bloku. Propozycje EDIT i REMOVE (PR 3c) wskazują wpis tekstem `before`, więc dotyczą pierwszego pasującego i nie da się wskazać drugiego duplikatu. Propozycja ADD identycznego wpisu jest odrzucana (agent dostaje `ok: false` i może ją poprawić). Do rozważenia: unikalne id wpisów albo blokada duplikatów przy zapisie płótna.
+
 ## Dokumentacja i narzędzia
 
 - **Ujednolicenie końców linii (`.gitattributes`).** Na Windows Git zamienia LF na CRLF, przez co np. `prisma/migrations/migration_lock.toml` pokazuje się jako zmieniony mimo pustego `git diff`. Dodać `.gitattributes` (np. `* text=auto eol=lf`) i sprawdzić, że nie zmienia sum kontrolnych zastosowanych migracji.
