@@ -1,7 +1,7 @@
 import { APICallError, LoadAPIKeyError, RetryError, StreamProviderError } from "ai";
 import type { LlmCallStatus } from "@/generated/prisma/client";
 
-export type LlmErrorKind = "RATE_LIMIT" | "AUTH" | "TIMEOUT" | "CONFIG" | "UNKNOWN";
+export type LlmErrorKind = "RATE_LIMIT" | "UNAVAILABLE" | "AUTH" | "TIMEOUT" | "CONFIG" | "UNKNOWN";
 
 export type ClassifiedLlmError = {
   kind: LlmErrorKind;
@@ -14,6 +14,7 @@ export type ClassifiedLlmError = {
 
 const MESSAGES: Record<LlmErrorKind, string> = {
   RATE_LIMIT: "Przekroczono limit zapytań modelu (darmowy plan). Spróbuj ponownie za chwilę.",
+  UNAVAILABLE: "Model jest chwilowo niedostępny (przeciążenie dostawcy). Spróbuj ponownie za chwilę.",
   AUTH: "Model odrzucił zapytanie: klucz API jest błędny lub nie ma uprawnień. Sprawdź konfigurację serwera.",
   TIMEOUT: "Model nie odpowiedział na czas. Spróbuj ponownie.",
   CONFIG: "Agent jest źle skonfigurowany (model lub klucz API). Sprawdź konfigurację serwera.",
@@ -42,6 +43,9 @@ export function classifyLlmError(error: unknown): ClassifiedLlmError {
   const statusCode = statusCodeOf(cause);
   if (statusCode === 429) {
     return { kind: "RATE_LIMIT", status: "PROVIDER_RATE_LIMIT", errorCode: "429", message: MESSAGES.RATE_LIMIT };
+  }
+  if (statusCode === 503 || statusCode === 502) {
+    return { kind: "UNAVAILABLE", status: "ERROR", errorCode: String(statusCode), message: MESSAGES.UNAVAILABLE };
   }
   if (statusCode === 401 || statusCode === 403) {
     return { kind: "AUTH", status: "ERROR", errorCode: String(statusCode), message: MESSAGES.AUTH };

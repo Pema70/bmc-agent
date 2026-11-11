@@ -31,12 +31,13 @@ export type LlmCallRecord = {
 /**
  * Zapisuje jedno wywołanie LLM. Nie przyjmuje treści promptów ani odpowiedzi, a kod błędu
  * ma być krótkim kodem (np. "429"), nie komunikatem dostawcy. Błąd zapisu logu nie może
- * przerwać odpowiedzi dla użytkownika, więc jest jawnie raportowany w logu serwera.
+ * przerwać odpowiedzi dla użytkownika, więc jest jawnie raportowany w logu serwera (wtedy wynik to null).
+ * Zwraca id zapisanego wiersza, żeby wynik (np. ocena) mógł się do niego odwołać.
  */
-export async function logLlmCall(record: LlmCallRecord): Promise<void> {
+export async function logLlmCall(record: LlmCallRecord): Promise<string | null> {
   const usage = record.usage ?? {};
   try {
-    await prisma.llmCallLog.create({
+    const row = await prisma.llmCallLog.create({
       data: {
         projectId: record.projectId ?? null,
         userId: record.userId ?? null,
@@ -52,8 +53,11 @@ export async function logLlmCall(record: LlmCallRecord): Promise<void> {
         status: record.status,
         errorCode: record.errorCode?.slice(0, 100) ?? null,
       },
+      select: { id: true },
     });
+    return row?.id ?? null;
   } catch (error) {
     console.error("[ai] Nie udało się zapisać LlmCallLog:", error instanceof Error ? error.message : "nieznany błąd");
+    return null;
   }
 }

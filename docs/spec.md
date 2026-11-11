@@ -137,6 +137,8 @@ model LlmCallLog {
 }
 ```
 
+Wynik `evaluate_bmc` zapisuje model `EvaluationResult` (krok 4; szczegóły w `docs/plan-krok-4.md`): `projectId`, `variantId`, `variantVersion`, `stateSnapshot` (oceniany stan), `result` (Json, `EvaluationOutput` walidowany Zod), `schemaVersion`, `source` (`AI` | `MANUAL`), `trigger` (`UI` | `CHAT`), `provider`, `model`, `promptVersion`, `llmCallLogId`, `createdById`, `createdAt`. Odpowiedź niezgodna ze schematem nie jest zapisywana (`LlmCallLog.status = SCHEMA_ERROR`).
+
 ## 6. Agent AI
 
 ### Kontekst
@@ -153,11 +155,11 @@ Wszystkie argumenty i wyniki są walidowane schematami Zod.
 | `propose_block_change` | narzędzie czatu | `blockKey`, `operation` (add / edit / remove), `before`, `after`, `rationale` | rekord `Proposal` ze statusem PENDING. **Stan BMC się nie zmienia.** |
 | `read_attachment` | narzędzie czatu | `attachmentId` (i opcjonalnie zakres) | wyekstrahowany tekst (z limitem długości) |
 | `analyze_impact` | analiza | `blockKey`, `change` | lista dotkniętych bloków z opisem wpływu i stopniem (niski/średni/wysoki) |
-| `evaluate_bmc` | analiza | stan BMC | obiekt z ocenami 1 do 10 dla kryteriów (spójność, ryzyko, realność, innowacyjność) i krótkim uzasadnieniem do każdego |
+| `evaluate_bmc` | analiza | stan BMC (w narzędziu czatu bez argumentów: stan czyta serwer) | obiekt z ocenami 1 do 10 dla kryteriów `coherence` (spójność), `risk_resilience` (ryzyko, **10 = niskie ryzyko**), `feasibility` (realność), `innovation` (innowacyjność) i krótkim uzasadnieniem do każdego. Wszystkie osie: więcej = lepiej. Etykieta PL ryzyka: „Ryzyko (10 = niskie)” |
 | `generate_strategies` | analiza | stan BMC, opcjonalnie wytyczne użytkownika | 2 do 3 wariantów pełnego BMC (każdy zgodny z `BmcState`) z nazwą i założeniem strategii |
 | `compare_variants` | analiza | lista `variantId` | różnice blok po bloku, zalety i wady każdego wariantu, rekomendacja |
 
-**Uwaga implementacyjna:** cztery narzędzia analityczne (`analyze_impact`, `evaluate_bmc`, `generate_strategies`, `compare_variants`) mogą być wywoływane zarówno przez agenta w rozmowie, jak i bezpośrednio z interfejsu (przyciski typu "Oceń model"). W obu przypadkach używają tej samej funkcji generującej obiekt według schematu Zod (`generateObject`). Wybór sposobu wywołania zapisz w kodzie jednym, spójnym wzorcem.
+**Uwaga implementacyjna:** cztery narzędzia analityczne (`analyze_impact`, `evaluate_bmc`, `generate_strategies`, `compare_variants`) mogą być wywoływane zarówno przez agenta w rozmowie, jak i bezpośrednio z interfejsu (przyciski typu "Oceń model"). W obu przypadkach używają tej samej funkcji generującej obiekt według schematu Zod: `generateText` z `output: Output.object({ schema })` (AI SDK 7; `generateObject` jest tam oznaczony jako przestarzały). Wybór sposobu wywołania zapisz w kodzie jednym, spójnym wzorcem.
 
 ### Prompty
 

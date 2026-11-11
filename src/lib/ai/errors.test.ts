@@ -33,6 +33,14 @@ describe("classifyLlmError", () => {
     expect(classifyLlmError(error)).toMatchObject({ kind: "RATE_LIMIT", errorCode: "429" });
   });
 
+  it("503 i 502 to chwilowa niedostępność dostawcy", () => {
+    expect(classifyLlmError(apiError(503))).toMatchObject({ kind: "UNAVAILABLE", errorCode: "503", status: "ERROR" });
+    expect(classifyLlmError(apiError(502)).kind).toBe("UNAVAILABLE");
+    expect(toUserFacingError(apiError(503))).toBe(
+      "Model jest chwilowo niedostępny (przeciążenie dostawcy). Spróbuj ponownie za chwilę.",
+    );
+  });
+
   it("401 i 403 to błąd klucza API", () => {
     expect(classifyLlmError(apiError(401))).toMatchObject({ kind: "AUTH", errorCode: "401", status: "ERROR" });
     expect(classifyLlmError(apiError(403)).kind).toBe("AUTH");
