@@ -59,7 +59,14 @@ describe("logLlmCall", () => {
         status: "OK",
         errorCode: null,
       },
+      select: { id: true },
     });
+  });
+
+  it("zwraca id zapisanego wiersza", async () => {
+    create.mockResolvedValue({ id: "log-1" });
+
+    await expect(logLlmCall({ ...base, status: "OK" })).resolves.toBe("log-1");
   });
 
   it("zapisuje błąd bez tokenów i kosztu", async () => {
@@ -75,7 +82,7 @@ describe("logLlmCall", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     create.mockRejectedValue(new Error("baza niedostępna"));
 
-    await expect(logLlmCall(base)).resolves.toBeUndefined();
+    await expect(logLlmCall(base)).resolves.toBeNull();
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
   });
