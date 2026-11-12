@@ -189,3 +189,13 @@ D1–D6, D8–D11 zgodnie z rekomendacjami, D12 zaakceptowany ze zmianami powyż
 2. Commit `docs:` z `docs/plan-krok-4.md` (1:1 ten plik) i zmianami w `spec.md`.
 3. **Stop:** potwierdzenie schematu `EvaluationResult` (D12) przed migracją.
 4. Schemat Zod, prompt, `runEvaluation`, `logLlmCall` ze zwracanym id, `UNAVAILABLE`, testy, weryfikacja, PR.
+
+## Stan po kroku 4 (2026-11-12)
+
+PR 4a-4d zmergowane (#13-#16). PR 4e (ręczna ocena) odłożony do przygotowań do testów, przed krokiem 10 (wpis w `docs/zadania.md`).
+
+**Pomiar z 4b (jedno prawdziwe wywołanie, dane przykładowe, `google` / `gemini-3.5-flash-lite`):** schemat `.strict()` z `minimum`/`maximum` przyjęty (HTTP 200), oceny w zakresie 1-10, `finishReason` STOP, 1788 tokenów wejścia i 397 wyjścia (limit 2000, `TRUNCATED` nie wystąpił), koszt hipotetyczny 0.0015 USD (darmowy plan), 2089 ms. Wiersze `LlmCallLog` (`evaluate_bmc`, `evaluate-v1`) i `EvaluationResult` poprawne. Osobny limit tokenów dla oceny niepotrzebny; ewentualna zmienna `EVALUATION_MAX_OUTPUT_TOKENS` opisana w `docs/zadania.md`.
+
+**Weryfikacja ręczna w przeglądarce (wykonana przez właściciela repozytorium, nie przez Claude Code):** wykres radarowy (4c), karta oceny w czacie i `router.refresh()` odświeżające panel (4d) oraz akceptacja pustego schematu wejścia narzędzia `evaluate_bmc` przez Gemini. Testy automatyczne obejmują te elementy tylko na mockach.
+
+**Wynik ręcznych prób, który trafił do `docs/zadania.md`:** agent uruchomił ocenę od nowa na pytanie o wyjaśnienie oceny.
