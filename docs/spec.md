@@ -184,7 +184,7 @@ Wszystkie argumenty i wyniki są walidowane schematami Zod.
 
 - Edytor BMC: siatka dziewięciu bloków w układzie klasycznego płótna.
 - **Przejrzystość zmian AI:** propozycje agenta wyświetlane jako podświetlony diff w bloku (usunięte i dodane wpisy) z przyciskami "Zaakceptuj" i "Odrzuć".
-- Wykres radarowy (Recharts) z wynikami `evaluate_bmc`.
+- Wykres radarowy (SVG) z wynikami `evaluate_bmc`.
 - Widok porównania wariantów obok siebie z podświetlonymi różnicami.
 - Czat z agentem (streaming) obok płótna.
 

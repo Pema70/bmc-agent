@@ -4,8 +4,10 @@ import { useState, useTransition } from "react";
 import { evaluateModelAction } from "@/app/projekty/[id]/evaluation-actions";
 import { DIRTY_MESSAGE, useOptionalVariantWorkspace } from "@/components/bmc/variant-workspace";
 import type { EvaluationListItem } from "@/lib/db/evaluations";
+import { RadarChart, type RadarSeries } from "@/components/evaluation/radar-chart";
 import { formatEvaluationDate, formatEvaluationSource, isEvaluationStale } from "@/lib/evaluation/format";
-import { CRITERION_LABELS, EVALUATION_CRITERIA, SCORE_MAX } from "@/lib/schemas/evaluation";
+import { comparableEvaluations } from "@/lib/evaluation/radar";
+import { CRITERION_LABELS, EVALUATION_CRITERIA, SCORE_MAX, type EvaluationView } from "@/lib/schemas/evaluation";
 
 const GENERIC_ERROR = "Nie udało się wykonać oceny. Sprawdź połączenie i spróbuj ponownie.";
 
@@ -26,11 +28,21 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
 
   const [items, setItems] = useState<EvaluationListItem[]>(initialItems);
   const [selectedId, setSelectedId] = useState<string | null>(() => firstValidId(initialItems));
+  const [compareId, setCompareId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const selected = items.find((item) => item.ok && item.evaluation.id === selectedId);
   const evaluation = selected?.ok ? selected.evaluation : null;
+  // Do nałożenia tylko poprawnie odczytane oceny z tym samym schemaVersion; uszkodzone wiersze nie są wybieralne.
+  const comparable = comparableEvaluations(items, selectedId);
+  const overlay = comparable.find((item) => item.id === compareId) ?? null;
+  const series: RadarSeries[] = evaluation
+    ? [{ id: evaluation.id, legend: `Wybrana: ${describe(evaluation)}`, result: evaluation.result }]
+    : [];
+  if (evaluation && overlay) {
+    series.push({ id: overlay.id, legend: `Nałożona: ${describe(overlay)}`, result: overlay.result });
+  }
 
   function evaluate() {
     if (dirty || pending) {
@@ -99,6 +111,24 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
               Ocena dotyczy wersji {evaluation.variantVersion} modelu, aktualna wersja to {version}.
             </p>
           ) : null}
+          <RadarChart series={series} />
+          {comparable.length > 0 ? (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium">Nałóż drugą ocenę</span>
+              <select
+                value={overlay ? overlay.id : ""}
+                onChange={(event) => setCompareId(event.target.value)}
+                className="rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 dark:border-zinc-700"
+              >
+                <option value="">Bez nakładki</option>
+                {comparable.map((item) => (
+                  <option key={item.id} value={item.id} className="bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
+                    {describe(item)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <table className="w-full border-collapse text-left text-sm">
             <caption className="sr-only">Oceny kryteriów modelu BMC w skali 1-{SCORE_MAX}</caption>
             <thead>
@@ -166,6 +196,10 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
       ) : null}
     </section>
   );
+}
+
+function describe(evaluation: EvaluationView): string {
+  return `${formatEvaluationDate(evaluation.createdAt)} · ${formatEvaluationSource(evaluation)}`;
 }
 
 function firstValidId(items: EvaluationListItem[]): string | null {
