@@ -555,7 +555,7 @@ describe("POST /api/chat: evaluate_bmc", () => {
 
     expect(mocks.runEvaluation).toHaveBeenCalledTimes(1);
     const thirdCallPrompt = JSON.stringify(model.doStreamCalls[2].prompt);
-    expect(thirdCallPrompt).toContain("już uruchomiona");
+    expect(thirdCallPrompt).toContain("najwyżej jedna na turę");
   });
 
   it("błąd oceny (limit dostawcy): model dostaje { ok: false, error } po polsku i nie ponawia w tej turze", async () => {
