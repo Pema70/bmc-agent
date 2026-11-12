@@ -120,3 +120,72 @@ export type ImpactView = {
   promptVersion: string;
   result: ImpactOutput;
 };
+
+/**
+ * Argumenty narzędzia czatu analyze_impact. Płaski obiekt z polami .nullish(): modele często wysyłają null
+ * zamiast pominąć pole, a null znaczy "brak". Reguła "dokładnie jedna forma" jest sprawdzana w execute
+ * (resolveImpactToolRequest), bo .refine nie trafia do JSON Schema przekazywanego dostawcy.
+ * Długości sprawdza dopiero ImpactChangeRequest, żeby model dostał czytelny komunikat zamiast błędu SDK.
+ */
+export const AnalyzeImpactToolInput = z.object({
+  proposalId: z
+    .string()
+    .nullish()
+    .describe(
+      "Forma 1: identyfikator oczekującej propozycji z wyniku propose_block_change w tej rozmowie. Inaczej pomiń lub null.",
+    ),
+  blockKey: BlockKey.nullish().describe("Forma 2: klucz zmienianego bloku BMC. Razem z description. Inaczej pomiń lub null."),
+  description: z
+    .string()
+    .nullish()
+    .describe("Forma 2: opis zmiany po polsku, 5-500 znaków, na podstawie prośby użytkownika. Inaczej pomiń lub null."),
+});
+export type AnalyzeImpactToolInput = z.infer<typeof AnalyzeImpactToolInput>;
+
+export const ANALYZE_IMPACT_FORM_MESSAGE =
+  "Podaj dokładnie jedną formę argumentów: samo proposalId albo blockKey razem z description (pozostałe pola pomiń lub ustaw null).";
+
+function presentText(value: string | null | undefined): string | null {
+  // null, undefined i pusty tekst oznaczają brak pola.
+  return value === null || value === undefined || value.trim() === "" ? null : value;
+}
+
+/**
+ * Z argumentów modelu robi ImpactChangeRequest albo zwraca polski komunikat dla modelu. Dokładnie jedna forma:
+ * (a) tylko proposalId, albo (b) blockKey razem z description.
+ */
+export function resolveImpactToolRequest(
+  input: AnalyzeImpactToolInput,
+): { ok: true; request: ImpactChangeRequest } | { ok: false; error: string } {
+  const proposalId = presentText(input.proposalId);
+  const blockKey = input.blockKey ?? null;
+  const description = presentText(input.description);
+
+  const hasProposal = proposalId !== null;
+  const hasDescriptionForm = blockKey !== null || description !== null;
+  if (hasProposal === hasDescriptionForm) {
+    return { ok: false, error: ANALYZE_IMPACT_FORM_MESSAGE };
+  }
+
+  const candidate = hasProposal ? { kind: "PROPOSAL", proposalId } : { kind: "DESCRIPTION", blockKey, description };
+  const parsed = ImpactChangeRequest.safeParse(candidate);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: hasProposal
+        ? "Nieprawidłowe proposalId."
+        : `Nieprawidłowy opis zmiany: podaj blockKey oraz description (${IMPACT_DESCRIPTION_MIN_LENGTH}-${IMPACT_DESCRIPTION_MAX_LENGTH} znaków).`,
+    };
+  }
+  return { ok: true, request: parsed.data };
+}
+
+/**
+ * Wynik narzędzia czatu analyze_impact widoczny dla modelu: tylko identyfikator zapisanej analizy (z bazy)
+ * albo polski komunikat błędu. Model nie dostaje wyniku analizy, a kartę UI czyta z bazy.
+ */
+export const AnalyzeImpactOutput = z.discriminatedUnion("ok", [
+  z.strictObject({ ok: z.literal(true), analysisId: z.string().min(1) }),
+  z.strictObject({ ok: z.literal(false), error: z.string().min(1) }),
+]);
+export type AnalyzeImpactOutput = z.infer<typeof AnalyzeImpactOutput>;

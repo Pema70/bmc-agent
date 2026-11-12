@@ -1,5 +1,6 @@
 import { askClarificationTool } from "@/lib/ai/tools/ask-clarification";
 import { createHeavyToolGate } from "@/lib/ai/tools/heavy-gate";
+import { createAnalyzeImpactTool } from "@/lib/ai/tools/analyze-impact";
 import { createEvaluateBmcTool, type EvaluateToolContext } from "@/lib/ai/tools/evaluate-bmc";
 import { createProposeBlockChangeTool, type ProposeToolContext } from "@/lib/ai/tools/propose-block-change";
 
@@ -11,5 +12,6 @@ export function createChatTools(context: ProposeToolContext & EvaluateToolContex
     ask_clarification: askClarificationTool,
     propose_block_change: createProposeBlockChangeTool(context),
     evaluate_bmc: createEvaluateBmcTool({ ...context, gate }),
+    analyze_impact: createAnalyzeImpactTool({ ...context, gate }),
   };
 }
