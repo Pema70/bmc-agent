@@ -4,7 +4,8 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState, type
 import { analyzeImpactAction } from "@/app/projekty/[id]/impact-actions";
 import { useOptionalVariantWorkspace } from "@/components/bmc/variant-workspace";
 import type { ImpactListItem } from "@/lib/db/impact";
-import type { ImpactChangeRequest } from "@/lib/schemas/impact";
+import { impactHighlights, type ImpactHighlights } from "@/lib/impact/highlights";
+import type { ImpactChangeRequest, ImpactView } from "@/lib/schemas/impact";
 
 const GENERIC_ERROR = "Nie udało się wykonać analizy. Sprawdź połączenie i spróbuj ponownie.";
 
@@ -23,6 +24,13 @@ export type ImpactContextValue = {
   pendingScope: ImpactScope | null;
   error: { scope: ImpactScope; text: string } | null;
   select: (id: string) => void;
+  // Analiza wyświetlana na płótnie. Wyliczana z listy, więc znika razem z rekordem (zmiana wariantu, odświeżenie)
+  // i uszkodzony rekord nigdy nie trafia na płótno.
+  activeId: string | null;
+  active: ImpactView | null;
+  highlights: ImpactHighlights | null;
+  show: (id: string) => void;
+  hide: () => void;
   analyze: (scope: ImpactScope, request: ImpactChangeRequest) => Promise<boolean>;
 };
 
@@ -58,6 +66,7 @@ export function ImpactProvider({ projectId, variantId, canAnalyze, currentVersio
 
   const [items, setItems] = useState<ImpactListItem[]>(initialItems);
   const [selectedId, setSelectedId] = useState<string | null>(() => firstValidId(initialItems));
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [pendingScope, setPendingScope] = useState<ImpactScope | null>(null);
   const [error, setError] = useState<ImpactContextValue["error"]>(null);
 
@@ -93,6 +102,14 @@ export function ImpactProvider({ projectId, variantId, canAnalyze, currentVersio
     [projectId, variantId, dirty],
   );
 
+  const active = useMemo(() => {
+    const found = items.find((item) => item.ok && item.analysis.id === activeId);
+    return found?.ok ? found.analysis : null;
+  }, [items, activeId]);
+  const highlights = useMemo(() => (active ? impactHighlights(active) : null), [active]);
+  const show = useCallback((id: string) => setActiveId(id), []);
+  const hide = useCallback(() => setActiveId(null), []);
+
   const value = useMemo<ImpactContextValue>(
     () => ({
       projectId,
@@ -105,9 +122,14 @@ export function ImpactProvider({ projectId, variantId, canAnalyze, currentVersio
       pendingScope,
       error,
       select: setSelectedId,
+      activeId: active ? activeId : null,
+      active,
+      highlights,
+      show,
+      hide,
       analyze,
     }),
-    [projectId, variantId, canAnalyze, version, dirty, items, selectedId, pendingScope, error, analyze],
+    [projectId, variantId, canAnalyze, version, dirty, items, selectedId, pendingScope, error, analyze, active, activeId, highlights, show, hide],
   );
 
   return <ImpactContext.Provider value={value}>{children}</ImpactContext.Provider>;

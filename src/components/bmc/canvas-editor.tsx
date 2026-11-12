@@ -2,9 +2,11 @@
 
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { saveCanvasAction } from "@/app/projekty/[id]/actions";
-import { BLOCK_CARD, BLOCK_PLACEMENT, CANVAS_GRID } from "@/components/bmc/layout";
+import { BLOCK_CARD_BASE, BLOCK_PLACEMENT, CANVAS_GRID } from "@/components/bmc/layout";
 import { useVariantWorkspace } from "@/components/bmc/variant-workspace";
 import { ProposalCard } from "@/components/chat/proposal-card";
+import { ImpactCanvasBanner } from "@/components/impact/canvas-banner";
+import { ImpactBadge, ImpactDetails, impactBorderClass, useBlockImpact } from "@/components/impact/block-impact";
 import { proposalDiffForBlock, type BlockDiff } from "@/lib/bmc/diff";
 import {
   addEntry,
@@ -164,6 +166,8 @@ export function CanvasEditor() {
         ) : null}
       </div>
 
+      <ImpactCanvasBanner />
+
       <div className={CANVAS_GRID}>
         {BLOCK_KEYS.map((key) => (
           <BlockEditor
@@ -216,6 +220,8 @@ function BlockEditor({
   const canAdd = remainingBlock > 0 && remainingTotal > 0 && !locked;
   const proposalCount =
     diff.additions.length + diff.stale.length + diff.entries.reduce((sum, entry) => sum + entry.proposals.length, 0);
+  // Wpływ działa na ramkę i nagłówek bloku; diff propozycji zostaje wewnątrz wpisów.
+  const impact = useBlockImpact(blockKey);
   const headingId = `block-${blockKey}`;
   const errorId = `block-${blockKey}-error`;
 
@@ -254,7 +260,8 @@ function BlockEditor({
   }
 
   return (
-    <section aria-labelledby={headingId} className={`${BLOCK_CARD} ${BLOCK_PLACEMENT[blockKey]}`}>
+    <section aria-labelledby={headingId} className={`${BLOCK_CARD_BASE} ${impactBorderClass(impact)} ${BLOCK_PLACEMENT[blockKey]}`}
+    >
       <header className="flex flex-col gap-0.5">
         <div className="flex items-baseline justify-between gap-2">
           <h3 id={headingId} className="text-sm font-semibold">
@@ -267,6 +274,7 @@ function BlockEditor({
             {entries.length}/{MAX_ENTRIES_PER_BLOCK}
           </span>
         </div>
+        <ImpactBadge state={impact} />
         {proposalCount > 0 ? (
           <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
             Propozycje AI w bloku: {proposalCount}
@@ -274,6 +282,7 @@ function BlockEditor({
         ) : null}
         <p className="text-xs text-zinc-500">{BLOCK_INFO[blockKey].description}</p>
       </header>
+      <ImpactDetails state={impact} />
 
       {entries.length === 0 ? (
         <p className="text-sm text-zinc-400 italic">Brak wpisów.</p>
