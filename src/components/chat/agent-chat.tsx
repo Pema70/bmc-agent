@@ -2,8 +2,10 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useVariantWorkspace } from "@/components/bmc/variant-workspace";
+import { EvaluationCard } from "@/components/chat/evaluation-card";
 import { ProposalCard } from "@/components/chat/proposal-card";
 import { CHAT_MESSAGE_MAX_CHARS, type ChatUIMessage } from "@/lib/schemas/chat";
 import type { ProposalView } from "@/lib/schemas/proposal";
@@ -56,6 +58,8 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
     transport,
   });
 
+  const router = useRouter();
+  const refreshedEvaluations = useRef(new Set<string>());
   const [input, setInput] = useState("");
   // Propozycje z wiadomości dołączonych w tej sesji są świeże (PENDING), starsze znamy z bazy.
   const [initialIds] = useState(() => new Set(initialMessages.map((message) => message.id)));
@@ -84,6 +88,30 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
       registerProposals(fresh);
     }
   }, [messages, initialIds, registerProposals]);
+
+  // Ocena z czatu pojawia się w panelu ocen po odświeżeniu strony serwerowej na końcu tury.
+  useEffect(() => {
+    if (busy) {
+      return;
+    }
+    let needsRefresh = false;
+    for (const message of messages) {
+      if (initialIds.has(message.id)) {
+        continue;
+      }
+      for (const part of message.parts) {
+        if (part.type === "tool-evaluate_bmc" && part.state === "output-available" && part.output.ok) {
+          if (!refreshedEvaluations.current.has(part.output.evaluationId)) {
+            refreshedEvaluations.current.add(part.output.evaluationId);
+            needsRefresh = true;
+          }
+        }
+      }
+    }
+    if (needsRefresh) {
+      router.refresh();
+    }
+  }, [busy, messages, initialIds, router]);
 
   function send(text: string) {
     const trimmed = text.trim();
@@ -203,6 +231,32 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
                       return (
                         <p key={index} className="text-zinc-500">
                           Agent przygotowuje propozycję…
+                        </p>
+                      );
+                  }
+                }
+                if (part.type === "tool-evaluate_bmc") {
+                  switch (part.state) {
+                    case "output-available":
+                      // Błąd oceny (limit, 429, 503) model opisuje własnym tekstem; karta tylko dla zapisanej oceny.
+                      return part.output.ok ? (
+                        <EvaluationCard
+                          key={part.output.evaluationId}
+                          projectId={projectId}
+                          variantId={variantId}
+                          evaluationId={part.output.evaluationId}
+                        />
+                      ) : null;
+                    case "output-error":
+                      return (
+                        <p key={index} className="text-red-700 dark:text-red-400">
+                          Ocena nie powiodła się. Spróbuj ponownie za chwilę.
+                        </p>
+                      );
+                    default:
+                      return (
+                        <p key={index} className="text-zinc-500">
+                          Oceniam model…
                         </p>
                       );
                   }

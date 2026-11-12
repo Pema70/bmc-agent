@@ -122,7 +122,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
         </div>
         {variant ? (
           <EvaluationPanel
-            key={variant.id}
+            // Nowa ocena (np. z czatu, po router.refresh()) zmienia klucz, więc panel wczytuje świeżą listę.
+            key={`${variant.id}:${evaluations.length}:${newestEvaluationId(evaluations)}`}
             projectId={access.projectId}
             variantId={variant.id}
             canEvaluate={canEditCanvas}
@@ -145,4 +146,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       ) : null}
     </main>
   );
+}
+
+function newestEvaluationId(items: { ok: boolean; id?: string; evaluation?: { id: string } }[]): string {
+  const first = items[0];
+  return first ? (first.evaluation?.id ?? first.id ?? "") : "";
 }

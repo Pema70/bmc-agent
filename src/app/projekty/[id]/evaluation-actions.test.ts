@@ -5,14 +5,16 @@ const mocks = vi.hoisted(() => ({
   getVariantProjectId: vi.fn(),
   runEvaluation: vi.fn(),
   revalidatePath: vi.fn(),
+  getEvaluation: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/permissions", () => ({ requireProjectRole: mocks.requireProjectRole }));
 vi.mock("@/lib/db/variants", () => ({ getVariantProjectId: mocks.getVariantProjectId }));
 vi.mock("@/lib/ai/evaluate", () => ({ runEvaluation: mocks.runEvaluation }));
+vi.mock("@/lib/db/evaluations", () => ({ getEvaluation: mocks.getEvaluation }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 
-import { evaluateModelAction } from "@/app/projekty/[id]/evaluation-actions";
+import { evaluateModelAction, getEvaluationAction } from "@/app/projekty/[id]/evaluation-actions";
 
 const session = { user: { id: "u1", email: "jan@example.com", name: null } };
 const editorAccess = { ok: true, session, projectId: "p1", role: "EDITOR" };
@@ -133,5 +135,42 @@ describe("evaluateModelAction", () => {
 
     mocks.runEvaluation.mockResolvedValue({ ok: false, error: "TOO_EMPTY", message: "Za mało." });
     await expect(evaluateModelAction("p1", "v1")).resolves.toMatchObject({ ok: false, error: "TOO_EMPTY" });
+  });
+});
+
+describe("getEvaluationAction", () => {
+  const viewerOk = { ok: true, session, projectId: "p1", role: "VIEWER" };
+  const item = { ok: true, evaluation: { id: "e1" } };
+
+  beforeEach(() => {
+    mocks.requireProjectRole.mockResolvedValue(viewerOk);
+    mocks.getEvaluation.mockResolvedValue(item);
+  });
+
+  it("wymaga roli VIEWER i czyta ocenę z projectId z uprawnień oraz variantId", async () => {
+    const result = await getEvaluationAction("p1", "v1", "e1");
+
+    expect(mocks.requireProjectRole).toHaveBeenCalledWith("p1", "VIEWER");
+    expect(mocks.getEvaluation).toHaveBeenCalledWith("p1", "v1", "e1");
+    expect(result).toEqual({ ok: true, item });
+  });
+
+  it("brak uprawnień: FORBIDDEN bez odczytu", async () => {
+    mocks.requireProjectRole.mockResolvedValue({ ok: false, error: "FORBIDDEN", session, projectId: "p1" });
+
+    await expect(getEvaluationAction("p1", "v1", "e1")).resolves.toMatchObject({ ok: false, error: "FORBIDDEN" });
+    expect(mocks.getEvaluation).not.toHaveBeenCalled();
+  });
+
+  it("zły argument: VALIDATION bez odczytu", async () => {
+    await expect(getEvaluationAction("p1", "v1", "")).resolves.toMatchObject({ ok: false, error: "VALIDATION" });
+    await expect(getEvaluationAction("p1", "   ", "e1")).resolves.toMatchObject({ ok: false, error: "VALIDATION" });
+    expect(mocks.getEvaluation).not.toHaveBeenCalled();
+  });
+
+  it("ocena z innego projektu lub wariantu: NOT_FOUND", async () => {
+    mocks.getEvaluation.mockResolvedValue(null);
+
+    await expect(getEvaluationAction("p1", "v1", "e-obca")).resolves.toMatchObject({ ok: false, error: "NOT_FOUND" });
   });
 });
