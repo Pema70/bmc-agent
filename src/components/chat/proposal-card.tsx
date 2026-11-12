@@ -1,6 +1,7 @@
 "use client";
 
 import { DIRTY_MESSAGE, useVariantWorkspace } from "@/components/bmc/variant-workspace";
+import { useOptionalImpact } from "@/components/impact/impact-provider";
 import { APPLY_ERROR_MESSAGES, checkProposable } from "@/lib/bmc/proposals";
 import { BLOCK_INFO } from "@/lib/schemas/bmc";
 import {
@@ -23,6 +24,7 @@ const buttonClass =
 
 export function ProposalCard({ proposal, status, compact = false }: ProposalCardProps) {
   const workspace = useVariantWorkspace();
+  const impact = useOptionalImpact();
   const { busy, dirty, feedback } = workspace;
 
   const pending = status === "PENDING";
@@ -33,6 +35,11 @@ export function ProposalCard({ proposal, status, compact = false }: ProposalCard
   const staleReason = check && !check.ok ? check.error : null;
   const canAccept = pending && staleReason === null && !dirty && !anyBusy;
   const message = feedback[proposal.id];
+  // Analiza wpływu: tylko dla oczekującej propozycji, którą da się zastosować, i bez niezapisanych zmian.
+  const scope = `proposal:${proposal.id}` as const;
+  const canAnalyze = impact !== null && impact.canAnalyze && pending && staleReason === null;
+  const analyzing = impact?.pendingScope === scope;
+  const impactError = impact?.error?.scope === scope ? impact.error.text : null;
 
   // Wszystkie treści (uzasadnienie, before, after) to zwykły tekst: węzły tekstowe React, bez HTML.
   return (
@@ -102,7 +109,23 @@ export function ProposalCard({ proposal, status, compact = false }: ProposalCard
           >
             {thisBusy && busy?.kind === "reject" ? "Odrzucanie…" : "Odrzuć"}
           </button>
+          {canAnalyze ? (
+            <button
+              type="button"
+              onClick={() => void impact.analyze(scope, { kind: "PROPOSAL", proposalId: proposal.id })}
+              disabled={dirty || impact.pendingScope !== null}
+              className={buttonClass}
+            >
+              {analyzing ? "Analizuję…" : "Analizuj wpływ"}
+            </button>
+          ) : null}
         </div>
+      ) : null}
+
+      {impactError ? (
+        <p role="alert" className="text-xs text-red-700 dark:text-red-400">
+          {impactError}
+        </p>
       ) : null}
 
       {message ? (

@@ -8,11 +8,14 @@ import { CanvasEditor } from "@/components/bmc/canvas-editor";
 import { VariantWorkspaceProvider, type VariantWorkspaceProviderProps } from "@/components/bmc/variant-workspace";
 import { AgentChat } from "@/components/chat/agent-chat";
 import { EvaluationPanel } from "@/components/evaluation/evaluation-panel";
+import { ImpactPanel } from "@/components/impact/impact-panel";
+import { ImpactProvider } from "@/components/impact/impact-provider";
 import { ProjectForm } from "@/components/projects/project-form";
 import { hasRole, requireProjectRole } from "@/lib/auth/permissions";
 import { loadAiLimits } from "@/lib/ai/config";
 import { listChatMessages } from "@/lib/db/chat";
 import { listEvaluationsForVariant } from "@/lib/db/evaluations";
+import { listImpactAnalysesForVariant } from "@/lib/db/impact";
 import { listProposalsForVariant } from "@/lib/db/proposals";
 import { getProject } from "@/lib/db/projects";
 import { getMainVariant } from "@/lib/db/variants";
@@ -20,6 +23,7 @@ import { PROJECT_ROLE_LABELS } from "@/lib/schemas/project";
 import type { ProposalItem } from "@/lib/schemas/proposal";
 
 const EVALUATIONS_SHOWN = 20;
+const IMPACT_ANALYSES_SHOWN = 20;
 
 export const metadata: Metadata = { title: "Projekt" };
 
@@ -67,6 +71,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   // Odczyt ocen dla każdego członka (VIEWER i wyżej): rola sprawdzona wyżej, zapytanie po projectId I variantId,
   // lista bez migawki stanu, a uszkodzony wiersz jest pokazywany jako wiersz z błędem.
   const evaluations = variant ? await listEvaluationsForVariant(access.projectId, variant.id, EVALUATIONS_SHOWN) : [];
+  // Analizy wpływu: ta sama zasada (VIEWER i wyżej, projectId I variantId, lista bez migawki stanu).
+  const impactAnalyses = variant ? await listImpactAnalysesForVariant(access.projectId, variant.id, IMPACT_ANALYSES_SHOWN) : [];
   const workspaceProvider =
     variant && canEditCanvas
       ? {
@@ -96,6 +102,15 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       </header>
 
       <Workspace key={variant?.id ?? "brak"} provider={workspaceProvider}>
+        <ImpactProvider
+          // Nowa analiza (np. z czatu, po router.refresh()) zmienia klucz, więc dostawca wczytuje świeżą listę.
+          key={`${variant?.id ?? "brak"}:${impactAnalyses.length}:${newestImpactId(impactAnalyses)}`}
+          projectId={access.projectId}
+          variantId={variant?.id ?? ""}
+          canAnalyze={canEditCanvas}
+          currentVersion={variant?.version ?? 0}
+          initialItems={impactAnalyses}
+        >
         <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <section className="flex min-w-0 flex-col gap-4" aria-labelledby="canvas-heading">
             <h2 id="canvas-heading" className="text-lg font-semibold">
@@ -131,6 +146,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
             initialItems={evaluations}
           />
         ) : null}
+        {variant ? <ImpactPanel /> : null}
+        </ImpactProvider>
       </Workspace>
 
       {canEdit ? (
@@ -146,6 +163,11 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       ) : null}
     </main>
   );
+}
+
+function newestImpactId(items: { ok: boolean; id?: string; analysis?: { id: string } }[]): string {
+  const first = items[0];
+  return first ? (first.analysis?.id ?? first.id ?? "") : "";
 }
 
 function newestEvaluationId(items: { ok: boolean; id?: string; evaluation?: { id: string } }[]): string {
