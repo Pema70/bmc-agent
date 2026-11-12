@@ -103,8 +103,8 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
 
       <Workspace key={variant?.id ?? "brak"} provider={workspaceProvider}>
         <ImpactProvider
-          // Nowa analiza (np. z czatu, po router.refresh()) zmienia klucz, więc dostawca wczytuje świeżą listę.
-          key={`${variant?.id ?? "brak"}:${impactAnalyses.length}:${newestImpactId(impactAnalyses)}`}
+          // Bez key zależnego od listy: dostawca obejmuje płótno i czat, więc remount po router.refresh() zgubiłby
+          // niezapisane zmiany w edytorze i rozmowę. Nowe analizy dołącza sam z props initialItems.
           projectId={access.projectId}
           variantId={variant?.id ?? ""}
           canAnalyze={canEditCanvas}
@@ -163,11 +163,6 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
       ) : null}
     </main>
   );
-}
-
-function newestImpactId(items: { ok: boolean; id?: string; analysis?: { id: string } }[]): string {
-  const first = items[0];
-  return first ? (first.analysis?.id ?? first.id ?? "") : "";
 }
 
 function newestEvaluationId(items: { ok: boolean; id?: string; evaluation?: { id: string } }[]): string {

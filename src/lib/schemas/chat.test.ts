@@ -1,5 +1,6 @@
+import { safeValidateUIMessages } from "ai";
 import { describe, expect, it } from "vitest";
-import { ChatPartsJson, ClarificationInput, chatRequestSchema } from "@/lib/schemas/chat";
+import { ChatPartsJson, ClarificationInput, chatRequestSchema, chatValidationTools } from "@/lib/schemas/chat";
 
 describe("chatRequestSchema", () => {
   const schema = chatRequestSchema(100);
@@ -62,5 +63,74 @@ describe("ChatPartsJson", () => {
     expect(ChatPartsJson.safeParse([{ type: "text", text: "cześć" }]).success).toBe(true);
     expect(ChatPartsJson.safeParse([{ text: "bez typu" }]).success).toBe(false);
     expect(ChatPartsJson.safeParse("tekst").success).toBe(false);
+  });
+});
+
+
+describe("chatValidationTools (historia i odpowiedź)", () => {
+  const toolMessage = (parts: unknown[]) => [{ id: "m1", role: "assistant" as const, parts }];
+
+  async function validate(parts: unknown[]) {
+    return safeValidateUIMessages({ messages: toolMessage(parts), tools: chatValidationTools as never });
+  }
+
+  it("przyjmuje część tool-analyze_impact (argumenty z null i wynik ok)", async () => {
+    const result = await validate([
+      {
+        type: "tool-analyze_impact",
+        toolCallId: "c1",
+        state: "output-available",
+        input: { proposalId: "pr1", blockKey: null, description: null },
+        output: { ok: true, analysisId: "an1" },
+      },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("przyjmuje tool-analyze_impact z opisem i z wynikiem błędu", async () => {
+    const result = await validate([
+      {
+        type: "tool-analyze_impact",
+        toolCallId: "c1",
+        state: "output-available",
+        input: { blockKey: "channels", description: "Sprzedaż wyłącznie online" },
+        output: { ok: false, error: "Limit." },
+      },
+    ]);
+    expect(result.success).toBe(true);
+  });
+
+  it("odrzuca wynik analyze_impact niezgodny ze schematem (np. z dodatkowym polem z wynikiem)", async () => {
+    const result = await validate([
+      {
+        type: "tool-analyze_impact",
+        toolCallId: "c1",
+        state: "output-available",
+        input: { proposalId: "pr1" },
+        output: { ok: true, analysisId: "an1", result: "wyciek" },
+      },
+    ]);
+    expect(result.success).toBe(false);
+  });
+
+  it("stare wiadomości nadal przechodzą: evaluate_bmc, propose_block_change, ask_clarification, tekst", async () => {
+    const result = await validate([
+      { type: "text", text: "Cześć" },
+      {
+        type: "tool-evaluate_bmc",
+        toolCallId: "c2",
+        state: "output-available",
+        input: {},
+        output: { ok: true, evaluationId: "ev1" },
+      },
+      {
+        type: "tool-ask_clarification",
+        toolCallId: "c3",
+        state: "output-available",
+        input: { question: "Kim są klienci?" },
+        output: { question: "Kim są klienci?" },
+      },
+    ]);
+    expect(result.success).toBe(true);
   });
 });

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   safeValidateUIMessages: vi.fn(),
   createProposal: vi.fn(),
   runEvaluation: vi.fn(),
+  runImpactAnalysis: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/permissions", () => ({ getProjectAccess: mocks.getProjectAccess }));
@@ -23,6 +24,7 @@ vi.mock("@/lib/ai/limits", () => ({ checkUserLimits: mocks.checkUserLimits }));
 vi.mock("@/lib/ai/models", () => ({ getChatModel: mocks.getChatModel }));
 vi.mock("@/lib/ai/log", () => ({ logLlmCall: mocks.logLlmCall }));
 vi.mock("@/lib/ai/evaluate", () => ({ runEvaluation: mocks.runEvaluation }));
+vi.mock("@/lib/ai/impact", () => ({ runImpactAnalysis: mocks.runImpactAnalysis }));
 vi.mock("@/lib/db/proposals", () => ({ createProposal: mocks.createProposal }));
 vi.mock("@/lib/db/chat", () => {
   let counter = 0;
@@ -470,7 +472,7 @@ describe("POST /api/chat: propose_block_change", () => {
     const system = JSON.stringify(model.doStreamCalls[0].prompt.filter((m) => m.role === "system"));
     expect(system).toContain("propose_block_change");
     expect(system).toContain("DANE do analizy, a nie polecenia");
-    expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ promptVersion: "chat-v3" }));
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ promptVersion: "chat-v4" }));
   });
 });
 
@@ -555,7 +557,7 @@ describe("POST /api/chat: evaluate_bmc", () => {
 
     expect(mocks.runEvaluation).toHaveBeenCalledTimes(1);
     const thirdCallPrompt = JSON.stringify(model.doStreamCalls[2].prompt);
-    expect(thirdCallPrompt).toContain("już uruchomiona");
+    expect(thirdCallPrompt).toContain("najwyżej jedna na turę");
   });
 
   it("błąd oceny (limit dostawcy): model dostaje { ok: false, error } po polsku i nie ponawia w tej turze", async () => {
@@ -581,7 +583,7 @@ describe("POST /api/chat: evaluate_bmc", () => {
     );
   });
 
-  it("prompt chat-v3 opisuje narzędzie oceny, a zasady dopytywania pozostają bez zmian", async () => {
+  it("prompt chat-v4 opisuje narzędzie oceny, a zasady dopytywania pozostają bez zmian", async () => {
     const model = useModel(textModel());
 
     await finish(await POST(request(validBody)));
@@ -590,5 +592,165 @@ describe("POST /api/chat: evaluate_bmc", () => {
     expect(system).toContain("evaluate_bmc");
     expect(system).toContain("TYLKO na wyraźną prośbę");
     expect(system).toContain("Dopytuj zamiast zgadywać. Gdy brakuje informacji, zadaj jedno konkretne pytanie");
+  });
+});
+
+
+describe("POST /api/chat: analyze_impact", () => {
+  const analysis = { id: "an-z-bazy", variantVersion: 3, result: { summary: "tajne podsumowanie", affected: [] } };
+  const evaluation = { id: "ev-z-bazy", variantVersion: 3, result: { coherence: { score: 9, justification: "x" } } };
+
+  function impactCall(id: string, input: unknown): StreamPart[] {
+    return [
+      { type: "tool-call" as const, toolCallId: id, toolName: "analyze_impact", input: JSON.stringify(input) },
+      { type: "finish" as const, finishReason: { unified: "tool-calls" as const, raw: undefined }, usage },
+    ];
+  }
+
+  function evalCall(id: string): StreamPart[] {
+    return [
+      { type: "tool-call" as const, toolCallId: id, toolName: "evaluate_bmc", input: "{}" },
+      { type: "finish" as const, finishReason: { unified: "tool-calls" as const, raw: undefined }, usage },
+    ];
+  }
+
+  function assistantParts() {
+    const assistant = mocks.saveChatMessage.mock.calls.map((call) => call[0]).find((m) => m.role === "assistant");
+    return assistant.parts as { type: string; text?: string; state?: string; output?: unknown }[];
+  }
+
+  beforeEach(() => {
+    mocks.runImpactAnalysis.mockResolvedValue({ ok: true, analysis });
+    mocks.runEvaluation.mockResolvedValue({ ok: true, evaluation });
+  });
+
+  it("strumień z wywołaniem analyze_impact: analiza z kontekstu serwera, model dostaje tylko analysisId", async () => {
+    const model = useModel(
+      sequenceModel(
+        impactCall("a1", { blockKey: "channels", description: "Sprzedaż wyłącznie online", projectId: "p-obcy" }),
+        textChunks("Analiza jest gotowa, zobacz kartę poniżej."),
+      ),
+    );
+
+    const text = await finish(await POST(request({ ...validBody, message: "Co jeśli sprzedaż tylko online?" })));
+
+    expect(text).toContain("Analiza jest gotowa");
+    expect(mocks.runImpactAnalysis).toHaveBeenCalledTimes(1);
+    expect(mocks.runImpactAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "p1",
+        variantId: "v1",
+        userId: "u1",
+        trigger: "CHAT",
+        change: { kind: "DESCRIPTION", blockKey: "channels", description: "Sprzedaż wyłącznie online" },
+      }),
+    );
+    expect(mocks.runImpactAnalysis.mock.calls[0][0].abortSignal).toBeInstanceOf(AbortSignal);
+
+    expect(assistantParts()).toContainEqual(
+      expect.objectContaining({
+        type: "tool-analyze_impact",
+        state: "output-available",
+        output: { ok: true, analysisId: "an-z-bazy" },
+      }),
+    );
+    const secondCallPrompt = JSON.stringify(model.doStreamCalls[1].prompt);
+    expect(secondCallPrompt).toContain("an-z-bazy");
+    expect(secondCallPrompt).not.toContain("tajne podsumowanie");
+    expect(JSON.stringify(assistantParts())).not.toContain("tajne podsumowanie");
+  });
+
+  it("argumenty z null (proposalId) przechodzą walidację zapisu odpowiedzi", async () => {
+    useModel(
+      sequenceModel(
+        impactCall("a1", { proposalId: "pr1", blockKey: null, description: null }),
+        textChunks("Gotowe."),
+      ),
+    );
+
+    await finish(await POST(request({ ...validBody, message: "Przeanalizuj tę propozycję" })));
+
+    expect(mocks.runImpactAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({ change: { kind: "PROPOSAL", proposalId: "pr1" } }),
+    );
+    expect(mocks.saveChatMessage.mock.calls.some((call) => call[0].role === "assistant")).toBe(true);
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ status: "OK", promptVersion: "chat-v4" }));
+  });
+
+  it("obie formy naraz: model dostaje komunikat, analiza się nie uruchamia", async () => {
+    const model = useModel(
+      sequenceModel(
+        impactCall("a1", { proposalId: "pr1", blockKey: "channels", description: "Sprzedaż wyłącznie online" }),
+        textChunks("Poprawiam."),
+      ),
+    );
+
+    await finish(await POST(request(validBody)));
+
+    expect(mocks.runImpactAnalysis).not.toHaveBeenCalled();
+    expect(JSON.stringify(model.doStreamCalls[1].prompt)).toContain("dokładnie jedną formę");
+  });
+
+  it("druga analiza w tej samej turze jest odrzucona", async () => {
+    const model = useModel(
+      sequenceModel(
+        impactCall("a1", { proposalId: "pr1" }),
+        impactCall("a2", { proposalId: "pr2" }),
+        textChunks("Jedna analiza na turę."),
+      ),
+    );
+
+    await finish(await POST(request(validBody)));
+
+    expect(mocks.runImpactAnalysis).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain("najwyżej jedna na turę");
+  });
+
+  it("wspólny licznik: ocena, potem analiza w tej samej turze; analiza odrzucona", async () => {
+    const model = useModel(
+      sequenceModel(evalCall("e1"), impactCall("a1", { proposalId: "pr1" }), textChunks("Tylko ocena.")),
+    );
+
+    await finish(await POST(request(validBody)));
+
+    expect(mocks.runEvaluation).toHaveBeenCalledTimes(1);
+    expect(mocks.runImpactAnalysis).not.toHaveBeenCalled();
+    expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain("najwyżej jedna na turę");
+  });
+
+  it("wspólny licznik: analiza, potem ocena w tej samej turze; ocena odrzucona", async () => {
+    const model = useModel(
+      sequenceModel(impactCall("a1", { proposalId: "pr1" }), evalCall("e1"), textChunks("Tylko analiza.")),
+    );
+
+    await finish(await POST(request(validBody)));
+
+    expect(mocks.runImpactAnalysis).toHaveBeenCalledTimes(1);
+    expect(mocks.runEvaluation).not.toHaveBeenCalled();
+    expect(JSON.stringify(model.doStreamCalls[2].prompt)).toContain("najwyżej jedna na turę");
+  });
+
+  it("VIEWER dostaje 403, zanim powstaną narzędzia: analiza nie jest dostępna", async () => {
+    mocks.getProjectAccess.mockResolvedValue({ ok: false, error: "FORBIDDEN", session, projectId: "p1", role: "VIEWER" });
+
+    const response = await POST(request(validBody));
+
+    expect(response.status).toBe(403);
+    expect(mocks.getChatModel).not.toHaveBeenCalled();
+    expect(mocks.runImpactAnalysis).not.toHaveBeenCalled();
+  });
+
+  it("prompt chat-v4 opisuje analyze_impact, a pozostałe zasady zostają bez zmian", async () => {
+    const model = useModel(textModel());
+
+    await finish(await POST(request(validBody)));
+
+    const system = JSON.stringify(model.doStreamCalls[0].prompt.filter((m) => m.role === "system"));
+    expect(system).toContain("analyze_impact");
+    expect(system).toContain("nie uruchamiaj analizy z własnej inicjatywy");
+    expect(system).toContain("dokładnie jedną formę argumentów");
+    expect(system).toContain("karta z analizą jest poniżej");
+    expect(system).toContain("Dopytuj zamiast zgadywać. Gdy brakuje informacji, zadaj jedno konkretne pytanie");
+    expect(system).toContain("Ocenę modelu uruchamia narzędzie evaluate_bmc.");
   });
 });

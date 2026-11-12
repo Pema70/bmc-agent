@@ -5,6 +5,7 @@ const { runEvaluation } = vi.hoisted(() => ({ runEvaluation: vi.fn() }));
 vi.mock("@/lib/ai/evaluate", () => ({ runEvaluation }));
 
 import { EVALUATE_ALREADY_USED_MESSAGE, createEvaluateBmcTool } from "@/lib/ai/tools/evaluate-bmc";
+import { HEAVY_TOOL_USED_MESSAGE, createHeavyToolGate } from "@/lib/ai/tools/heavy-gate";
 
 const context = { projectId: "p1", variantId: "v1", userId: "u1" };
 
@@ -91,6 +92,26 @@ describe("evaluate_bmc", () => {
 
     expect(runEvaluation).toHaveBeenCalledTimes(1);
     expect(results.filter((r) => (r as { ok: boolean }).ok)).toHaveLength(1);
+  });
+
+  it("wspólny licznik: gdy inne ciężkie narzędzie zajęło turę, ocena jest odrzucana bez wywołania", async () => {
+    const gate = createHeavyToolGate();
+    gate.tryAcquire(); // np. analyze_impact w tej samej turze
+
+    const output = await run({}, { ...context, gate } as never).call();
+
+    expect(output).toEqual({ ok: false, error: HEAVY_TOOL_USED_MESSAGE });
+    expect(output).toMatchObject({ error: expect.stringContaining("analizę wpływu") });
+    expect(runEvaluation).not.toHaveBeenCalled();
+  });
+
+  it("wspólny licznik: ocena zajmuje turę dla drugiego narzędzia, także po błędzie", async () => {
+    runEvaluation.mockResolvedValue({ ok: false, error: "PROVIDER", message: "Model jest chwilowo niedostępny." });
+    const gate = createHeavyToolGate();
+
+    await run({}, { ...context, gate } as never).call();
+
+    expect(gate.tryAcquire()).toBe(false);
   });
 
   it("nowa tura (nowe narzędzie) może ocenić ponownie", async () => {

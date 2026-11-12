@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { useVariantWorkspace } from "@/components/bmc/variant-workspace";
 import { EvaluationCard } from "@/components/chat/evaluation-card";
+import { ImpactCard } from "@/components/chat/impact-card";
 import { ProposalCard } from "@/components/chat/proposal-card";
 import { CHAT_MESSAGE_MAX_CHARS, type ChatUIMessage } from "@/lib/schemas/chat";
 import type { ProposalView } from "@/lib/schemas/proposal";
@@ -59,6 +60,7 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
   });
 
   const router = useRouter();
+  // Wyniki ciężkich narzędzi (ocena, analiza wpływu), po których odświeżono już stronę serwerową.
   const refreshedEvaluations = useRef(new Set<string>());
   const [input, setInput] = useState("");
   // Propozycje z wiadomości dołączonych w tej sesji są świeże (PENDING), starsze znamy z bazy.
@@ -89,7 +91,7 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
     }
   }, [messages, initialIds, registerProposals]);
 
-  // Ocena z czatu pojawia się w panelu ocen po odświeżeniu strony serwerowej na końcu tury.
+  // Ocena i analiza wpływu z czatu pojawiają się w swoich panelach po odświeżeniu strony serwerowej na końcu tury.
   useEffect(() => {
     if (busy) {
       return;
@@ -103,6 +105,12 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
         if (part.type === "tool-evaluate_bmc" && part.state === "output-available" && part.output.ok) {
           if (!refreshedEvaluations.current.has(part.output.evaluationId)) {
             refreshedEvaluations.current.add(part.output.evaluationId);
+            needsRefresh = true;
+          }
+        }
+        if (part.type === "tool-analyze_impact" && part.state === "output-available" && part.output.ok) {
+          if (!refreshedEvaluations.current.has(part.output.analysisId)) {
+            refreshedEvaluations.current.add(part.output.analysisId);
             needsRefresh = true;
           }
         }
@@ -257,6 +265,32 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
                       return (
                         <p key={index} className="text-zinc-500">
                           Oceniam model…
+                        </p>
+                      );
+                  }
+                }
+                if (part.type === "tool-analyze_impact") {
+                  switch (part.state) {
+                    case "output-available":
+                      // Błąd analizy (limit, 429, 503) model opisuje własnym tekstem; karta tylko dla zapisanej analizy.
+                      return part.output.ok ? (
+                        <ImpactCard
+                          key={part.output.analysisId}
+                          projectId={projectId}
+                          variantId={variantId}
+                          analysisId={part.output.analysisId}
+                        />
+                      ) : null;
+                    case "output-error":
+                      return (
+                        <p key={index} className="text-red-700 dark:text-red-400">
+                          Analiza wpływu nie powiodła się. Spróbuj ponownie za chwilę.
+                        </p>
+                      );
+                    default:
+                      return (
+                        <p key={index} className="text-zinc-500">
+                          Analizuję wpływ zmiany…
                         </p>
                       );
                   }
