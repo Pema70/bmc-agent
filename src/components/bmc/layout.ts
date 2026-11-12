@@ -16,5 +16,5 @@ export const BLOCK_PLACEMENT: Record<BlockKey, string> = {
   revenue_streams: "lg:col-span-5 lg:col-start-6 lg:row-start-3",
 };
 
-export const BLOCK_CARD =
-  "flex flex-col gap-2 rounded-md border border-zinc-300 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900";
+// Obramowanie jest osobno (BLOCK_BORDER), bo wyróżnienie analizy wpływu zastępuje domyślną ramkę.
+export const BLOCK_CARD_BASE = "flex flex-col gap-2 rounded-md bg-white p-3 dark:bg-zinc-900";

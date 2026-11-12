@@ -9,6 +9,9 @@ import { describeChange } from "@/lib/impact/format";
 import { BLOCK_INFO, BLOCK_KEYS, type BlockKey } from "@/lib/schemas/bmc";
 import { IMPACT_DESCRIPTION_MAX_LENGTH, IMPACT_DESCRIPTION_MIN_LENGTH } from "@/lib/schemas/impact";
 
+const canvasButtonClass =
+  "rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800";
+
 export function ImpactPanel() {
   const impact = useImpact();
   const [blockKey, setBlockKey] = useState<BlockKey>(BLOCK_KEYS[0]);
@@ -96,7 +99,20 @@ export function ImpactPanel() {
       ) : null}
 
       {analysis ? (
-        <ImpactResult analysis={analysis} currentVersion={impact.currentVersion} />
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {impact.activeId === analysis.id ? (
+              <button type="button" onClick={impact.hide} className={canvasButtonClass}>
+                Ukryj analizę
+              </button>
+            ) : (
+              <button type="button" onClick={() => impact.show(analysis.id)} className={canvasButtonClass}>
+                Pokaż na płótnie
+              </button>
+            )}
+          </div>
+          <ImpactResult analysis={analysis} currentVersion={impact.currentVersion} />
+        </div>
       ) : (
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           {impact.items.length === 0 ? "Ten wariant nie ma jeszcze żadnej analizy wpływu." : "Wybierz analizę z historii."}
