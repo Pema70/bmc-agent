@@ -98,6 +98,13 @@ docs/                # spec.md i dokumentacja
 - Nie wywołuj prawdziwego API LLM w testach automatycznych (mock). Ocena jakości odpowiedzi modeli to osobny, ręcznie uruchamiany skrypt.
 - Nowa funkcja bez testów nie jest skończona.
 
+## Windows
+
+- Skrypty pomocnicze z polskimi znakami pisz jako pliki Pythona (narzędziem do zapisu plików), nie jako heredoc w bashu: heredoc z polskim tekstem potrafi się wysypać (`unexpected EOF`).
+- Pliki w repozytorium mogą mieć końce linii CRLF. Edytuj je skryptem, który zachowuje końce linii (odczyt i zapis z `newline=""`), żeby nie wygenerować diffu całych plików.
+- Opis PR: `gh pr create --body-file <plik>` (PowerShell 5.1 psuje `--body`).
+- Pull i push: `git -c http.sslBackend=schannel pull` / `push` (domyślny backend SSL kończy się błędem).
+
 ## Czego nie robić
 
 - Nie dodawaj LangChain ani podobnych frameworków.
