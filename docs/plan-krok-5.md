@@ -265,3 +265,18 @@ Na później (nie w 5a):
 - **`STALE_PROPOSAL` ujednolicone z akceptacją.** Zamiast porównywać `baseVersion` (punkt 1 wyżej, zastąpiony), `runImpactAnalysis` woła `checkProposable` na aktualnym stanie wariantu, tak jak akceptacja i narzędzie `propose_block_change`. `STALE_PROPOSAL` tylko wtedy, gdy propozycji nie dałoby się teraz zastosować (STALE / DUPLICATE / LIMIT), z komunikatem z `APPLY_ERROR_MESSAGES`; bez limitów, logu i modelu.
 - **Niezapisane zmiany płótna** blokują przycisk „Analizuj wpływ” i formularz „Co jeśli…?” (komunikat „Najpierw zapisz albo cofnij swoje zmiany”), bo analiza dotyczy zapisanego stanu.
 - **Pomiar z prawdziwym API** po 5b wykonuje użytkownik przez interfejs (lista kontrolna w opisie PR 5b).
+
+## Stan po kroku 5 (2026-11-12)
+
+PR #18-#21 (5a-5d) zmergowane. Po 5d `npm test` przechodzi w całości (523 testy, wyłącznie mocki). Krok 5 nie dodał żadnych zależności.
+
+**Weryfikacja ręczna w przeglądarce (wykonana przez właściciela repozytorium, nie przez Claude Code), przeszła:** analiza z panelu i z czatu, karta analizy w czacie, „Pokaż na płótnie”, wspólny licznik ciężkich narzędzi (`evaluate_bmc` i `analyze_impact`, najwyżej jedno na turę) oraz historia czatu po odświeżeniu strony. Testy automatyczne obejmują te elementy tylko na mockach.
+
+**Odstępstwa od planu:**
+- Stan „aktywna analiza” (`activeId`, `show`, `hide`) jest w `ImpactProvider`, a nie w `VariantWorkspaceProvider` (5c): lista analiz mieszka w `ImpactProvider`, a VIEWER nie ma `VariantWorkspaceProvider`.
+- `STALE_PROPOSAL` nie opiera się na `baseVersion`, tylko na `checkProposable` na aktualnym stanie wariantu, tak jak akceptacja propozycji (5b).
+- Naprawiony błąd z `key` na `ImpactProvider` (wprowadzony w 5b, poprawiony w 5d): zmiana klucza po `router.refresh()` remontowała płótno i czat, więc giniły niezapisane zmiany w edytorze i rozmowa. Dostawca dołącza teraz brakujące analizy z props bez remountu.
+
+**Model dev:** w `.env` użytkownika ustawiony jest `gemini-3.5-flash-lite`; wcześniej próbowany `gemini-3.8-flash` nie działał. Używany model zapisuje kolumna `model` (w `ImpactAnalysis`, `EvaluationResult` i `LlmCallLog`).
+
+Otwarte kwestie po kroku: `docs/zadania.md` (sekcja „Agent AI”: wyjaśnianie wyniku analizy, narzędzie do odczytu zapisanych wyników; „Dokumentacja i narzędzia”: wspólny helper przepływu LLM, do wydzielenia na początku kroku 6, D8).

@@ -21,6 +21,8 @@ Rzeczy świadomie odłożone. Każda pozycja to osobny, mały PR po uzgodnieniu 
 
 - **Duplikaty wpisów w bloku a propozycje agenta.** Wpisy to zwykłe stringi (spec §4, D4), więc użytkownik może ręcznie wpisać dwa identyczne wpisy w jednym bloku. Propozycje EDIT i REMOVE (PR 3c) wskazują wpis tekstem `before`, więc dotyczą pierwszego pasującego i nie da się wskazać drugiego duplikatu. Propozycja ADD identycznego wpisu jest odrzucana (agent dostaje `ok: false` i może ją poprawić). Do rozważenia: unikalne id wpisów albo blokada duplikatów przy zapisie płótna.
 
+- **Kosmetyka: przycisk „Analizuj wpływ”.** W wąskiej kolumnie karty propozycji przycisk zawija się do dwóch wierszy. Do poprawy układu przycisków na karcie (np. zawijanie rzędu przycisków lub krótsza etykieta).
+
 ## Dokumentacja i narzędzia
 
 - **Ujednolicenie końców linii (`.gitattributes`).** Na Windows Git zamienia LF na CRLF, przez co np. `prisma/migrations/migration_lock.toml` pokazuje się jako zmieniony mimo pustego `git diff`. Dodać `.gitattributes` (np. `* text=auto eol=lf`) i sprawdzić, że nie zmienia sum kontrolnych zastosowanych migracji.
@@ -28,6 +30,8 @@ Rzeczy świadomie odłożone. Każda pozycja to osobny, mały PR po uzgodnieniu 
 - **Brak Prettiera.** W projekcie nie ma Prettiera (ani w `package.json`, ani w `node_modules`), formatowanie pilnuje wyłącznie ESLint. Dodanie Prettiera to nowa zależność, więc wymaga zgody.
 
 - **Aktualizacja sekcji „Komendy” w `CLAUDE.md`** do faktycznych skryptów z `package.json` (np. `typecheck` to `next typegen && tsc --noEmit`, `test:watch`, `postinstall: prisma generate`, port bazy 5433). Zrobione w PR `docs/porzadki-po-kroku-3`.
+
+- **Wspólny helper przepływu LLM.** `runEvaluation`, `runImpactAnalysis` i (w kroku 6) kolejne funkcje powielają ten sam przepływ: odczyt wariantu, limity, kontrola minimalnej zawartości, model, `safeParse`, log, zapis, mapowanie błędów. Wydzielić wspólny helper na początku kroku 6 (D8 z `docs/plan-krok-5.md`), zanim powstaną trzecia i czwarta kopia.
 
 ## Dane testowe i środowisko dev
 
@@ -46,3 +50,4 @@ Rzeczy świadomie odłożone. Każda pozycja to osobny, mały PR po uzgodnieniu 
   - Tura z oceną zużywa 2 wiersze `LlmCallLog` (`chat` i `evaluate_bmc`) i 3-4 wywołania modelu (przy `MAX_STEPS=3`), więc szybciej wyczerpuje `CHAT_MAX_REQUESTS_PER_HOUR` i limit tokenów.
 - **`EVALUATION_MAX_OUTPUT_TOKENS`.** Ewentualna osobna zmienna z limitem tokenów wyjściowych dla oceny, gdyby pojawił się status `TRUNCATED` (dziś ocena zużywa ok. 400 z 2000 tokenów, więc niepotrzebna). Nie podnosić `LLM_MAX_OUTPUT_TOKENS` czatu.
 - **Ręczna ocena referencyjna (krok 4e) odłożona.** Formularz oceny ręcznej (`source = MANUAL`, nakładka na radarze, różnice w punktach) zrobić w przygotowaniach do testów porównawczych, przed krokiem 10. Kolumna `source` jest już w schemacie.
+- **Agent a wynik analizy i narzędzia.** Zauważone po PR 5d. Na prośbę „wyjaśnij mi ten wynik” agent nie ma wyniku analizy (narzędzie zwraca mu tylko `analysisId`, a analiza z panelu nie trafia do historii czatu), więc zaproponował nową zmianę zamiast powiedzieć, że szczegóły są na karcie. Wspomniał też nazwę `analyze_impact` i surowe id propozycji oraz kazał użytkownikowi „skorzystać z narzędzia”. Do poprawy w prompcie (podbić `PROMPT_VERSION`): przy pytaniu o wynik analizy lub oceny odsyłaj do karty i panelu, nie proponuj nowych zmian, nigdy nie podawaj nazw narzędzi ani identyfikatorów, opisując propozycję trzymaj się jej faktycznej treści. Scenariusze do pomiaru przed i po: „wyjaśnij wynik analizy”, „dodaj wpis” (bez analizy), „oceń model”. Do rozważenia osobno: narzędzie tylko do odczytu zapisanych wyników (tekst modelu wracałby do modelu jako dane, ryzyko prompt injection).
