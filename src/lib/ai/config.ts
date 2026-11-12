@@ -49,3 +49,7 @@ export function loadAiLimits(env: Record<string, string | undefined> = process.e
 // Minimalna zawartość modelu BMC do oceny (D5). Poniżej tego ocena nie ma sensu i tylko zużywa limity.
 export const EVALUATION_MIN_ENTRIES = 5;
 export const EVALUATION_MIN_NON_EMPTY_BLOCKS = 3;
+
+// Minimalna zawartość modelu BMC do analizy wpływu (niższa niż dla oceny): zmiana musi mieć o co się oprzeć.
+export const IMPACT_MIN_ENTRIES = 3;
+export const IMPACT_MIN_NON_EMPTY_BLOCKS = 2;

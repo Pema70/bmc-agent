@@ -14,7 +14,7 @@ Aplikacja webowa z agentem AI wspierającym analizę, tworzenie i ocenę modeli 
 |---|---|
 | Zmiany proponowane przez agenta | Agent **proponuje**, użytkownik **akceptuje lub odrzuca**. Stan BMC zmienia się dopiero po akceptacji (human-in-the-loop). |
 | Streaming czatu | Route handler `/api/chat` (Vercel AI SDK). Server Actions służą do zwykłych mutacji. |
-| Analiza wpływu zmian | Jakościowa (opis tekstowy i lista dotkniętych bloków). **DO ZDECYDOWANIA:** czy dodajemy proste parametry liczbowe (koszty, przychody). Domyślnie: nie. |
+| Analiza wpływu zmian | Jakościowa (opis tekstowy i lista dotkniętych bloków ze stopniem niski/średni/wysoki), **bez parametrów liczbowych** (decyzja kroku 5, `docs/plan-krok-5.md`). W interfejsie oznaczona jako „Analiza AI”, nie weryfikacja biznesowa. |
 | Praca zespołowa | Asynchroniczna: zapis w Postgres, odświeżanie stanu, role. Ochrona przed nadpisaniem przez pole `version` (optymistyczne blokowanie). |
 | Język | Interfejs i odpowiedzi agenta po polsku. |
 | Uwierzytelnianie | `next-auth@4.24.15` (Auth.js v4), provider Credentials (e-mail i hasło), sesja JWT. **Uzasadnienie:** Auth.js v5 w chwili decyzji (2026-11) był wciąż w becie (`5.0.0-beta.32`), a projekt używa tylko stabilnych wersji; v4 oficjalnie wspiera Next 16. **Migracja na v5:** cały kod serwerowy czyta sesję wyłącznie przez `getSession()` / `requireSession()` w `src/lib/auth/session.ts`, a `next-auth` importują tylko `src/lib/auth/options.ts`, route handler `/api/auth/[...nextauth]` i komponenty formularzy (`signIn`/`signOut`). Sekret w zmiennej `AUTH_SECRET` (nazwa z v5, v4 też ją czyta). |
@@ -137,6 +137,8 @@ model LlmCallLog {
 }
 ```
 
+Wynik `analyze_impact` zapisuje model `ImpactAnalysis` (krok 5; szczegóły w `docs/plan-krok-5.md`): `projectId`, `variantId`, `variantVersion`, `stateSnapshot`, `changeKind` (`PROPOSAL` | `DESCRIPTION`), `proposalId`, `change` (migawka zmiany), `result` (Json, `ImpactOutput` walidowany Zod), `schemaVersion`, `trigger` (`UI` | `CHAT`), `provider`, `model`, `promptVersion`, `llmCallLogId`, `createdById`, `createdAt`. Analizy są dopisywane (bez nadpisywania); odpowiedź niezgodna ze schematem nie jest zapisywana (`LlmCallLog.status = SCHEMA_ERROR`).
+
 Wynik `evaluate_bmc` zapisuje model `EvaluationResult` (krok 4; szczegóły w `docs/plan-krok-4.md`): `projectId`, `variantId`, `variantVersion`, `stateSnapshot` (oceniany stan), `result` (Json, `EvaluationOutput` walidowany Zod), `schemaVersion`, `source` (`AI` | `MANUAL`), `trigger` (`UI` | `CHAT`), `provider`, `model`, `promptVersion`, `llmCallLogId`, `createdById`, `createdAt`. Odpowiedź niezgodna ze schematem nie jest zapisywana (`LlmCallLog.status = SCHEMA_ERROR`).
 
 ## 6. Agent AI
@@ -154,7 +156,7 @@ Wszystkie argumenty i wyniki są walidowane schematami Zod.
 | `ask_clarification` | narzędzie czatu | `question`, opcjonalnie `suggestedAnswers[]` | pytanie wyświetlone użytkownikowi, agent czeka na odpowiedź |
 | `propose_block_change` | narzędzie czatu | `blockKey`, `operation` (add / edit / remove), `before`, `after`, `rationale` | rekord `Proposal` ze statusem PENDING. **Stan BMC się nie zmienia.** |
 | `read_attachment` | narzędzie czatu | `attachmentId` (i opcjonalnie zakres) | wyekstrahowany tekst (z limitem długości) |
-| `analyze_impact` | analiza | `blockKey`, `change` | lista dotkniętych bloków z opisem wpływu i stopniem (niski/średni/wysoki) |
+| `analyze_impact` | analiza | zmiana: `proposalId` oczekującej propozycji albo `blockKey` + `description` (stan czyta serwer) | `summary` i lista dotkniętych bloków (innych niż zmieniany) z opisem wpływu i stopniem (niski/średni/wysoki). Wynik zapisuje `ImpactAnalysis` |
 | `evaluate_bmc` | analiza | stan BMC (w narzędziu czatu bez argumentów: stan czyta serwer) | obiekt z ocenami 1 do 10 dla kryteriów `coherence` (spójność), `risk_resilience` (ryzyko, **10 = niskie ryzyko**), `feasibility` (realność), `innovation` (innowacyjność) i krótkim uzasadnieniem do każdego. Wszystkie osie: więcej = lepiej. Etykieta PL ryzyka: „Ryzyko (10 = niskie)” |
 | `generate_strategies` | analiza | stan BMC, opcjonalnie wytyczne użytkownika | 2 do 3 wariantów pełnego BMC (każdy zgodny z `BmcState`) z nazwą i założeniem strategii |
 | `compare_variants` | analiza | lista `variantId` | różnice blok po bloku, zalety i wady każdego wariantu, rekomendacja |
@@ -253,7 +255,7 @@ Wszystkie argumenty i wyniki są walidowane schematami Zod.
 
 ## 15. Otwarte kwestie
 
-- Czy analiza wpływu ma zawierać parametry liczbowe?
+- ~~Czy analiza wpływu ma zawierać parametry liczbowe?~~ Rozstrzygnięte w kroku 5: nie.
 - Gdzie przechowywać pliki załączników na produkcji?
 - Gdzie hostować bazę Postgres na produkcji?
 - Dokładne nazwy i ceny modeli do porównania oraz aktualne limity darmowego planu Gemini API (weryfikacja w dokumentacji dostawców przed testami).

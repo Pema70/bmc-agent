@@ -246,3 +246,12 @@ export async function rejectProposal(args: {
   const existing = await findProposalInVariant(prisma, { projectId, variantId, proposalId });
   return { ok: false, error: existing ? "ALREADY_RESOLVED" : "NOT_FOUND" };
 }
+
+/** Propozycja po id z filtrem po wariancie i projekcie (dla analizy wpływu); cudze id daje null. */
+export async function getProposalInVariant(
+  projectId: string,
+  variantId: string,
+  proposalId: string,
+): Promise<ProposalRecord | null> {
+  return findProposalInVariant(prisma, { projectId, variantId, proposalId });
+}

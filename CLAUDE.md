@@ -113,4 +113,5 @@ docs/                # spec.md i dokumentacja
 - Nie modyfikuj wygenerowanych migracji, które już trafiły na `main`.
 - Nie edytuj migracji Prisma, które zostały już zastosowane w bazie (zmienia to sumę kontrolną i wymusza reset). Zmiany robimy nową migracją.
 - Nie refaktoryzuj kodu niezwiązanego z bieżącym zadaniem.
+- Nie uruchamiaj skryptów ani komend ładujących `.env` (np. `node --env-file`, `dotenv`) bez zgody użytkownika. Pomiary z prawdziwym API wykonuje użytkownik albo agent po wyraźnej zgodzie, z tymczasowym skryptem poza repozytorium.
 - Nie usuwaj niczego bez zgody użytkownika: stashy, gałęzi (poza lokalną gałęzią zmergowanego PR, gdy użytkownik o to poprosił), plików, kontenerów, wolumenów ani danych w bazie. Jeśli coś wygląda na zbędne, napisz, co to jest i dlaczego można to usunąć, i poczekaj na odpowiedź.
