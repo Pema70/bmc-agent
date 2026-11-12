@@ -67,6 +67,21 @@ export function ImpactProvider({ projectId, variantId, canAnalyze, currentVersio
   const [items, setItems] = useState<ImpactListItem[]>(initialItems);
   const [selectedId, setSelectedId] = useState<string | null>(() => firstValidId(initialItems));
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Po router.refresh() strona serwerowa przekazuje świeżą listę (np. analiza zlecona z czatu). Dołączamy tylko
+  // brakujące rekordy, bez remountu dostawcy (obejmuje płótno i czat), i wybieramy najnowszą nową analizę.
+  const [seenInitial, setSeenInitial] = useState(initialItems);
+  if (seenInitial !== initialItems) {
+    setSeenInitial(initialItems);
+    const known = new Set(items.map(itemKey));
+    const fresh = initialItems.filter((item) => !known.has(itemKey(item)));
+    if (fresh.length > 0) {
+      setItems([...fresh, ...items]);
+      const newest = fresh.find((item) => item.ok);
+      if (newest?.ok) {
+        setSelectedId(newest.analysis.id);
+      }
+    }
+  }
   const [pendingScope, setPendingScope] = useState<ImpactScope | null>(null);
   const [error, setError] = useState<ImpactContextValue["error"]>(null);
 
@@ -133,6 +148,10 @@ export function ImpactProvider({ projectId, variantId, canAnalyze, currentVersio
   );
 
   return <ImpactContext.Provider value={value}>{children}</ImpactContext.Provider>;
+}
+
+function itemKey(item: ImpactListItem): string {
+  return item.ok ? item.analysis.id : item.id;
 }
 
 function firstValidId(items: ImpactListItem[]): string | null {
