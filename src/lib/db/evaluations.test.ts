@@ -8,6 +8,7 @@ vi.mock("@/lib/db/client", () => ({
 
 import {
   createEvaluation,
+  getEvaluation,
   getEvaluationSnapshot,
   listEvaluationsForVariant,
   parseEvaluationRow,
@@ -156,5 +157,26 @@ describe("createEvaluation", () => {
 
     await expect(createEvaluation(bad)).rejects.toThrow();
     expect(mocks.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("getEvaluation", () => {
+  it("czyta jedną ocenę z filtrem po id, projectId ORAZ variantId, bez migawki stanu", async () => {
+    mocks.findFirst.mockResolvedValue(row());
+
+    const item = await getEvaluation("p1", "v1", "e1");
+
+    const args = mocks.findFirst.mock.calls[0][0];
+    expect(args.where).toEqual({ id: "e1", projectId: "p1", variantId: "v1" });
+    expect(args.select).not.toHaveProperty("stateSnapshot");
+    expect(item).toMatchObject({ ok: true, evaluation: { id: "e1" } });
+  });
+
+  it("zwraca null dla oceny z obcego projektu lub wariantu i błąd dla uszkodzonego rekordu", async () => {
+    mocks.findFirst.mockResolvedValueOnce(null);
+    expect(await getEvaluation("p-obcy", "v1", "e1")).toBeNull();
+
+    mocks.findFirst.mockResolvedValueOnce(row({ result: { zepsute: true } }));
+    expect(await getEvaluation("p1", "v1", "e1")).toMatchObject({ ok: false, id: "e1" });
   });
 });

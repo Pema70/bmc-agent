@@ -60,3 +60,13 @@ export type EvaluationView = {
   promptVersion: string | null;
   result: EvaluationOutput;
 };
+
+/**
+ * Wynik narzędzia czatu evaluate_bmc widoczny dla modelu: tylko identyfikator zapisanej oceny (z bazy)
+ * albo polski komunikat błędu. Model nie dostaje punktów ani uzasadnień, a kartę wyniku UI czyta z bazy.
+ */
+export const EvaluateBmcOutput = z.discriminatedUnion("ok", [
+  z.strictObject({ ok: z.literal(true), evaluationId: z.string().min(1) }),
+  z.strictObject({ ok: z.literal(false), error: z.string().min(1) }),
+]);
+export type EvaluateBmcOutput = z.infer<typeof EvaluateBmcOutput>;

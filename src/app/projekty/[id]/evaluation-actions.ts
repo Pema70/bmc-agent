@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { runEvaluation, type EvaluationErrorCode } from "@/lib/ai/evaluate";
 import { requireProjectRole } from "@/lib/auth/permissions";
+import { getEvaluation, type EvaluationListItem } from "@/lib/db/evaluations";
 import { getVariantProjectId } from "@/lib/db/variants";
 import { VariantId } from "@/lib/schemas/bmc";
 import type { EvaluationView } from "@/lib/schemas/evaluation";
@@ -16,6 +17,37 @@ export type EvaluateModelActionResult =
 
 const FORBIDDEN_MESSAGE = "Nie masz uprawnień do oceniania modelu w tym projekcie.";
 const NOT_FOUND_MESSAGE = "Nie znaleziono tego wariantu w projekcie.";
+
+export type GetEvaluationActionResult =
+  | { ok: true; item: EvaluationListItem }
+  | { ok: false; error: "FORBIDDEN" | "VALIDATION" | "NOT_FOUND"; message: string };
+
+const EvaluationId = z.string().trim().min(1).max(64);
+
+/**
+ * Odczyt jednej zapisanej oceny dla karty w czacie (karta pokazuje dane z bazy, nie z tekstu modelu).
+ * Rola VIEWER przed jakimkolwiek odczytem; zapytanie zawsze z projectId ORAZ variantId.
+ */
+export async function getEvaluationAction(
+  projectId: string,
+  variantId: string,
+  evaluationId: string,
+): Promise<GetEvaluationActionResult> {
+  const access = await requireProjectRole(projectId, "VIEWER");
+  if (!access.ok) {
+    return { ok: false, error: "FORBIDDEN", message: "Nie masz uprawnień do tego projektu." };
+  }
+  const variant = VariantId.safeParse(variantId);
+  const id = EvaluationId.safeParse(evaluationId);
+  if (!variant.success || !id.success) {
+    return { ok: false, error: "VALIDATION", message: "Nieprawidłowy identyfikator oceny." };
+  }
+  const item = await getEvaluation(access.projectId, variant.data, id.data);
+  if (!item) {
+    return { ok: false, error: "NOT_FOUND", message: "Nie znaleziono tej oceny." };
+  }
+  return { ok: true, item };
+}
 
 /**
  * Ocena zapisanego stanu wariantu (nie tego, co jest w edytorze). Kolejność:

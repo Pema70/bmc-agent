@@ -132,6 +132,19 @@ export async function listEvaluationsForVariant(
   return rows.map(parseEvaluationRow);
 }
 
+/** Jedna ocena po id (bez migawki), z filtrem po projekcie i wariancie. Brak rekordu: null. */
+export async function getEvaluation(
+  projectId: string,
+  variantId: string,
+  evaluationId: string,
+): Promise<EvaluationListItem | null> {
+  const row = await prisma.evaluationResult.findFirst({
+    where: { id: evaluationId, projectId, variantId },
+    select: LIST_SELECT,
+  });
+  return row ? parseEvaluationRow(row) : null;
+}
+
 /** Migawka stanu ocenionego modelu, czytana osobno po id (też z filtrem po projekcie i wariancie). */
 export async function getEvaluationSnapshot(
   projectId: string,

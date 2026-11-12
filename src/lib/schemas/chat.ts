@@ -1,6 +1,7 @@
 import type { UIDataTypes, UIMessage } from "ai";
 import { z } from "zod";
 import { VariantId } from "@/lib/schemas/bmc";
+import { EvaluateBmcOutput } from "@/lib/schemas/evaluation";
 import { ProjectId } from "@/lib/schemas/project";
 import {
   ProposeBlockChangeInput,
@@ -50,12 +51,14 @@ export type ClarificationInput = z.infer<typeof ClarificationInput>;
 export type ChatTools = {
   ask_clarification: { input: ClarificationInput; output: ClarificationInput };
   propose_block_change: { input: ProposeBlockChangeToolInput; output: ProposeBlockChangeOutput };
+  evaluate_bmc: { input: Record<string, never>; output: EvaluateBmcOutput };
 };
 
 // Schematy narzędzi do walidacji zapisanych wiadomości (historia z bazy, odpowiedź przed zapisem).
 export const chatValidationTools = {
   ask_clarification: { inputSchema: ClarificationInput, outputSchema: ClarificationInput },
   propose_block_change: { inputSchema: ProposeBlockChangeInput, outputSchema: ProposeBlockChangeOutput },
+  evaluate_bmc: { inputSchema: z.object({}), outputSchema: EvaluateBmcOutput },
 };
 export type ChatUIMessage = UIMessage<unknown, UIDataTypes, ChatTools>;
 
