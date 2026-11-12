@@ -36,7 +36,7 @@ Rzeczy świadomie odłożone. Każda pozycja to osobny, mały PR po uzgodnieniu 
 ## Dane testowe i środowisko dev
 
 - **Dane testowe z kroku 4b w lokalnej bazie dev.** Konto `ocena-test@example.com` (hasło `!`, nie da się na nie zalogować), projekt „TEST ocena 4b (dane przykładowe)” z jedną oceną AI. Do usunięcia dopiero po zgodzie właściciela repozytorium (kasowanie kaskadowe: projekt, wariant, ocena, wiersze logów powiązane przez użytkownika).
-- **Różnica modelu dev.** `gemini-3.8-flash` z planu kroku 3 nie działał, dev używa `gemini-3.5-flash-lite` (`LLM_MODEL` w `.env`). Używany model zapisuje kolumna `model` w `LlmCallLog`, `EvaluationResult` i `ImpactAnalysis`, więc wyniki da się odróżnić. Przed pomiarami do pracy ustalić jeden model (sprawdzić nazwę w dokumentacji dostawcy), żeby wyniki ocen, analiz i kosztów dało się porównywać.
+- **Różnica modelu dev.** `gemini-3.8-flash` z planu kroku 3 nie działał, dev używa na ten moment albo `gemini-3.5-flash-lite`, albo `gemini-3.1-flash-lite` (`LLM_MODEL` w `.env`). Używany model zapisuje kolumna `model` w `LlmCallLog`, `EvaluationResult` i `ImpactAnalysis`, więc wyniki da się odróżnić. Przed pomiarami do pracy ustalić jeden model (sprawdzić nazwę w dokumentacji dostawcy), żeby wyniki ocen, analiz i kosztów dało się porównywać.
 
 ## Agent AI
 
