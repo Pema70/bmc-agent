@@ -17,6 +17,7 @@ import { createImpactAnalysis } from "@/lib/db/impact";
 import { getProject } from "@/lib/db/projects";
 import { getProposalInVariant } from "@/lib/db/proposals";
 import { getVariantForProject } from "@/lib/db/variants";
+import { APPLY_ERROR_MESSAGES, checkProposable } from "@/lib/bmc/proposals";
 import { BLOCK_KEYS, countEntries, type BmcState } from "@/lib/schemas/bmc";
 import {
   ImpactChange,
@@ -53,7 +54,6 @@ export type RunImpactResult =
   | { ok: false; error: ImpactErrorCode; message: string; retryAfterSec?: number };
 
 export const IMPACT_TOO_EMPTY_MESSAGE = `Model jest jeszcze zbyt pusty do analizy wpływu. Dodaj co najmniej ${IMPACT_MIN_ENTRIES} wpisy w co najmniej ${IMPACT_MIN_NON_EMPTY_BLOCKS} blokach.`;
-export const STALE_PROPOSAL_MESSAGE = "Propozycja dotyczy starszej wersji płótna.";
 export const IMPACT_NOT_FOUND_MESSAGE = "Nie znaleziono tego wariantu lub oczekującej propozycji w projekcie.";
 const VALIDATION_MESSAGE = "Nieprawidłowy opis zmiany.";
 const CONFIG_MESSAGE = "Agent jest źle skonfigurowany (model lub klucz API). Sprawdź konfigurację serwera.";
@@ -71,10 +71,7 @@ type ResolvedChange =
   | { ok: true; change: ImpactChange; proposalId: string | null }
   | { ok: false; error: "VALIDATION" | "NOT_FOUND" | "STALE_PROPOSAL"; message: string };
 
-async function resolveChange(
-  ctx: RunImpactContext,
-  variantVersion: number,
-): Promise<ResolvedChange> {
+async function resolveChange(ctx: RunImpactContext, state: BmcState): Promise<ResolvedChange> {
   const request = ImpactChangeRequest.safeParse(ctx.change);
   if (!request.success) {
     return { ok: false, error: "VALIDATION", message: VALIDATION_MESSAGE };
@@ -90,10 +87,11 @@ async function resolveChange(
   if (!proposal || proposal.status !== "PENDING") {
     return { ok: false, error: "NOT_FOUND", message: IMPACT_NOT_FOUND_MESSAGE };
   }
-  // Inaczej niż akceptacja (która sprawdza expectedVersion od klienta i stosuje zmianę do aktualnego stanu),
-  // analiza wymaga, by propozycja powstała na obecnej wersji płótna.
-  if (proposal.baseVersion !== variantVersion) {
-    return { ok: false, error: "STALE_PROPOSAL", message: STALE_PROPOSAL_MESSAGE };
+  // Te same reguły co przy akceptacji (checkProposable na aktualnym stanie): analizujemy tylko propozycję,
+  // którą dałoby się teraz zastosować. Odrzucenie następuje przed limitami i modelem.
+  const check = checkProposable(state, proposal);
+  if (!check.ok) {
+    return { ok: false, error: "STALE_PROPOSAL", message: APPLY_ERROR_MESSAGES[check.error] };
   }
   const change = ImpactChange.safeParse({
     kind: "PROPOSAL",
@@ -121,7 +119,7 @@ export async function runImpactAnalysis(ctx: RunImpactContext): Promise<RunImpac
     return { ok: false, error: "NOT_FOUND", message: IMPACT_NOT_FOUND_MESSAGE };
   }
 
-  const resolvedChange = await resolveChange(ctx, variant.version);
+  const resolvedChange = await resolveChange(ctx, variant.state);
   if (!resolvedChange.ok) {
     return { ok: false, error: resolvedChange.error, message: resolvedChange.message };
   }
