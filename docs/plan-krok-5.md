@@ -259,3 +259,9 @@ Na później (nie w 5a):
 - **5c:** znacznik „Analiza dla wersji N, aktualna to M” także przy wyróżnieniu na płótnie.
 - **Pomiar z prawdziwym API po 5b, przez interfejs.** Bez skryptów ładujących `.env` (zastępuje wzmiankę o tymczasowym skrypcie w sekcji Pomiar).
 - Po otwarciu PR 5a zatrzymuję się i czekam na review.
+
+## Zmiany w PR 5b (2026-11-12)
+
+- **`STALE_PROPOSAL` ujednolicone z akceptacją.** Zamiast porównywać `baseVersion` (punkt 1 wyżej, zastąpiony), `runImpactAnalysis` woła `checkProposable` na aktualnym stanie wariantu, tak jak akceptacja i narzędzie `propose_block_change`. `STALE_PROPOSAL` tylko wtedy, gdy propozycji nie dałoby się teraz zastosować (STALE / DUPLICATE / LIMIT), z komunikatem z `APPLY_ERROR_MESSAGES`; bez limitów, logu i modelu.
+- **Niezapisane zmiany płótna** blokują przycisk „Analizuj wpływ” i formularz „Co jeśli…?” (komunikat „Najpierw zapisz albo cofnij swoje zmiany”), bo analiza dotyczy zapisanego stanu.
+- **Pomiar z prawdziwym API** po 5b wykonuje użytkownik przez interfejs (lista kontrolna w opisie PR 5b).

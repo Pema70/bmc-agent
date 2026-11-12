@@ -23,11 +23,11 @@ vi.mock("@/lib/db/impact", () => ({ createImpactAnalysis: mocks.createImpactAnal
 import {
   IMPACT_SAVE_FAILED_MESSAGE,
   IMPACT_TOO_EMPTY_MESSAGE,
-  STALE_PROPOSAL_MESSAGE,
   isImpactAnalyzable,
   runImpactAnalysis,
 } from "@/lib/ai/impact";
 import { IMPACT_PROMPT_VERSION } from "@/lib/ai/prompts/impact";
+import { APPLY_ERROR_MESSAGES } from "@/lib/bmc/proposals";
 import { emptyBmcState, type BmcState } from "@/lib/schemas/bmc";
 import type { ImpactChangeRequest } from "@/lib/schemas/impact";
 
@@ -316,18 +316,30 @@ describe("runImpactAnalysis", () => {
     expect(mocks.logLlmCall).not.toHaveBeenCalled();
   });
 
-  it("propozycja ze starszej wersji płótna: STALE_PROPOSAL bez wywołania modelu", async () => {
-    mocks.getProposalInVariant.mockResolvedValue({ ...proposal, baseVersion: 3 });
+  it("propozycja ze starszej wersji, którą nadal da się zastosować, jest analizowana", async () => {
+    mocks.getProposalInVariant.mockResolvedValue({ ...proposal, baseVersion: 1 });
+    setModel(generateModel(JSON.stringify(goodOutput)));
+
+    const result = await runImpactAnalysis({ ...ctx, change: proposalRequest });
+
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it.each([
+    ["wpis before zniknął (STALE)", { ...proposal, before: "Nie ma takiego wpisu" }, APPLY_ERROR_MESSAGES.STALE],
+    ["wpis after już istnieje (DUPLICATE)", { ...proposal, after: "Aplikacja" }, APPLY_ERROR_MESSAGES.DUPLICATE],
+  ])("propozycji nie da się zastosować: %s -> STALE_PROPOSAL bez modelu, limitów i logu", async (_label, stale, message) => {
+    mocks.getProposalInVariant.mockResolvedValue(stale);
     const model = generateModel(JSON.stringify(goodOutput));
     setModel(model);
 
     const result = await runImpactAnalysis({ ...ctx, change: proposalRequest });
 
-    expect(result).toEqual({ ok: false, error: "STALE_PROPOSAL", message: STALE_PROPOSAL_MESSAGE });
-    expect(STALE_PROPOSAL_MESSAGE).toBe("Propozycja dotyczy starszej wersji płótna.");
+    expect(result).toEqual({ ok: false, error: "STALE_PROPOSAL", message });
     expect(model.doGenerateCalls).toHaveLength(0);
     expect(mocks.checkUserLimits).not.toHaveBeenCalled();
     expect(mocks.logLlmCall).not.toHaveBeenCalled();
+    expect(mocks.createImpactAnalysis).not.toHaveBeenCalled();
   });
 
   it("niepoprawny opis zmiany: VALIDATION bez modelu", async () => {
