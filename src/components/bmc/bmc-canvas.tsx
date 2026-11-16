@@ -2,24 +2,32 @@
 
 import { BLOCK_CARD_BASE, BLOCK_PLACEMENT, CANVAS_GRID } from "@/components/bmc/layout";
 import { ImpactCanvasBanner } from "@/components/impact/canvas-banner";
-import { ImpactBadge, ImpactDetails, impactBorderClass, useBlockImpact } from "@/components/impact/block-impact";
+import {
+  ImpactBadge,
+  ImpactDetails,
+  impactBorderClass,
+  useBlockImpact,
+  type BlockImpactState,
+} from "@/components/impact/block-impact";
 import { BLOCK_INFO, BLOCK_KEYS, type BlockKey, type BmcState } from "@/lib/schemas/bmc";
 
-export function BmcCanvas({ state }: { state: BmcState }) {
+// showImpact=false: podgląd cudzego stanu (np. kandydata strategii) bez wyróżnień aktywnej analizy wpływu bieżącego wariantu.
+export function BmcCanvas({ state, showImpact = true }: { state: BmcState; showImpact?: boolean }) {
   return (
     <div className="flex flex-col gap-2">
-      <ImpactCanvasBanner />
+      {showImpact ? <ImpactCanvasBanner /> : null}
       <div className={CANVAS_GRID}>
         {BLOCK_KEYS.map((key) => (
-          <ReadOnlyBlock key={key} blockKey={key} entries={state[key]} />
+          <ReadOnlyBlock key={key} blockKey={key} entries={state[key]} showImpact={showImpact} />
         ))}
       </div>
     </div>
   );
 }
 
-function ReadOnlyBlock({ blockKey, entries }: { blockKey: BlockKey; entries: string[] }) {
-  const impact = useBlockImpact(blockKey);
+function ReadOnlyBlock({ blockKey, entries, showImpact }: { blockKey: BlockKey; entries: string[]; showImpact: boolean }) {
+  const blockImpact = useBlockImpact(blockKey);
+  const impact: BlockImpactState = showImpact ? blockImpact : { kind: "none" };
   return (
     <section
       aria-labelledby={`block-${blockKey}`}
