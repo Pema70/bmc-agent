@@ -12,6 +12,7 @@ import { ImpactPanel } from "@/components/impact/impact-panel";
 import { ImpactProvider } from "@/components/impact/impact-provider";
 import { ProjectForm } from "@/components/projects/project-form";
 import { StrategiesPanel } from "@/components/strategies/strategies-panel";
+import { ComparePicker } from "@/components/variants/compare-picker";
 import { VariantActions } from "@/components/variants/variant-actions";
 import { VariantSwitcher } from "@/components/variants/variant-switcher";
 import { hasRole, requireProjectRole } from "@/lib/auth/permissions";
@@ -173,6 +174,7 @@ export default async function ProjectPage({
               isOwner={isOwner}
               pendingOnMain={pendingOnMain}
             />
+            <ComparePicker projectId={access.projectId} variants={variantSummaries} />
             <StrategiesPanel
               // Bez key zależnego od listy: nowe generacje dołącza sam z props initialItems (bez remountu).
               projectId={access.projectId}
