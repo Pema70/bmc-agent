@@ -114,7 +114,7 @@ export type VariantListItem = {
   entryCount: number | null;
 };
 
-const LIST_SELECT = {
+export const LIST_SELECT = {
   id: true,
   name: true,
   isMain: true,
@@ -126,7 +126,7 @@ const LIST_SELECT = {
   state: true,
 } as const;
 
-function toListItem(row: {
+export function toListItem(row: {
   id: string;
   name: string;
   isMain: boolean;
