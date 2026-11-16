@@ -22,3 +22,21 @@ export function nextCopyName(sourceName: string, existingNames: readonly string[
     }
   }
 }
+
+/**
+ * Nazwa wariantu ze strategii: nazwa od modelu, a przy powtórzeniu w projekcie numer „(2)”, „(3)”…
+ * Numerację nadaje serwer w transakcji. Całość mieści się w VARIANT_NAME_MAX_LENGTH.
+ */
+export function uniqueVariantName(name: string, existingNames: readonly string[]): string {
+  const base = name.trim();
+  const taken = new Set(existingNames);
+  if (!taken.has(base)) {
+    return base;
+  }
+  for (let n = 2; ; n += 1) {
+    const candidate = withSuffix(base, ` (${n})`);
+    if (!taken.has(candidate)) {
+      return candidate;
+    }
+  }
+}
