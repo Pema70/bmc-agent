@@ -305,3 +305,35 @@ export async function setMainVariant(
 export async function getVariantMeta(projectId: string, variantId: string): Promise<{ id: string; isMain: boolean } | null> {
   return prisma.bmcVariant.findFirst({ where: { id: variantId, projectId }, select: { id: true, isMain: true } });
 }
+
+export type VariantForCompare = {
+  id: string;
+  name: string;
+  description: string | null;
+  version: number;
+  state: BmcState;
+};
+
+/**
+ * Warianty do porównania jednym zapytaniem po projectId i liście id, w kolejności żądania. Wariant spoza projektu lub
+ * nieistniejący po prostu nie wchodzi do wyniku (wywołujący porównuje liczbę znalezionych z żądaną). Stan niezgodny
+ * z BmcState to błąd danych: jawny wyjątek zamiast porównywania uszkodzonego modelu.
+ */
+export async function getVariantsForCompare(projectId: string, variantIds: readonly string[]): Promise<VariantForCompare[]> {
+  const rows = await prisma.bmcVariant.findMany({
+    where: { projectId, id: { in: [...variantIds] } },
+    select: { id: true, name: true, description: true, version: true, state: true },
+  });
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return variantIds.flatMap((id) => {
+    const row = byId.get(id);
+    if (!row) {
+      return [];
+    }
+    const parsed = BmcState.safeParse(row.state);
+    if (!parsed.success) {
+      throw new Error(`Niepoprawny stan BMC w wariancie ${row.id}: ${z.prettifyError(parsed.error)}`);
+    }
+    return [{ id: row.id, name: row.name, description: row.description, version: row.version, state: parsed.data }];
+  });
+}
