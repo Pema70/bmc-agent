@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { loadAiLimits } from "@/lib/ai/config";
 import { requireProjectRole } from "@/lib/auth/permissions";
+import { MAIN_VARIANT_CONFLICT_MESSAGE } from "@/lib/bmc/messages";
 import { createVariant, getVariantProjectId, renameVariant, setMainVariant, type VariantListItem } from "@/lib/db/variants";
 import { VariantId } from "@/lib/schemas/bmc";
 import { CreateVariantInput, RenameVariantInput, SetMainVariantInput } from "@/lib/schemas/variant";
@@ -17,7 +18,6 @@ export type SetMainVariantActionResult = { ok: true; mainVariantId: string; chan
 
 const NOT_FOUND_MESSAGE = "Nie znaleziono tego wariantu w projekcie.";
 const CONFIG_MESSAGE = "Aplikacja jest źle skonfigurowana. Sprawdź konfigurację serwera.";
-export const CONFLICT_MESSAGE = "Wariant główny zmienił się w międzyczasie. Odśwież stronę, aby zobaczyć aktualny stan.";
 
 function forbidden(message: string): VariantActionFailure {
   return { ok: false, error: "FORBIDDEN", message };
@@ -137,7 +137,7 @@ export async function setMainVariantAction(
   const result = await setMainVariant(access.projectId, parsed.data.variantId, parsed.data.expectedMainId);
   if (!result.ok) {
     return result.error === "CONFLICT"
-      ? { ok: false, error: "CONFLICT", message: CONFLICT_MESSAGE }
+      ? { ok: false, error: "CONFLICT", message: MAIN_VARIANT_CONFLICT_MESSAGE }
       : { ok: false, error: "NOT_FOUND", message: NOT_FOUND_MESSAGE };
   }
 
