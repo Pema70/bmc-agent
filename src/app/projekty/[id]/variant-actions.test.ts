@@ -18,8 +18,8 @@ vi.mock("@/lib/db/variants", () => ({
 }));
 vi.mock("next/cache", () => ({ revalidatePath: m.revalidatePath }));
 
+import { MAIN_VARIANT_CONFLICT_MESSAGE as CONFLICT_MESSAGE } from "@/lib/bmc/messages";
 import {
-  CONFLICT_MESSAGE,
   createVariantAction,
   renameVariantAction,
   setMainVariantAction,

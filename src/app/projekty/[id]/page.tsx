@@ -11,16 +11,20 @@ import { EvaluationPanel } from "@/components/evaluation/evaluation-panel";
 import { ImpactPanel } from "@/components/impact/impact-panel";
 import { ImpactProvider } from "@/components/impact/impact-provider";
 import { ProjectForm } from "@/components/projects/project-form";
+import { VariantActions } from "@/components/variants/variant-actions";
+import { VariantSwitcher } from "@/components/variants/variant-switcher";
 import { hasRole, requireProjectRole } from "@/lib/auth/permissions";
 import { loadAiLimits } from "@/lib/ai/config";
 import { listChatMessages } from "@/lib/db/chat";
 import { listEvaluationsForVariant } from "@/lib/db/evaluations";
 import { listImpactAnalysesForVariant } from "@/lib/db/impact";
-import { listProposalsForVariant } from "@/lib/db/proposals";
+import { countPendingProposals, listProposalsForVariant } from "@/lib/db/proposals";
 import { getProject } from "@/lib/db/projects";
-import { getMainVariant } from "@/lib/db/variants";
+import { getVariantDetails, listVariants } from "@/lib/db/variants";
+import { VariantId } from "@/lib/schemas/bmc";
 import { PROJECT_ROLE_LABELS } from "@/lib/schemas/project";
 import type { ProposalItem } from "@/lib/schemas/proposal";
+import { toVariantSummary } from "@/lib/variants/presentation";
 
 const EVALUATIONS_SHOWN = 20;
 const IMPACT_ANALYSES_SHOWN = 20;
@@ -38,8 +42,15 @@ function Workspace({
   return provider ? <VariantWorkspaceProvider {...provider}>{children}</VariantWorkspaceProvider> : <>{children}</>;
 }
 
-export default async function ProjectPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProjectPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ wariant?: string | string[] }>;
+}) {
   const { id } = await params;
+  const { wariant } = await searchParams;
   const access = await requireProjectRole(id, "VIEWER");
   if (!access.ok) {
     notFound();
@@ -50,13 +61,36 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
     notFound();
   }
 
-  const variant = await getMainVariant(access.projectId);
-  const canEdit = hasRole(access.role, "OWNER");
-  const canEditCanvas = hasRole(access.role, "EDITOR");
-  // Czat tylko dla EDITOR i wyżej (D10); historię czytamy dopiero po sprawdzeniu roli.
-  const chatMessages =
-    variant && canEditCanvas ? await listChatMessages(access.projectId, loadAiLimits().historyLimit) : null;
+  const variantList = await listVariants(access.projectId);
+  const mainListed = variantList.find((item) => item.isMain) ?? null;
 
+  // Brak parametru: wariant główny. Parametr: wariant tego projektu (zapytanie po projectId); powtórzony,
+  // niepoprawny, obcy lub nieistniejący id to 404.
+  let selectedId: string | null = mainListed?.id ?? null;
+  if (Array.isArray(wariant)) {
+    notFound();
+  }
+  if (wariant !== undefined && wariant !== "") {
+    const parsedId = VariantId.safeParse(wariant);
+    if (!parsedId.success) {
+      notFound();
+    }
+    selectedId = parsedId.data;
+  }
+  const variant = selectedId ? await getVariantDetails(access.projectId, selectedId) : null;
+  if (selectedId && !variant) {
+    notFound();
+  }
+
+  const isOwner = hasRole(access.role, "OWNER");
+  const canEdit = isOwner;
+  const canEditCanvas = hasRole(access.role, "EDITOR");
+  // Czat tylko dla EDITOR i wyżej (D10) i tylko na wariancie głównym (D2); historię czytamy po sprawdzeniu roli.
+  const chatMessages =
+    variant && variant.isMain && canEditCanvas ? await listChatMessages(access.projectId, loadAiLimits().historyLimit) : null;
+
+  // Propozycje są przypięte do wariantu: czytamy je dla wyświetlanego wariantu, więc na wariancie niegłównym działają
+  // tak samo jak na głównym (przyciski w płótnie), a propozycje innych wariantów się tu nie pojawiają.
   const proposals = variant && canEditCanvas ? await listProposalsForVariant(access.projectId, variant.id, 200) : [];
   // Z bazy od najnowszej; interfejs potrzebuje kolejności powstawania.
   const initialProposals: ProposalItem[] = [...proposals].reverse().map((proposal) => ({
@@ -73,6 +107,12 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
   const evaluations = variant ? await listEvaluationsForVariant(access.projectId, variant.id, EVALUATIONS_SHOWN) : [];
   // Analizy wpływu: ta sama zasada (VIEWER i wyżej, projectId I variantId, lista bez migawki stanu).
   const impactAnalyses = variant ? await listImpactAnalysesForVariant(access.projectId, variant.id, IMPACT_ANALYSES_SHOWN) : [];
+  // Do potwierdzenia zmiany głównego (tylko właściciel, tylko na wariancie niegłównym): ile propozycji czeka na starym głównym.
+  const pendingOnMain =
+    isOwner && variant && !variant.isMain && mainListed
+      ? await countPendingProposals(access.projectId, mainListed.id)
+      : 0;
+  const variantSummaries = variantList.map(toVariantSummary);
   const workspaceProvider =
     variant && canEditCanvas
       ? {
@@ -111,9 +151,25 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
           currentVersion={variant?.version ?? 0}
           initialItems={impactAnalyses}
         >
+        {variant ? (
+          <section className="flex flex-col gap-3" aria-labelledby="variants-heading">
+            <h2 id="variants-heading" className="text-lg font-semibold">
+              Warianty
+            </h2>
+            <VariantSwitcher projectId={access.projectId} variants={variantSummaries} currentId={variant.id} />
+            <VariantActions
+              projectId={access.projectId}
+              current={{ id: variant.id, name: variant.name, isMain: variant.isMain }}
+              mainVariantId={mainListed?.id ?? null}
+              canEdit={canEditCanvas}
+              isOwner={isOwner}
+              pendingOnMain={pendingOnMain}
+            />
+          </section>
+        ) : null}
         <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <section className="flex min-w-0 flex-col gap-4" aria-labelledby="canvas-heading">
-            <h2 id="canvas-heading" className="text-lg font-semibold">
+            <h2 id="canvas-heading" className="text-lg font-semibold break-words">
               {variant ? variant.name : "Business Model Canvas"}
             </h2>
             {variant && canEditCanvas ? (
@@ -133,6 +189,19 @@ export default async function ProjectPage({ params }: { params: Promise<{ id: st
               variantId={variant.id}
               initialMessages={chatMessages}
             />
+          ) : variant && canEditCanvas ? (
+            <aside className="flex flex-col gap-2 self-start rounded-md border border-zinc-200 p-4 text-sm dark:border-zinc-800">
+              <p className="font-medium">Czat działa na wariancie głównym</p>
+              <p className="text-zinc-600 dark:text-zinc-400">
+                Ten wariant nie jest główny, więc rozmowa z agentem jest tu niedostępna. Oceny i analizy wpływu działają na
+                każdym wariancie.
+              </p>
+              {mainListed ? (
+                <Link href={`/projekty/${access.projectId}`} className="font-medium underline">
+                  Przejdź do wariantu głównego
+                </Link>
+              ) : null}
+            </aside>
           ) : null}
         </div>
         {variant ? (
