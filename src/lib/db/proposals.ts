@@ -255,3 +255,8 @@ export async function getProposalInVariant(
 ): Promise<ProposalRecord | null> {
   return findProposalInVariant(prisma, { projectId, variantId, proposalId });
 }
+
+/** Liczba oczekujących propozycji wariantu, tylko z wariantu należącego do projektu (np. do potwierdzenia zmiany głównego). */
+export async function countPendingProposals(projectId: string, variantId: string): Promise<number> {
+  return prisma.proposal.count({ where: { variantId, status: "PENDING", variant: { projectId } } });
+}

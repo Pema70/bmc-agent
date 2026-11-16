@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getProjectAccess: vi.fn(),
   getVariantForProject: vi.fn(),
+  getVariantMeta: vi.fn(),
   getProject: vi.fn(),
   checkUserLimits: vi.fn(),
   getChatModel: vi.fn(),
@@ -18,7 +19,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/permissions", () => ({ getProjectAccess: mocks.getProjectAccess }));
-vi.mock("@/lib/db/variants", () => ({ getVariantForProject: mocks.getVariantForProject }));
+vi.mock("@/lib/db/variants", () => ({
+  getVariantForProject: mocks.getVariantForProject,
+  getVariantMeta: mocks.getVariantMeta,
+}));
 vi.mock("@/lib/db/projects", () => ({ getProject: mocks.getProject }));
 vi.mock("@/lib/ai/limits", () => ({ checkUserLimits: mocks.checkUserLimits }));
 vi.mock("@/lib/ai/models", () => ({ getChatModel: mocks.getChatModel }));
@@ -142,6 +146,7 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   mocks.getProjectAccess.mockResolvedValue(editorAccess);
   mocks.getVariantForProject.mockResolvedValue({ id: "v1", version: 3, state });
+  mocks.getVariantMeta.mockResolvedValue({ id: "v1", isMain: true });
   mocks.getProject.mockResolvedValue({ id: "p1", name: "Kawiarnia", description: "Mała kawiarnia w centrum" });
   mocks.checkUserLimits.mockResolvedValue({ ok: true });
   mocks.listChatMessages.mockResolvedValue([]);
@@ -212,6 +217,44 @@ describe("POST /api/chat: uprawnienia i walidacja (bez odczytu i bez wywołania 
     expect(mocks.checkUserLimits).not.toHaveBeenCalled();
     expect(mocks.listChatMessages).not.toHaveBeenCalled();
     expect(mocks.saveChatMessage).not.toHaveBeenCalled();
+    expect(mocks.getChatModel).not.toHaveBeenCalled();
+  });
+
+  it("wariant niegłówny zwraca 409: czat działa tylko na głównym, bez limitów, historii, zapisu i modelu", async () => {
+    mocks.getVariantForProject.mockResolvedValue({ id: "v2", version: 1, state });
+    mocks.getVariantMeta.mockResolvedValue({ id: "v2", isMain: false });
+
+    const response = await POST(request({ ...validBody, variantId: "v2" }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "VARIANT_NOT_MAIN", message: "Czat działa na wariancie głównym." });
+    expect(mocks.getVariantMeta).toHaveBeenCalledWith("p1", "v2");
+    expect(mocks.checkUserLimits).not.toHaveBeenCalled();
+    expect(mocks.getProject).not.toHaveBeenCalled();
+    expect(mocks.listChatMessages).not.toHaveBeenCalled();
+    expect(mocks.saveChatMessage).not.toHaveBeenCalled();
+    expect(mocks.getChatModel).not.toHaveBeenCalled();
+    expect(mocks.logLlmCall).not.toHaveBeenCalled();
+  });
+
+  it("kolejność: sesja i EDITOR przed odczytem, wariant z projektu przed sprawdzeniem głównego", async () => {
+    mocks.getProjectAccess.mockResolvedValue({ ok: false, error: "FORBIDDEN", session, projectId: "p1", role: "VIEWER" });
+    expect((await POST(request({ ...validBody, variantId: "v2" }))).status).toBe(403);
+    expect(mocks.getVariantMeta).not.toHaveBeenCalled();
+
+    mocks.getProjectAccess.mockResolvedValue(editorAccess);
+    mocks.getVariantForProject.mockResolvedValue(null);
+    expect((await POST(request({ ...validBody, variantId: "v-z-innego-projektu" }))).status).toBe(404);
+    expect(mocks.getVariantMeta).not.toHaveBeenCalled();
+  });
+
+  it("wariant znika między odczytami: 404, bez limitów i modelu", async () => {
+    mocks.getVariantMeta.mockResolvedValue(null);
+
+    const response = await POST(request(validBody));
+
+    expect(response.status).toBe(404);
+    expect(mocks.checkUserLimits).not.toHaveBeenCalled();
     expect(mocks.getChatModel).not.toHaveBeenCalled();
   });
 

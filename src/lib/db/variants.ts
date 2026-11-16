@@ -297,3 +297,11 @@ export async function setMainVariant(
     return { ok: true, mainVariantId: variantId, changed: true } as const;
   });
 }
+
+/**
+ * Minimalne dane wariantu (bez stanu) do sprawdzeń uprawnień i reguł, np. „czat tylko dla wariantu głównego”.
+ * Zapytanie po id i projectId; null dla wariantu z innego projektu.
+ */
+export async function getVariantMeta(projectId: string, variantId: string): Promise<{ id: string; isMain: boolean } | null> {
+  return prisma.bmcVariant.findFirst({ where: { id: variantId, projectId }, select: { id: true, isMain: true } });
+}

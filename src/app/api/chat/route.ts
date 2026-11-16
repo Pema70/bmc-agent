@@ -19,7 +19,7 @@ import { createChatTools } from "@/lib/ai/tools";
 import { getProjectAccess } from "@/lib/auth/permissions";
 import { listChatMessages, newChatMessageId, saveChatMessage } from "@/lib/db/chat";
 import { getProject } from "@/lib/db/projects";
-import { getVariantForProject } from "@/lib/db/variants";
+import { getVariantForProject, getVariantMeta } from "@/lib/db/variants";
 import { chatRequestSchema, chatValidationTools, type ChatUIMessage } from "@/lib/schemas/chat";
 
 const MAX_RETRIES = 2;
@@ -77,6 +77,16 @@ export async function POST(req: Request): Promise<Response> {
   const variant = await getVariantForProject(projectId, request.variantId);
   if (!variant) {
     return jsonError(404, "NOT_FOUND", "Nie znaleziono tego wariantu w projekcie.");
+  }
+
+  // 3b. Czat działa tylko na wariancie głównym (D2): jeden wątek na projekt nie ma variantId, a propozycje i narzędzia
+  // dotyczą wariantu z żądania. Sprawdzenie przed limitami, żeby odrzucone żądanie niczego nie zużywało.
+  const meta = await getVariantMeta(projectId, variant.id);
+  if (!meta) {
+    return jsonError(404, "NOT_FOUND", "Nie znaleziono tego wariantu w projekcie.");
+  }
+  if (!meta.isMain) {
+    return jsonError(409, "VARIANT_NOT_MAIN", "Czat działa na wariancie głównym.");
   }
 
   // 4. Limity użytkownika.
