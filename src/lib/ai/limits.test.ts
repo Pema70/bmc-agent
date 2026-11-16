@@ -19,6 +19,8 @@ const limits = {
   maxMessageChars: 4000,
   historyLimit: 30,
   maxPendingProposals: 20,
+  maxVariantsPerProject: 10,
+  maxOutputTokensLong: 12_000,
 };
 
 function usage(requests: number, input: number | null, output: number | null) {

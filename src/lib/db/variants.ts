@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/client";
 import type { PrismaClient } from "@/generated/prisma/client";
-import { BmcState } from "@/lib/schemas/bmc";
+import { nextCopyName } from "@/lib/bmc/variant-names";
+import { BmcState, countEntries } from "@/lib/schemas/bmc";
+import type { VariantOrigin } from "@/lib/schemas/variant";
 
 export const MAIN_VARIANT_NAME = "Wariant główny";
 
@@ -93,4 +95,205 @@ export async function saveVariantState(
 
   const count = await writeVariantStateIfVersion(prisma, variantId, expectedVersion, parsed.data);
   return count === 0 ? { ok: false, error: "VERSION_CONFLICT" } : { ok: true, version: expectedVersion + 1 };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Warianty (krok 6). Każdy odczyt i zapis jest ograniczony do projektu (projectId); stan zawsze czyta serwer z bazy.
+// ---------------------------------------------------------------------------------------------------------------------
+
+export type VariantListItem = {
+  id: string;
+  name: string;
+  isMain: boolean;
+  origin: VariantOrigin;
+  description: string | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+  // Liczba wpisów we wszystkich blokach; null, gdy stan w bazie jest uszkodzony (lista ma się mimo to wyświetlić).
+  entryCount: number | null;
+};
+
+const LIST_SELECT = {
+  id: true,
+  name: true,
+  isMain: true,
+  origin: true,
+  description: true,
+  version: true,
+  createdAt: true,
+  updatedAt: true,
+  state: true,
+} as const;
+
+function toListItem(row: {
+  id: string;
+  name: string;
+  isMain: boolean;
+  origin: VariantOrigin;
+  description: string | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+  state: unknown;
+}): VariantListItem {
+  const { state, ...rest } = row;
+  const parsed = BmcState.safeParse(state);
+  return { ...rest, entryCount: parsed.success ? countEntries(parsed.data) : null };
+}
+
+/** Warianty projektu (główny pierwszy, potem od najstarszego), bez stanu, z liczbą wpisów. */
+export async function listVariants(projectId: string): Promise<VariantListItem[]> {
+  const rows = await prisma.bmcVariant.findMany({
+    where: { projectId },
+    orderBy: [{ isMain: "desc" }, { createdAt: "asc" }, { id: "asc" }],
+    select: LIST_SELECT,
+  });
+  return rows.map(toListItem);
+}
+
+export type VariantDetails = {
+  id: string;
+  name: string;
+  isMain: boolean;
+  origin: VariantOrigin;
+  description: string | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+  state: BmcState;
+};
+
+/**
+ * Wariant tylko wtedy, gdy należy do wskazanego projektu (jedno zapytanie po id i projectId); null dla cudzego.
+ * Stan niezgodny z BmcState to błąd danych: rzucamy jawny wyjątek zamiast pokazywać uszkodzony model.
+ */
+export async function getVariantDetails(projectId: string, variantId: string): Promise<VariantDetails | null> {
+  const row = await prisma.bmcVariant.findFirst({
+    where: { id: variantId, projectId },
+    select: LIST_SELECT,
+  });
+  if (!row) {
+    return null;
+  }
+  const parsed = BmcState.safeParse(row.state);
+  if (!parsed.success) {
+    throw new Error(`Niepoprawny stan BMC w wariancie ${row.id}: ${z.prettifyError(parsed.error)}`);
+  }
+  return {
+    id: row.id,
+    name: row.name,
+    isMain: row.isMain,
+    origin: row.origin,
+    description: row.description,
+    version: row.version,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    state: parsed.data,
+  };
+}
+
+export type CreateVariantResult =
+  | { ok: true; variant: VariantListItem }
+  | { ok: false; error: "NOT_FOUND" | "LIMIT" };
+
+/**
+ * Kopia zapisanego wariantu. Stan pochodzi z bazy (nigdy od klienta), nazwę nadaje serwer w transakcji
+ * („(kopia)”, „(kopia 2)”…). Limit wariantów na projekt jest egzekwowany pod blokadą wiersza projektu,
+ * więc równoległe żądania nie przekroczą go o jedną kopię.
+ */
+export async function createVariant(args: {
+  projectId: string;
+  sourceVariantId: string;
+  createdById: string;
+  maxVariants: number;
+}): Promise<CreateVariantResult> {
+  const { projectId, sourceVariantId, createdById, maxVariants } = args;
+
+  return prisma.$transaction(async (tx) => {
+    const locked = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "Project" WHERE "id" = ${projectId} FOR UPDATE`;
+    if (locked.length === 0) {
+      return { ok: false, error: "NOT_FOUND" } as const;
+    }
+
+    const source = await tx.bmcVariant.findFirst({
+      where: { id: sourceVariantId, projectId },
+      select: { id: true, name: true, state: true },
+    });
+    if (!source) {
+      return { ok: false, error: "NOT_FOUND" } as const;
+    }
+    const state = BmcState.safeParse(source.state);
+    if (!state.success) {
+      throw new Error(`Niepoprawny stan BMC w wariancie ${source.id}: ${z.prettifyError(state.error)}`);
+    }
+
+    const existing = await tx.bmcVariant.findMany({ where: { projectId }, select: { name: true } });
+    if (existing.length >= maxVariants) {
+      return { ok: false, error: "LIMIT" } as const;
+    }
+
+    const row = await tx.bmcVariant.create({
+      data: {
+        projectId,
+        name: nextCopyName(
+          source.name,
+          existing.map((variant) => variant.name),
+        ),
+        isMain: false,
+        state: state.data,
+        origin: "MANUAL",
+        createdById,
+      },
+      select: LIST_SELECT,
+    });
+    return { ok: true, variant: toListItem(row) } as const;
+  });
+}
+
+export type RenameVariantResult = { ok: true } | { ok: false; error: "NOT_FOUND" };
+
+/** Zmiana nazwy nie zmienia `version` (to wersja stanu), więc nie wywołuje fałszywych konfliktów edycji. */
+export async function renameVariant(projectId: string, variantId: string, name: string): Promise<RenameVariantResult> {
+  const { count } = await prisma.bmcVariant.updateMany({ where: { id: variantId, projectId }, data: { name } });
+  return count === 0 ? { ok: false, error: "NOT_FOUND" } : { ok: true };
+}
+
+export type SetMainVariantResult =
+  | { ok: true; mainVariantId: string; changed: boolean }
+  | { ok: false; error: "NOT_FOUND" | "CONFLICT" };
+
+/**
+ * Ustawia wariant główny w jednej transakcji z blokadą (FOR UPDATE) wszystkich wariantów projektu.
+ * Najpierw zdejmuje isMain ze starego, potem ustawia nowemu (częściowy indeks unikalny dopuszcza jednego głównego).
+ * `expectedMainId` to główny, którego widział klient; niezgodność oznacza konflikt (ktoś zmienił głównego w międzyczasie).
+ * Nie zmienia `version` ani stanu żadnego wariantu.
+ */
+export async function setMainVariant(
+  projectId: string,
+  variantId: string,
+  expectedMainId: string | null,
+): Promise<SetMainVariantResult> {
+  return prisma.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<Array<{ id: string; isMain: boolean }>>`
+      SELECT "id", "isMain" FROM "BmcVariant" WHERE "projectId" = ${projectId} FOR UPDATE`;
+    const target = rows.find((row) => row.id === variantId);
+    if (!target) {
+      return { ok: false, error: "NOT_FOUND" } as const;
+    }
+    const current = rows.find((row) => row.isMain);
+    if ((current?.id ?? null) !== expectedMainId) {
+      return { ok: false, error: "CONFLICT" } as const;
+    }
+    if (target.isMain) {
+      return { ok: true, mainVariantId: variantId, changed: false } as const;
+    }
+
+    if (current) {
+      await tx.bmcVariant.updateMany({ where: { id: current.id, projectId }, data: { isMain: false } });
+    }
+    await tx.bmcVariant.updateMany({ where: { id: variantId, projectId }, data: { isMain: true } });
+    return { ok: true, mainVariantId: variantId, changed: true } as const;
+  });
 }

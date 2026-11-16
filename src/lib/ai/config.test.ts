@@ -11,6 +11,8 @@ describe("loadAiLimits", () => {
       maxMessageChars: 4000,
       historyLimit: 30,
       maxPendingProposals: 20,
+      maxVariantsPerProject: 10,
+      maxOutputTokensLong: 12_000,
     });
   });
 
