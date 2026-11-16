@@ -31,7 +31,7 @@ Rzeczy świadomie odłożone. Każda pozycja to osobny, mały PR po uzgodnieniu 
 
 - **Aktualizacja sekcji „Komendy” w `CLAUDE.md`** do faktycznych skryptów z `package.json` (np. `typecheck` to `next typegen && tsc --noEmit`, `test:watch`, `postinstall: prisma generate`, port bazy 5433). Zrobione w PR `docs/porzadki-po-kroku-3`.
 
-- **Wspólny helper przepływu LLM.** `runEvaluation`, `runImpactAnalysis` i (w kroku 6) kolejne funkcje powielają ten sam przepływ: odczyt wariantu, limity, kontrola minimalnej zawartości, model, `safeParse`, log, zapis, mapowanie błędów. Wydzielić wspólny helper na początku kroku 6 (D8 z `docs/plan-krok-5.md`), zanim powstaną trzecia i czwarta kopia.
+- **Wspólny helper przepływu LLM.** `runEvaluation`, `runImpactAnalysis` i (w kroku 6) kolejne funkcje powielają ten sam przepływ: odczyt wariantu, limity, kontrola minimalnej zawartości, model, `safeParse`, log, zapis, mapowanie błędów. Wydzielić wspólny helper na początku kroku 6 (D8 z `docs/plan-krok-5.md`), zanim powstaną trzecia i czwarta kopia. Zrobione w PR 6a (`src/lib/ai/run-object-operation.ts`, użyty przez `runEvaluation` i `runImpactAnalysis`); kolejne funkcje (strategie, porównanie) użyją go od razu.
 
 - **Usuwanie lub archiwizacja wariantów (krok 6, D9).** Krok 6 nie dodaje usuwania wariantów; liczbę wariantów ogranicza `MAX_VARIANTS_PER_PROJECT` (domyślnie 10). Usunięcie wariantu skasowałoby kaskadowo jego `Proposal`, `EvaluationResult`, `ImpactAnalysis` i `StrategyGeneration` (dane pomiarowe do pracy), więc do rozważenia: usuwanie przez OWNER z wpisaniem nazwy i listą skutków albo archiwizacja (`archivedAt`).
 
