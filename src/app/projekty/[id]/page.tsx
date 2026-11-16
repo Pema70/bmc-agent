@@ -11,6 +11,7 @@ import { EvaluationPanel } from "@/components/evaluation/evaluation-panel";
 import { ImpactPanel } from "@/components/impact/impact-panel";
 import { ImpactProvider } from "@/components/impact/impact-provider";
 import { ProjectForm } from "@/components/projects/project-form";
+import { StrategiesPanel } from "@/components/strategies/strategies-panel";
 import { VariantActions } from "@/components/variants/variant-actions";
 import { VariantSwitcher } from "@/components/variants/variant-switcher";
 import { hasRole, requireProjectRole } from "@/lib/auth/permissions";
@@ -20,6 +21,7 @@ import { listEvaluationsForVariant } from "@/lib/db/evaluations";
 import { listImpactAnalysesForVariant } from "@/lib/db/impact";
 import { countPendingProposals, listProposalsForVariant } from "@/lib/db/proposals";
 import { getProject } from "@/lib/db/projects";
+import { listStrategyGenerationsForVariant } from "@/lib/db/strategies";
 import { getVariantDetails, listVariants } from "@/lib/db/variants";
 import { VariantId } from "@/lib/schemas/bmc";
 import { PROJECT_ROLE_LABELS } from "@/lib/schemas/project";
@@ -28,6 +30,7 @@ import { toVariantSummary } from "@/lib/variants/presentation";
 
 const EVALUATIONS_SHOWN = 20;
 const IMPACT_ANALYSES_SHOWN = 20;
+const STRATEGIES_SHOWN = 20;
 
 export const metadata: Metadata = { title: "Projekt" };
 
@@ -107,6 +110,11 @@ export default async function ProjectPage({
   const evaluations = variant ? await listEvaluationsForVariant(access.projectId, variant.id, EVALUATIONS_SHOWN) : [];
   // Analizy wpływu: ta sama zasada (VIEWER i wyżej, projectId I variantId, lista bez migawki stanu).
   const impactAnalyses = variant ? await listImpactAnalysesForVariant(access.projectId, variant.id, IMPACT_ANALYSES_SHOWN) : [];
+  // Strategie (kandydaci): ta sama zasada (VIEWER i wyżej, projectId I variantId, lista bez migawki stanu, uszkodzony
+  // rekord jako wiersz z błędem).
+  const strategyGenerations = variant
+    ? await listStrategyGenerationsForVariant(access.projectId, variant.id, STRATEGIES_SHOWN)
+    : [];
   // Do potwierdzenia zmiany głównego (tylko właściciel, tylko na wariancie niegłównym): ile propozycji czeka na starym głównym.
   const pendingOnMain =
     isOwner && variant && !variant.isMain && mainListed
@@ -154,7 +162,7 @@ export default async function ProjectPage({
         {variant ? (
           <section className="flex flex-col gap-3" aria-labelledby="variants-heading">
             <h2 id="variants-heading" className="text-lg font-semibold">
-              Warianty
+              Warianty i strategie
             </h2>
             <VariantSwitcher projectId={access.projectId} variants={variantSummaries} currentId={variant.id} />
             <VariantActions
@@ -164,6 +172,14 @@ export default async function ProjectPage({
               canEdit={canEditCanvas}
               isOwner={isOwner}
               pendingOnMain={pendingOnMain}
+            />
+            <StrategiesPanel
+              // Bez key zależnego od listy: nowe generacje dołącza sam z props initialItems (bez remountu).
+              projectId={access.projectId}
+              variantId={variant.id}
+              canGenerate={canEditCanvas}
+              currentVersion={variant.version}
+              initialItems={strategyGenerations}
             />
           </section>
         ) : null}
