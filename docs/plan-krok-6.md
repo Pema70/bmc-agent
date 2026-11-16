@@ -1,5 +1,7 @@
 # Plan kroku 6: `generate_strategies`, `compare_variants`, zapis i widok wariantów
 
+> Sekcja „Zmiany po akceptacji” na końcu pliku ma pierwszeństwo przed treścią powyżej (m.in. 6f wycięty, chat-v5 tylko w PR P).
+
 Krok 6 z `docs/spec.md` §14. **Do akceptacji (2026-11-16).**
 Ten plik trafia 1:1 do `docs/plan-krok-6.md` jako pierwszy commit `docs:` pierwszego PR-a (6a).
 
