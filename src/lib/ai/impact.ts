@@ -1,18 +1,13 @@
-import { NoObjectGeneratedError, Output, generateText } from "ai";
 import {
   IMPACT_MIN_ENTRIES,
   IMPACT_MIN_NON_EMPTY_BLOCKS,
-  loadAiLimits,
 } from "@/lib/ai/config";
-import { classifyLlmError } from "@/lib/ai/errors";
-import { checkUserLimits } from "@/lib/ai/limits";
-import { logLlmCall, type TokenUsage } from "@/lib/ai/log";
-import { getChatModel } from "@/lib/ai/models";
 import {
   IMPACT_PROMPT_VERSION,
   buildImpactPrompt,
   buildImpactSystemPrompt,
 } from "@/lib/ai/prompts/impact";
+import { runObjectOperation, type ObjectOperationSpec } from "@/lib/ai/run-object-operation";
 import { createImpactAnalysis } from "@/lib/db/impact";
 import { getProject } from "@/lib/db/projects";
 import { getProposalInVariant } from "@/lib/db/proposals";
@@ -27,7 +22,6 @@ import {
 } from "@/lib/schemas/impact";
 
 export const IMPACT_OPERATION = "analyze_impact";
-const MAX_RETRIES = 2;
 
 export type RunImpactContext = {
   projectId: string;
@@ -106,130 +100,63 @@ async function resolveChange(ctx: RunImpactContext, state: BmcState): Promise<Re
   return { ok: true, change: change.data, proposalId: proposal.id };
 }
 
-/**
- * Jedyna funkcja analizy wpływu, wołana zarówno z interfejsu (Server Action), jak i z narzędzia czatu.
- * Wywołujący sprawdza sesję i rolę EDITOR przed wywołaniem; tu dodatkowo wariant i propozycja są czytane
- * po projectId i variantId. variantVersion i migawka stanu pochodzą z jednego odczytu wariantu,
- * wykonanego przed wywołaniem modelu, więc analizowany jest dokładnie ten stan.
- */
-export async function runImpactAnalysis(ctx: RunImpactContext): Promise<RunImpactResult> {
-  const variant = await getVariantForProject(ctx.projectId, ctx.variantId);
-  const project = variant ? await getProject(ctx.projectId) : null;
-  if (!variant || !project) {
-    return { ok: false, error: "NOT_FOUND", message: IMPACT_NOT_FOUND_MESSAGE };
-  }
+type Loaded = {
+  variant: NonNullable<Awaited<ReturnType<typeof getVariantForProject>>>;
+  project: NonNullable<Awaited<ReturnType<typeof getProject>>>;
+};
+type Prepared = { change: ImpactChange; proposalId: string | null };
 
-  const resolvedChange = await resolveChange(ctx, variant.state);
-  if (!resolvedChange.ok) {
-    return { ok: false, error: resolvedChange.error, message: resolvedChange.message };
-  }
-  const { change, proposalId } = resolvedChange;
-
-  let limits: ReturnType<typeof loadAiLimits>;
-  try {
-    limits = loadAiLimits();
-  } catch (error) {
-    console.error("[impact] Błędna konfiguracja limitów:", error instanceof Error ? error.message : "nieznany błąd");
-    return { ok: false, error: "CONFIG", message: CONFIG_MESSAGE };
-  }
-
-  const limitCheck = await checkUserLimits(ctx.userId, new Date(), limits);
-  if (!limitCheck.ok) {
-    return { ok: false, error: "LIMIT", message: limitCheck.message, retryAfterSec: limitCheck.retryAfterSec };
-  }
-
-  if (!isImpactAnalyzable(variant.state)) {
-    return { ok: false, error: "TOO_EMPTY", message: IMPACT_TOO_EMPTY_MESSAGE };
-  }
-
-  let resolved: ReturnType<typeof getChatModel>;
-  try {
-    resolved = getChatModel("chat");
-  } catch (error) {
-    console.error("[impact] Błędna konfiguracja modelu:", error instanceof Error ? error.message : "nieznany błąd");
-    return { ok: false, error: "CONFIG", message: CONFIG_MESSAGE };
-  }
-
-  const startedAt = Date.now();
-  const base = {
-    projectId: ctx.projectId,
-    userId: ctx.userId,
-    operation: IMPACT_OPERATION,
-    provider: resolved.provider,
-    modelId: resolved.modelId,
-    promptVersion: IMPACT_PROMPT_VERSION,
-  };
-  const duration = () => Date.now() - startedAt;
-
-  let output: ImpactOutput;
-  let usage: TokenUsage;
-  try {
-    const result = await generateText({
-      model: resolved.model,
-      system: buildImpactSystemPrompt(),
-      prompt: buildImpactPrompt(project, variant.state, change),
-      output: Output.object({
-        schema: ImpactOutput,
-        name: "bmc_impact_analysis",
-        description: "Analiza wpływu zmiany w jednym bloku BMC na pozostałe bloki: podsumowanie i lista dotkniętych bloków.",
-      }),
-      maxOutputTokens: limits.maxOutputTokens,
-      maxRetries: MAX_RETRIES,
-      abortSignal: ctx.abortSignal,
-    });
-    usage = { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens };
-
-    // Druga, jawna walidacja: do bazy trafia wyłącznie obiekt, który przeszedł nasz schemat,
-    // a blok zmieniany nie może występować wśród dotkniętych (analiza dotyczy "pozostałych").
-    const parsed = ImpactOutput.safeParse(result.output);
-    if (!parsed.success || parsed.data.affected.some((item) => item.blockKey === change.blockKey)) {
-      await logLlmCall({
-        ...base,
-        durationMs: duration(),
-        usage,
-        stepCount: 1,
-        status: "SCHEMA_ERROR",
-        errorCode: "INVALID_RESPONSE",
-      });
-      return { ok: false, error: "SCHEMA", message: SCHEMA_MESSAGE };
+// Przepływ (limity, model, walidacja, log, zapis) jest we wspólnym helperze; tu zostaje to, co specyficzne dla analizy:
+// rozwiązanie zmiany (przed limitami) i reguła „blok zmieniany nie występuje wśród dotkniętych”.
+const IMPACT_SPEC: ObjectOperationSpec<
+  RunImpactContext,
+  Loaded,
+  Prepared,
+  ImpactOutput,
+  ImpactView,
+  "VALIDATION" | "NOT_FOUND" | "STALE_PROPOSAL"
+> = {
+  tag: "impact",
+  operation: IMPACT_OPERATION,
+  promptVersion: IMPACT_PROMPT_VERSION,
+  schema: ImpactOutput,
+  schemaName: "bmc_impact_analysis",
+  schemaDescription: "Analiza wpływu zmiany w jednym bloku BMC na pozostałe bloki: podsumowanie i lista dotkniętych bloków.",
+  messages: {
+    notFound: IMPACT_NOT_FOUND_MESSAGE,
+    tooEmpty: IMPACT_TOO_EMPTY_MESSAGE,
+    schema: SCHEMA_MESSAGE,
+    config: CONFIG_MESSAGE,
+    saveFailed: IMPACT_SAVE_FAILED_MESSAGE,
+    saveFailedLog: "Nie udało się zapisać analizy:",
+  },
+  load: async (ctx) => {
+    const variant = await getVariantForProject(ctx.projectId, ctx.variantId);
+    const project = variant ? await getProject(ctx.projectId) : null;
+    return variant && project ? { variant, project } : null;
+  },
+  prepare: async (ctx, { variant }) => {
+    const resolvedChange = await resolveChange(ctx, variant.state);
+    if (!resolvedChange.ok) {
+      return { ok: false, error: resolvedChange.error, message: resolvedChange.message };
     }
-    output = parsed.data;
-  } catch (error) {
-    if (NoObjectGeneratedError.isInstance(error)) {
-      await logLlmCall({
-        ...base,
-        durationMs: duration(),
-        usage: error.usage
-          ? { inputTokens: error.usage.inputTokens, outputTokens: error.usage.outputTokens }
-          : undefined,
-        stepCount: 1,
-        status: "SCHEMA_ERROR",
-        // Odpowiedź ucięta limitem tokenów to inny problem niż zły format, więc liczymy je osobno.
-        errorCode: error.finishReason === "length" ? "TRUNCATED" : "INVALID_RESPONSE",
-      });
-      return { ok: false, error: "SCHEMA", message: SCHEMA_MESSAGE };
-    }
-
-    const classified = classifyLlmError(error);
-    console.error("[impact] Błąd wywołania modelu:", classified.errorCode);
-    await logLlmCall({ ...base, durationMs: duration(), status: classified.status, errorCode: classified.errorCode });
-    return {
-      ok: false,
-      error: classified.kind === "CONFIG" ? "CONFIG" : "PROVIDER",
-      message: classified.message,
-    };
-  }
-
-  const llmCallLogId = await logLlmCall({ ...base, durationMs: duration(), usage, stepCount: 1, status: "OK" });
-
-  try {
-    const analysis = await createImpactAnalysis({
+    return { ok: true, prepared: { change: resolvedChange.change, proposalId: resolvedChange.proposalId } };
+  },
+  isSufficient: ({ variant }) => isImpactAnalyzable(variant.state),
+  buildPrompt: ({ variant, project }, { change }) => ({
+    system: buildImpactSystemPrompt(),
+    prompt: buildImpactPrompt(project, variant.state, change),
+  }),
+  // Analiza dotyczy „pozostałych” bloków, więc blok zmieniany na liście dotkniętych to błąd odpowiedzi.
+  validate: (output, { change }) => !output.affected.some((item) => item.blockKey === change.blockKey),
+  save: ({ ctx, loaded, prepared, output, resolved, llmCallLogId }) =>
+    createImpactAnalysis({
       projectId: ctx.projectId,
-      variantId: variant.id,
-      variantVersion: variant.version,
-      stateSnapshot: variant.state,
-      change,
-      proposalId,
+      variantId: loaded.variant.id,
+      variantVersion: loaded.variant.version,
+      stateSnapshot: loaded.variant.state,
+      change: prepared.change,
+      proposalId: prepared.proposalId,
       result: output,
       trigger: ctx.trigger,
       provider: resolved.provider,
@@ -237,10 +164,16 @@ export async function runImpactAnalysis(ctx: RunImpactContext): Promise<RunImpac
       promptVersion: IMPACT_PROMPT_VERSION,
       llmCallLogId,
       createdById: ctx.userId,
-    });
-    return { ok: true, analysis };
-  } catch (error) {
-    console.error("[impact] Nie udało się zapisać analizy:", error instanceof Error ? error.message : "nieznany błąd");
-    return { ok: false, error: "SAVE_FAILED", message: IMPACT_SAVE_FAILED_MESSAGE };
-  }
+    }),
+};
+
+/**
+ * Jedyna funkcja analizy wpływu, wołana zarówno z interfejsu (Server Action), jak i z narzędzia czatu.
+ * Wywołujący sprawdza sesję i rolę EDITOR przed wywołaniem; tu dodatkowo wariant i propozycja są czytane
+ * po projectId i variantId. variantVersion i migawka stanu pochodzą z jednego odczytu wariantu,
+ * wykonanego przed wywołaniem modelu, więc analizowany jest dokładnie ten stan.
+ */
+export async function runImpactAnalysis(ctx: RunImpactContext): Promise<RunImpactResult> {
+  const result = await runObjectOperation(IMPACT_SPEC, ctx);
+  return result.ok ? { ok: true, analysis: result.value } : result;
 }

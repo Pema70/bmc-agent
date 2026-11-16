@@ -15,6 +15,7 @@ Aplikacja webowa z agentem AI wspierającym analizę, tworzenie i ocenę modeli 
 | Zmiany proponowane przez agenta | Agent **proponuje**, użytkownik **akceptuje lub odrzuca**. Stan BMC zmienia się dopiero po akceptacji (human-in-the-loop). |
 | Streaming czatu | Route handler `/api/chat` (Vercel AI SDK). Server Actions służą do zwykłych mutacji. |
 | Analiza wpływu zmian | Jakościowa (opis tekstowy i lista dotkniętych bloków ze stopniem niski/średni/wysoki), **bez parametrów liczbowych** (decyzja kroku 5, `docs/plan-krok-5.md`). W interfejsie oznaczona jako „Analiza AI”, nie weryfikacja biznesowa. |
+| Warianty strategii (krok 6) | Generowanie strategii zapisuje *kandydatów* (`StrategyGeneration`), wariant powstaje dopiero po akceptacji użytkownika (EDITOR+), agent nie tworzy wariantów sam. Różnice we wpisach przy porównaniu wylicza aplikacja, a nie model. Szczegóły: `docs/plan-krok-6.md`. |
 | Praca zespołowa | Asynchroniczna: zapis w Postgres, odświeżanie stanu, role. Ochrona przed nadpisaniem przez pole `version` (optymistyczne blokowanie). |
 | Język | Interfejs i odpowiedzi agenta po polsku. |
 | Uwierzytelnianie | `next-auth@4.24.15` (Auth.js v4), provider Credentials (e-mail i hasło), sesja JWT. **Uzasadnienie:** Auth.js v5 w chwili decyzji (2026-11) był wciąż w becie (`5.0.0-beta.32`), a projekt używa tylko stabilnych wersji; v4 oficjalnie wspiera Next 16. **Migracja na v5:** cały kod serwerowy czyta sesję wyłącznie przez `getSession()` / `requireSession()` w `src/lib/auth/session.ts`, a `next-auth` importują tylko `src/lib/auth/options.ts`, route handler `/api/auth/[...nextauth]` i komponenty formularzy (`signIn`/`signOut`). Sekret w zmiennej `AUTH_SECRET` (nazwa z v5, v4 też ją czyta). |
@@ -24,7 +25,7 @@ Aplikacja webowa z agentem AI wspierającym analizę, tworzenie i ocenę modeli 
 1. **Inicjalizacja:** użytkownik podaje nazwę projektu i krótki opis. Agent generuje startowy zarys BMC albo rozpoczyna wywiad.
 2. **Budowanie krok po kroku:** agent dopytuje o szczegóły (`ask_clarification`) zamiast zgadywać. Proponuje wpisy do bloków, a użytkownik je zatwierdza.
 3. **Ewaluacja i modyfikacje:** użytkownik uruchamia ocenę modelu. Edytuje bloki i widzi analizę wpływu zmiany na pozostałe bloki.
-4. **Warianty i strategie:** agent generuje 2 do 3 alternatywnych wariantów całego BMC. Warianty są zapisywane w bazie i porównywane.
+4. **Warianty i strategie:** agent generuje 2 do 3 alternatywnych wariantów całego BMC. Warianty są zapisywane w bazie i porównywane. Agent (model) tylko generuje kandydatów, a wariantem staje się kandydat dopiero po zapisaniu przez użytkownika.
 5. **Współpraca:** właściciel udostępnia projekt innym kontom z określoną rolą.
 6. **Eksport:** gotowy model do PDF lub DOCX.
 
@@ -158,10 +159,12 @@ Wszystkie argumenty i wyniki są walidowane schematami Zod.
 | `read_attachment` | narzędzie czatu | `attachmentId` (i opcjonalnie zakres) | wyekstrahowany tekst (z limitem długości) |
 | `analyze_impact` | analiza | zmiana: `proposalId` oczekującej propozycji albo `blockKey` + `description` (stan czyta serwer) | `summary` i lista dotkniętych bloków (innych niż zmieniany) z opisem wpływu i stopniem (niski/średni/wysoki). Wynik zapisuje `ImpactAnalysis` |
 | `evaluate_bmc` | analiza | stan BMC (w narzędziu czatu bez argumentów: stan czyta serwer) | obiekt z ocenami 1 do 10 dla kryteriów `coherence` (spójność), `risk_resilience` (ryzyko, **10 = niskie ryzyko**), `feasibility` (realność), `innovation` (innowacyjność) i krótkim uzasadnieniem do każdego. Wszystkie osie: więcej = lepiej. Etykieta PL ryzyka: „Ryzyko (10 = niskie)” |
-| `generate_strategies` | analiza | stan BMC, opcjonalnie wytyczne użytkownika | 2 do 3 wariantów pełnego BMC (każdy zgodny z `BmcState`) z nazwą i założeniem strategii |
-| `compare_variants` | analiza | lista `variantId` | różnice blok po bloku, zalety i wady każdego wariantu, rekomendacja |
+| `generate_strategies` | analiza (na razie tylko z interfejsu) | stan BMC, opcjonalnie wytyczne użytkownika | 2 do 3 wariantów pełnego BMC (każdy zgodny z `BmcState`) z nazwą i założeniem strategii |
+| `compare_variants` | analiza (na razie tylko z interfejsu) | lista `variantId` | różnice blok po bloku, zalety i wady każdego wariantu, rekomendacja |
 
 **Uwaga implementacyjna:** cztery narzędzia analityczne (`analyze_impact`, `evaluate_bmc`, `generate_strategies`, `compare_variants`) mogą być wywoływane zarówno przez agenta w rozmowie, jak i bezpośrednio z interfejsu (przyciski typu "Oceń model"). W obu przypadkach używają tej samej funkcji generującej obiekt według schematu Zod: `generateText` z `output: Output.object({ schema })` (AI SDK 7; `generateObject` jest tam oznaczony jako przestarzały). Wybór sposobu wywołania zapisz w kodzie jednym, spójnym wzorcem.
+
+**Stan po kroku 6:** `generate_strategies` i `compare_variants` są na razie dostępne **tylko z interfejsu** (Server Actions), nie jako narzędzia czatu. Wejście stanu: stan czyta serwer z zapisanego wariantu (jak w `evaluate_bmc`). `generate_strategies` zwraca kandydatów, a nie warianty. W `compare_variants` model dostaje etykiety wariantów (A/B/C) zamiast identyfikatorów, a dokładne różnice wpis po wpisie wylicza aplikacja. Narzędzia czatu są odłożone (`docs/zadania.md`).
 
 ### Prompty
 
