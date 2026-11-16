@@ -90,12 +90,18 @@ model BmcVariant {
   name      String
   isMain    Boolean  @default(false)
   state     Json     // BmcState (walidowany Zod przy zapisie i odczycie)
-  version   Int      @default(1) // optymistyczne blokowanie
+  version   Int      @default(1) // optymistyczne blokowanie (wersja stanu, nie nazwy ani flagi głównego)
+  description     String?        // założenie strategii (AI_STRATEGY) albo opis ręczny, do 400 znaków
+  origin          VariantOrigin  @default(MANUAL) // MANUAL | AI_STRATEGY
+  createdById     String?
+  generationId    String?        // generacja, z której pochodzi wariant
+  generationIndex Int?           // numer kandydata w generacji
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   @@index([projectId])
   // + częściowy indeks unikalny ("projectId") WHERE "isMain", dopisany ręcznie do SQL migracji (D2)
+  // + @@unique([generationId, generationIndex]): ta sama strategia nie zapisze się dwa razy
 }
 
 model Proposal {          // propozycje zmian od agenta
@@ -141,6 +147,8 @@ model LlmCallLog {
 Wynik `analyze_impact` zapisuje model `ImpactAnalysis` (krok 5; szczegóły w `docs/plan-krok-5.md`): `projectId`, `variantId`, `variantVersion`, `stateSnapshot`, `changeKind` (`PROPOSAL` | `DESCRIPTION`), `proposalId`, `change` (migawka zmiany), `result` (Json, `ImpactOutput` walidowany Zod), `schemaVersion`, `trigger` (`UI` | `CHAT`), `provider`, `model`, `promptVersion`, `llmCallLogId`, `createdById`, `createdAt`. Analizy są dopisywane (bez nadpisywania); odpowiedź niezgodna ze schematem nie jest zapisywana (`LlmCallLog.status = SCHEMA_ERROR`).
 
 Wynik `evaluate_bmc` zapisuje model `EvaluationResult` (krok 4; szczegóły w `docs/plan-krok-4.md`): `projectId`, `variantId`, `variantVersion`, `stateSnapshot` (oceniany stan), `result` (Json, `EvaluationOutput` walidowany Zod), `schemaVersion`, `source` (`AI` | `MANUAL`), `trigger` (`UI` | `CHAT`), `provider`, `model`, `promptVersion`, `llmCallLogId`, `createdById`, `createdAt`. Odpowiedź niezgodna ze schematem nie jest zapisywana (`LlmCallLog.status = SCHEMA_ERROR`).
+
+Wynik `generate_strategies` zapisuje model `StrategyGeneration` (krok 6; szczegóły w `docs/plan-krok-6.md`): `projectId`, `variantId` (wariant bazowy), `variantVersion`, `stateSnapshot`, `guidelines` (wytyczne użytkownika, traktowane jako dane), `result` (Json, `StrategiesOutput` walidowany Zod: 2 do 3 kandydatów z nazwą, założeniem i pełnym `BmcState`), `schemaVersion`, `trigger` (`UI` | `CHAT`), `provider`, `model`, `promptVersion`, `llmCallLogId`, `createdById`, `createdAt`. To są **kandydaci, nie warianty**: wariant (`BmcVariant` z `origin = AI_STRATEGY`) powstaje dopiero po zapisaniu kandydata przez użytkownika (EDITOR+). Wpisy są dopisywane (bez nadpisywania), odpowiedź niezgodna ze schematem nie jest zapisywana (`LlmCallLog.status = SCHEMA_ERROR`). Model porównania wariantów (`VariantComparison`) dochodzi w kroku 6 w PR 6e1.
 
 ## 6. Agent AI
 

@@ -39,6 +39,17 @@ enum ImpactTrigger {
   CHAT
 }
 
+enum VariantOrigin {
+  MANUAL
+  AI_STRATEGY
+}
+
+// Wspólny dla nowych tabel wyników (krok 6); enumy z kroków 4 i 5 bez zmian.
+enum OperationTrigger {
+  UI
+  CHAT
+}
+
 enum ProposalStatus {
   PENDING
   ACCEPTED
@@ -58,32 +69,35 @@ enum Role {
 }
 
 model User {
-  id                String             @id @default(cuid())
-  email             String             @unique
-  name              String?
-  passwordHash      String
-  createdAt         DateTime           @default(now())
-  members           ProjectMember[]
-  llmCalls          LlmCallLog[]
-  chatMessages      ChatMessage[]
-  proposalsCreated  Proposal[]         @relation("ProposalCreatedBy")
-  proposalsResolved Proposal[]         @relation("ProposalResolvedBy")
-  evaluations       EvaluationResult[]
-  impactAnalyses    ImpactAnalysis[]
+  id                  String               @id @default(cuid())
+  email               String               @unique
+  name                String?
+  passwordHash        String
+  createdAt           DateTime             @default(now())
+  members             ProjectMember[]
+  llmCalls            LlmCallLog[]
+  chatMessages        ChatMessage[]
+  proposalsCreated    Proposal[]           @relation("ProposalCreatedBy")
+  proposalsResolved   Proposal[]           @relation("ProposalResolvedBy")
+  evaluations         EvaluationResult[]
+  impactAnalyses      ImpactAnalysis[]
+  variantsCreated     BmcVariant[]         @relation("VariantCreatedBy")
+  strategyGenerations StrategyGeneration[]
 }
 
 model Project {
-  id             String             @id @default(cuid())
-  name           String
-  description    String
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  members        ProjectMember[]
-  variants       BmcVariant[]
-  llmCalls       LlmCallLog[]
-  messages       ChatMessage[]
-  evaluations    EvaluationResult[]
-  impactAnalyses ImpactAnalysis[]
+  id                  String               @id @default(cuid())
+  name                String
+  description         String
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  members             ProjectMember[]
+  variants            BmcVariant[]
+  llmCalls            LlmCallLog[]
+  messages            ChatMessage[]
+  evaluations         EvaluationResult[]
+  impactAnalyses      ImpactAnalysis[]
+  strategyGenerations StrategyGeneration[]
 }
 
 model ProjectMember {
@@ -102,42 +116,52 @@ model ProjectMember {
 // "BmcVariant_projectId_main_key" ON ("projectId") WHERE "isMain" jest dopisany
 // ręcznie do SQL migracji bmc_variant (Prisma 7.10 obsługuje takie indeksy tylko w preview).
 model BmcVariant {
-  id             String             @id @default(cuid())
-  projectId      String
-  name           String
-  isMain         Boolean            @default(false)
-  state          Json // BmcState, walidowany Zod przy zapisie i odczycie
-  version        Int                @default(1)
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  project        Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  proposals      Proposal[]
-  evaluations    EvaluationResult[]
-  impactAnalyses ImpactAnalysis[]
+  id                  String               @id @default(cuid())
+  projectId           String
+  name                String
+  isMain              Boolean              @default(false)
+  state               Json // BmcState, walidowany Zod przy zapisie i odczycie
+  version             Int                  @default(1)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  description         String? // założenie strategii (AI_STRATEGY) albo opis ręczny; Zod ≤ 400
+  origin              VariantOrigin        @default(MANUAL)
+  createdById         String?
+  generationId        String? // generacja, z której pochodzi wariant (AI_STRATEGY)
+  generationIndex     Int? // numer kandydata w generacji
+  project             Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy           User?                @relation("VariantCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  generation          StrategyGeneration?  @relation("GeneratedVariants", fields: [generationId], references: [id], onDelete: SetNull)
+  proposals           Proposal[]
+  evaluations         EvaluationResult[]
+  impactAnalyses      ImpactAnalysis[]
+  strategyGenerations StrategyGeneration[] @relation("GenerationBase")
 
+  @@unique([generationId, generationIndex]) // ta sama strategia nie zapisze się dwa razy (NULL-e się nie kolidują)
   @@index([projectId])
 }
 
 model LlmCallLog {
-  id             String            @id @default(cuid())
-  projectId      String?
-  userId         String?
-  operation      String // "chat"; w krokach 4-6 np. "evaluate_bmc"
-  provider       String // google | openai | anthropic
-  model          String // identyfikator modelu u dostawcy
-  promptVersion  String
-  durationMs     Int
-  inputTokens    Int?
-  outputTokens   Int?
-  costUsd        Decimal?          @db.Decimal(12, 6)
-  stepCount      Int?
-  status         LlmCallStatus
-  errorCode      String? // kod HTTP lub typ błędu, bez treści promptu i bez kluczy
-  createdAt      DateTime          @default(now())
-  project        Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  user           User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
-  evaluation     EvaluationResult?
-  impactAnalysis ImpactAnalysis?
+  id                 String              @id @default(cuid())
+  projectId          String?
+  userId             String?
+  operation          String // "chat"; w krokach 4-6 np. "evaluate_bmc"
+  provider           String // google | openai | anthropic
+  model              String // identyfikator modelu u dostawcy
+  promptVersion      String
+  durationMs         Int
+  inputTokens        Int?
+  outputTokens       Int?
+  costUsd            Decimal?            @db.Decimal(12, 6)
+  stepCount          Int?
+  status             LlmCallStatus
+  errorCode          String? // kod HTTP lub typ błędu, bez treści promptu i bez kluczy
+  createdAt          DateTime            @default(now())
+  project            Project?            @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user               User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  evaluation         EvaluationResult?
+  impactAnalysis     ImpactAnalysis?
+  strategyGeneration StrategyGeneration?
 
   @@index([userId, createdAt])
   @@index([projectId])
@@ -236,4 +260,33 @@ model ImpactAnalysis {
   @@index([variantId, createdAt])
   @@index([projectId])
   @@index([proposalId])
+}
+
+// Wynik generate_strategies: kandydaci (2-3 pełne modele), nie warianty. Wariant powstaje dopiero po zapisaniu
+// kandydata przez użytkownika. Wpisy są dopisywane (append-only); zapis tylko po walidacji Zod, odpowiedź
+// niezgodna ze schematem nie trafia do tabeli.
+model StrategyGeneration {
+  id             String           @id @default(cuid())
+  projectId      String
+  variantId      String // wariant bazowy
+  schemaVersion  Int              @default(1) // wersja StrategiesOutput
+  variantVersion Int // version wariantu bazowego w chwili generowania
+  stateSnapshot  Json // BmcState bazowy
+  guidelines     String? // wytyczne użytkownika (≤ 500), traktowane jako dane, nie polecenia
+  result         Json // StrategiesOutput
+  trigger        OperationTrigger
+  provider       String
+  model          String
+  promptVersion  String // np. "strategies-v1"
+  llmCallLogId   String?          @unique
+  createdById    String?
+  createdAt      DateTime         @default(now())
+  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  variant        BmcVariant       @relation("GenerationBase", fields: [variantId], references: [id], onDelete: Cascade)
+  llmCall        LlmCallLog?      @relation(fields: [llmCallLogId], references: [id], onDelete: SetNull)
+  createdBy      User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  variants       BmcVariant[]     @relation("GeneratedVariants")
+
+  @@index([variantId, createdAt])
+  @@index([projectId])
 }
