@@ -83,6 +83,7 @@ model User {
   impactAnalyses      ImpactAnalysis[]
   variantsCreated     BmcVariant[]         @relation("VariantCreatedBy")
   strategyGenerations StrategyGeneration[]
+  variantComparisons  VariantComparison[]
 }
 
 model Project {
@@ -98,6 +99,7 @@ model Project {
   evaluations         EvaluationResult[]
   impactAnalyses      ImpactAnalysis[]
   strategyGenerations StrategyGeneration[]
+  variantComparisons  VariantComparison[]
 }
 
 model ProjectMember {
@@ -162,6 +164,7 @@ model LlmCallLog {
   evaluation         EvaluationResult?
   impactAnalysis     ImpactAnalysis?
   strategyGeneration StrategyGeneration?
+  variantComparison  VariantComparison?
 
   @@index([userId, createdAt])
   @@index([projectId])
@@ -289,4 +292,28 @@ model StrategyGeneration {
 
   @@index([variantId, createdAt])
   @@index([projectId])
+}
+
+// Wynik compare_variants: migawka porównywanych wariantów (2-3) i opinia modelu. Wpisy są dopisywane (append-only);
+// zapis tylko po walidacji Zod, odpowiedź niezgodna ze schematem nie trafia do tabeli. Celowo bez kluczy obcych do
+// wariantów: porównanie dotyczy wielu wariantów i ma przeżyć ich ewentualne usunięcie (identyfikatory wariantów są
+// tylko tekstem w `inputs`). Odczyty są po projectId.
+model VariantComparison {
+  id            String           @id @default(cuid())
+  projectId     String
+  schemaVersion Int              @default(1) // wersja CompareOutput i VariantComparisonInputs
+  inputs        Json // [{ label, variantId, name, version, state }] (Zod): migawka porównywanych wariantów
+  result        Json // CompareOutput
+  trigger       OperationTrigger
+  provider      String
+  model         String
+  promptVersion String // np. "compare-v1"
+  llmCallLogId  String?          @unique
+  createdById   String?
+  createdAt     DateTime         @default(now())
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  llmCall       LlmCallLog?      @relation(fields: [llmCallLogId], references: [id], onDelete: SetNull)
+  createdBy     User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
 }
