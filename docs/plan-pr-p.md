@@ -42,7 +42,7 @@ Wypełniony model (do scenariuszy S2–S5):
 | Kanały | Lokal stacjonarny; Strona zamówień online |
 | Relacje z klientami | Karta lojalnościowa; Profil w mediach społecznościowych |
 | Strumienie przychodów | Sprzedaż napojów i wypieków; Sprzedaż kawy w ziarnach |
-| Kluczowe zasoby | Ekspres ciśnieniowy i młynek; Wykwalifikowani baristzy |
+| Kluczowe zasoby | Ekspres ciśnieniowy i młynek; Wykwalifikowani bariści |
 | Kluczowe działania | Przygotowanie kawy; Obsługa klientów w lokalu |
 | Kluczowi partnerzy | Lokalna palarnia; Piekarnia dostarczająca wypieki |
 | Struktura kosztów | Czynsz za lokal; Wynagrodzenia baristów; Zakup ziarna |
@@ -111,7 +111,7 @@ SELECT vid, pid, 'Wariant główny', true,
       "channels":["Lokal stacjonarny","Strona zamówień online"],
       "customer_relationships":["Karta lojalnościowa","Profil w mediach społecznościowych"],
       "revenue_streams":["Sprzedaż napojów i wypieków","Sprzedaż kawy w ziarnach"],
-      "key_resources":["Ekspres ciśnieniowy i młynek","Wykwalifikowani baristzy"],
+      "key_resources":["Ekspres ciśnieniowy i młynek","Wykwalifikowani bariści"],
       "key_activities":["Przygotowanie kawy","Obsługa klientów w lokalu"],
       "key_partnerships":["Lokalna palarnia","Piekarnia dostarczająca wypieki"],
       "cost_structure":["Czynsz za lokal","Wynagrodzenia baristów","Zakup ziarna"]}'::jsonb
@@ -214,7 +214,7 @@ Wymaga: działającej bazy (`docker compose up -d db`), `npm run dev`, klucza Ge
 
    SELECT m.id, m."createdAt", jsonb_pretty(m.parts) AS parts
    FROM "ChatMessage" m
-   WHERE m.role = 'assistant'
+   WHERE m.role = 'ASSISTANT'
      AND EXISTS (SELECT 1 FROM jsonb_array_elements(m.parts) p WHERE p->>'type' LIKE 'tool-%')
    ORDER BY m."createdAt" DESC
    LIMIT 1;
@@ -284,7 +284,7 @@ WHERE m."projectId" = 'ID_PROJEKTU'
 ORDER BY m."createdAt";
 ```
 
-Jeśli kolumny z licznikami wszędzie dają 0, a w czacie widać karty, sprawdź kształt części: `SELECT jsonb_pretty(parts) FROM "ChatMessage" WHERE "projectId" = 'ID_PROJEKTU' AND role = 'assistant' ORDER BY "createdAt" DESC LIMIT 1;` i daj mi znać (poprawię nazwy typów w zapytaniu i w planie).
+Jeśli kolumny z licznikami wszędzie dają 0, a w czacie widać karty, sprawdź kształt części: `SELECT jsonb_pretty(parts) FROM "ChatMessage" WHERE "projectId" = 'ID_PROJEKTU' AND role = 'ASSISTANT' ORDER BY "createdAt" DESC LIMIT 1;` i daj mi znać (poprawię nazwy typów w zapytaniu i w planie).
 
 Q3: wycieki w tekście asystenta:
 
@@ -294,7 +294,7 @@ SELECT t."createdAt", t.tekst FROM (
     (SELECT string_agg(p->>'text', ' ') FROM jsonb_array_elements(m.parts) p WHERE p->>'type' = 'text') AS tekst
   FROM "ChatMessage" m WHERE m."projectId" = 'ID_PROJEKTU'
 ) t
-WHERE t.role = 'assistant'
+WHERE t.role = 'ASSISTANT'
   AND (t.tekst ~* '(ask_clarification|propose_block_change|evaluate_bmc|analyze_impact|proposalId|evaluationId|analysisId)'
        OR t.tekst ~ 'c[a-z0-9]{24}');
 ```
