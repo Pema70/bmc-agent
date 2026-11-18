@@ -2,6 +2,8 @@
 
 Webowa aplikacja z agentem AI do tworzenia, analizy i oceny modeli biznesowych (Business Model Canvas). Projekt jest częścią pracy inżynierskiej. Pełna specyfikacja funkcji, narzędzi agenta i modelu danych: `docs/spec.md`. **Przed implementacją nowej funkcji przeczytaj odpowiedni fragment spec.md.**
 
+Projekty są jednoosobowe; role EDITOR/VIEWER zostają w kodzie bez zmian, nie dodawaj udostępniania ani zaproszeń.
+
 ## Stos
 
 - Next.js (App Router), TypeScript w trybie `strict`
@@ -60,7 +62,7 @@ docs/                # spec.md i dokumentacja
 ## Konwencje kodu
 
 - Typy wyprowadzaj ze schematów Zod (`z.infer`), nie duplikuj ich ręcznie.
-- Server Actions: zwykłe mutacje (zapis projektu, zaproszenia, akceptacja zmiany). Streaming czatu: route handler `/api/chat`.
+- Server Actions: zwykłe mutacje (zapis projektu, akceptacja zmiany). Streaming czatu: route handler `/api/chat`.
 - Każda Server Action i route handler: najpierw sprawdź sesję i uprawnienia do projektu, potem waliduj wejście Zod.
 - Nie ma middleware, więc ochrona tras nie jest automatyczna. Każda strona serwerowa, Server Action i route handler musi wywołać getSession() lub requireSession() z src/lib/auth/session.ts i sprawdzić uprawnienia do zasobu (projektu).
 - Komponenty funkcyjne, hooki, brak klas. Tailwind zamiast własnego CSS.
