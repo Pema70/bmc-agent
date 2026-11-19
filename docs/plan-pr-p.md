@@ -1,6 +1,6 @@
 # Plan PR „P”: poprawki promptu agenta (chat-v5) z pomiarem przed i po
 
-**Do akceptacji (2026-11-18), decyzje D1–D5 rozstrzygnięte przez właściciela repozytorium (sekcja „Decyzje”).** Ten plik to jedyna zmiana w pierwszym kroku (`docs/`). Kod i prompt (`chat-v4`) bez zmian, dopóki nie ma wyników „przed”. Wszystkie serie „przed” muszą być skończone przed zmianą promptu (mogą być rozłożone na kilka dni, jeśli dzienny limit Gemini okaże się niski).
+**Zaakceptowany (2026-11-18), decyzje D1–D5 rozstrzygnięte przez właściciela repozytorium (sekcja „Decyzje”); poprawiony 2026-11-19 po próbnej rozmowie (sekcja „Stan wyjściowy i warunki wstępne”).** Ten plik to jedyna zmiana w pierwszym kroku (`docs/`). Kod i prompt (`chat-v4`) bez zmian, dopóki nie ma wyników „przed”. Wszystkie serie „przed” muszą być skończone przed zmianą promptu (mogą być rozłożone na kilka dni, jeśli dzienny limit Gemini okaże się niski).
 
 Zakres wynika z `docs/plan-krok-6.md`, „Zmiany po akceptacji”, punkty 4 i 11 (PR „P”: scenariusze o dopytywaniu, niechcianej ocenie, wyniku analizy i nazwach narzędzi; prompt `chat-v5`, baseline na `chat-v4`) oraz z wpisów sekcji „Agent AI” w `docs/zadania.md`:
 
@@ -14,14 +14,35 @@ Zakres wynika z `docs/plan-krok-6.md`, „Zmiany po akceptacji”, punkty 4 i 11
 ## Podział na kroki
 
 1. **Ten plan** (`docs/plan-pr-p.md`), PR `docs/plan-pr-p`. Po akceptacji i merge.
-2. **Pomiar „przed”** na `chat-v4`: wykonuje właściciel repozytorium przez interfejs (sekcje „Instrukcja pomiaru” i „Metryki”). Wyniki wpisuje do tabel i przekazuje.
+2. **Pomiar „przed”** na `chat-v4`, dopiero po warunkach wstępnych (sekcja „Stan wyjściowy i warunki wstępne”, w tym krok 0b): wykonuje właściciel repozytorium przez interfejs (sekcje „Instrukcja pomiaru” i „Metryki”). Wyniki wpisuje do tabel i przekazuje.
 3. **PR `feat/prompt-chat-v5`**: dopiero po wynikach „przed”. Prompt `chat-v5`, ewentualnie `prepareStep`, testy na mockach. Zakres zmian prompu wynika z tabeli wyników „przed”, nie z domysłów (szkic hipotez niżej).
 4. **Pomiar „po”**: ten sam model, te same scenariusze i wiadomości, ta sama liczba powtórzeń. Wyniki do tabel i do rozdziału testowego pracy.
 5. **Domknięcie**: wyniki „przed” i „po” w tym pliku (osobny commit `docs:`), aktualizacja wpisów w `docs/zadania.md` (wpisy zamknięte, dopisek o ewentualnym narzędziu odczytu).
 
+## Stan wyjściowy i warunki wstępne (po próbnej rozmowie 2026-11-19)
+
+**Warunki wstępne pomiaru „przed”** (wszystkie spełnione, zanim ruszy pierwsza seria):
+
+1. Zapis odpowiedzi asystenta działa (PR #34, zmergowany). Do tego czasu każda odpowiedź kończyła się `SAVE_FAILED` (82 z 90 wierszy `chat`, od 2026-11-10).
+2. Argumenty `propose_block_change` mają wymagane `before` i `after` (PR #35, zmergowany).
+3. Krok 0b (niżej) przeszedł bez uwag.
+4. Prompt pozostaje `chat-v4`, `MAX_STEPS=3` bez zmian. Prompt zmienia dopiero PR „P”.
+
+**Skutek błędu zapisu dla wcześniejszych obserwacji.** Przed #34 agent nie widział własnych wypowiedzi (historia dla modelu to były same wiadomości użytkownika), więc obserwacje z wpisów „Agent AI” w `docs/zadania.md` (dopytywanie w kółko, wyjaśnianie wyniku analizy, niechciane oceny) były zebrane na zepsutej aplikacji. Nie są punktem odniesienia: baseline to dopiero pomiar „przed” po naprawach.
+
+**Obserwacje z próbnej rozmowy** (`gemini-3.1-flash-lite`, projekt niepomiarowy; służą jako przykłady do metryk i hipotez, nie jako wyniki):
+
+- **Przykład do M4 (wyciek identyfikatora):** na „Oceń mój model” agent odpowiedział: „Ocena Twojego modelu jest już gotowa (identyfikator: `cmwn…`). Możesz ją zobaczyć na karcie powyżej.”. Prompt `chat-v4` zakazuje podawania punktów, ale mówi też „Wynik zawiera tylko identyfikator oceny”, co zachęca do jego powtórzenia. Hipoteza dla `chat-v5`: wprost zakazać podawania identyfikatora i nie wspominać o nim w opisie wyniku narzędzia.
+- **Przykład do hipotez `chat-v5` („karta powyżej”):** agent napisał „na karcie powyżej”, a prompt mówi „na karcie pod Twoją odpowiedzią”. Agent miał rację: części wiadomości są renderowane w kolejności (`agent-chat.tsx`), więc karta narzędzia jest nad tekstem końcowym. To nieścisłość promptu, a nie błąd modelu. Hipoteza dla `chat-v5`: „na karcie w tej wiadomości”.
+- **Błąd argumentów (naprawiony w #35, mierzony w M9):** `propose_block_change` z `operation: "add"` bez `before` i `after` dał `AI_InvalidToolInputError` (część `output-error`), po czym agent poprawił wywołanie w kolejnym kroku. W metryce M9 sprawdzamy, czy po #35 Gemini podaje `before: null`.
+- **Osierocona wiadomość użytkownika zmienia zachowanie agenta.** Dwie tury zakończyły się `ABORTED` (po ok. 26–35 s), po czym w historii zostały wiadomości użytkownika bez odpowiedzi, a następna odpowiedź agenta dotyczyła wcześniejszej, nieobsłużonej prośby, a nie bieżącej wiadomości „Dziękuję”. Oznacza to, że niechciana propozycja na „Dziękuję” w tej próbie nie dowodzi nadgorliwości modelu (M10 trzeba czytać razem z Q1c: tura po turze bez `ABORTED`). Czasy `ABORTED` kończą się 2–3 s przed kolejną wiadomością, co wskazuje na kliknięcie „Zatrzymaj” (wniosek z czasów, nie z logów).
+- **Interfejs czatu nie pozwala wysłać drugiej wiadomości w trakcie odpowiedzi** (`src/components/chat/agent-chat.tsx`): `send()` kończy się, gdy `busy`, a przycisk „Wyślij” jest wyłączony. Pole tekstowe pozostaje edytowalne, ale Enter w trakcie odpowiedzi nic nie wysyła. Przerwane tury biorą się więc z „Zatrzymaj”, zamknięcia lub odświeżenia strony, a nie z podwójnego wysyłania. Osierocenie wiadomości po przerwaniu to osobny wpis w `docs/zadania.md`; nie blokuje pomiaru, bo protokół (niżej) zabrania przerywania i unieważnia każdą turę bez statusu `OK`.
+- **Czasy odpowiedzi są niestabilne**: od ok. 9 s do ponad 90 s dla jednokrokowej tury (ponowienia dostawcy wchodzą w `durationMs`). Czas nie jest metryką jakości; nie przerywaj odpowiedzi, czekaj na zakończenie.
+- **Jedna tura bez wiersza w dzienniku** (wiadomość użytkownika bez odpowiedzi i bez wpisu w `LlmCallLog`): prawdopodobnie przerwane żądanie (restart serwera lub zamknięcie karty), nie wyjaśnione. Dlatego w trakcie serii nie restartujemy `npm run dev` i nie zamykamy ani nie odświeżamy karty z czatem.
+
 ## Warunki pomiaru (stałe dla „przed” i „po”)
 
-- **Model stały: `gemini-3.5-flash-lite`** (`LLM_PROVIDER=google`). Właściciel ustawia go w `.env` przed pierwszą serią „przed” i nie zmienia do końca serii „po”. Poza pomiarami może używać `gemini-3.1-flash-lite`, ale tylko w projektach niepomiarowych (nazwy `P-…` są zarezerwowane dla pomiarów). Używany model zapisuje kolumna `model` w `LlmCallLog`; zapytania Q1 filtrują po `model`, a kontrola Q1b sprawdza, że w projektach pomiarowych nie ma wierszy z innym modelem ani innym `promptVersion` (`chat-v4` w „przed”, `chat-v5` w „po”). Seria z choćby jednym obcym wierszem jest nieważna.
+- **Model stały: `gemini-3.5-flash-lite`** (`LLM_PROVIDER=google`). Właściciel ustawia go w `.env` przed pierwszą serią „przed” i nie zmienia do końca serii „po”. Poza pomiarami może używać `gemini-3.1-flash-lite`, ale tylko w projektach niepomiarowych (nazwy `P-przed-…` i `P-po-…` są zarezerwowane dla pomiarów). Używany model zapisuje kolumna `model` w `LlmCallLog`; zapytania Q1 filtrują po `model`, a kontrola Q1b sprawdza, że w projektach pomiarowych nie ma wierszy z innym modelem ani innym `promptVersion` (`chat-v4` w „przed”, `chat-v5` w „po”). Seria z choćby jednym obcym wierszem jest nieważna.
 - Dane: wyłącznie przykładowe (niżej). Żadnych prawdziwych danych firmy ani osobowych (darmowy plan Gemini).
 - Ustawienia `.env`: poza limitami z D3 bez zmian względem codziennej pracy. `MAX_STEPS=3`, `LLM_MAX_OUTPUT_TOKENS=2000` zostają. Limity z D3 (**te same wartości w seriach „przed” i „po”**): `CHAT_MAX_REQUESTS_PER_HOUR=60`, `CHAT_MAX_TOKENS_PER_DAY=600000`. **Po zakończeniu wszystkich pomiarów przywróć wartości domyślne** (`CHAT_MAX_REQUESTS_PER_HOUR=30`, `CHAT_MAX_TOKENS_PER_DAY=200000`, jak w `.env.example`).
 - Nie czytam ani nie modyfikuję `.env` i nie ładuję go żadnym skryptem; zmiany w `.env` wykonuje właściciel.
@@ -51,7 +72,7 @@ Scenariusz S1 używa projektu z tym samym opisem i **pustym** modelem.
 
 ### Izolacja serii (D2)
 
-Historia czatu jest jedna na projekt, więc rozmowa z poprzedniej serii zmieniałaby zachowanie agenta. **Wariant A (D2): osobny projekt na każdą kombinację faza × scenariusz × seria, nic nie jest kasowane.** Rozmowy zostają jako surowe dane do pracy. Projektów jest 4 scenariusze × 3 serie = **12 na fazę** (S3 i S5 w jednym projekcie `S3S5`), nazwy: `P-przed-S1-seria1`, `P-przed-S2-seria1`, `P-przed-S3S5-seria1`, `P-przed-S4-seria1`, … `P-przed-S4-seria3`; w fazie „po” prefiks `P-po-`. Projekty z prefiksem `P-` są zarezerwowane dla pomiarów.
+Historia czatu jest jedna na projekt, więc rozmowa z poprzedniej serii zmieniałaby zachowanie agenta. **Wariant A (D2): osobny projekt na każdą kombinację faza × scenariusz × seria, nic nie jest kasowane.** Rozmowy zostają jako surowe dane do pracy. Projektów jest 4 scenariusze × 3 serie = **12 na fazę** (S3 i S5 w jednym projekcie `S3S5`), nazwy: `P-przed-S1-seria1`, `P-przed-S2-seria1`, `P-przed-S3S5-seria1`, `P-przed-S4-seria1`, … `P-przed-S4-seria3`; w fazie „po” prefiks `P-po-`. Projekty z prefiksem `P-` są zarezerwowane dla pomiarów (wyjątek: projekty próbne `P-proba-…` z kroku 0b, których Q1b i Q1c nie obejmują).
 
 Projekty zakłada zapytanie Q0 (niżej), a nie ręczne wpisywanie.
 
@@ -158,8 +179,9 @@ Oczekiwane (`chat-v5`): najwyżej dwie tury pytań z rzędu, bez powtarzania pyt
 
 1. `U: Dodaj do segmentów klientów: rodziny z dziećmi.`
 2. `U: Dodaj do kanałów: dostawa przez aplikację mobilną.`
+3. `U: Dziękuję.`
 
-Oczekiwane: po jednej propozycji `propose_block_change` na turę, krótka odpowiedź bez ciężkich narzędzi; `evaluate_bmc` i `analyze_impact` nieużyte; w tekście brak nazw narzędzi i identyfikatorów. Propozycji nie trzeba odrzucać ani zatwierdzać (projekt jest jednorazowy); nie zatwierdzaj ich, żeby nie zmieniać stanu modelu.
+Oczekiwane: po jednej propozycji `propose_block_change` na turę, krótka odpowiedź bez ciężkich narzędzi; `evaluate_bmc` i `analyze_impact` nieużyte; w tekście brak nazw narzędzi i identyfikatorów. Tura 3 („Dziękuję.”): krótka odpowiedź tekstowa, **bez żadnych narzędzi** (M10). Propozycji nie trzeba odrzucać ani zatwierdzać (projekt jest jednorazowy); nie zatwierdzaj ich, żeby nie zmieniać stanu modelu.
 
 ### S3. „Oceń model” (model wypełniony)
 
@@ -182,7 +204,7 @@ Oczekiwane: agent odsyła do karty analizy lub mówi wprost, że jej nie widzi, 
 
 Oczekiwane: agent nie woła `evaluate_bmc` (ocena już istnieje), odsyła do karty oceny albo uczciwie mówi, że nie widzi szczegółów, bez wymyślania uzasadnienia punktów. Wartość do zapisu: liczba niechcianych `evaluate_bmc` w tej turze.
 
-S3 i S5 to jedna rozmowa w jednym projekcie (S3 tura 1, S5 tura 2). W tabelach liczone osobno.
+S3 i S5 to jedna rozmowa w jednym projekcie (S3 tura 1, S5 tura 2), po której dochodzi tura 3: `U: Dziękuję.` (oczekiwane: krótka odpowiedź tekstowa bez żadnych narzędzi, M10). W tabelach S3 i S5 liczone osobno.
 
 ## Metryki
 
@@ -192,12 +214,14 @@ S3 i S5 to jedna rozmowa w jednym projekcie (S3 tura 1, S5 tura 2). W tabelach l
 | M2 | Tury pytań z rzędu | najdłuższy ciąg kolejnych wiadomości asystenta z co najmniej jednym `ask_clarification` | Q2 (kolumna `ask` w kolejnych wierszach) |
 | M3 | Niechciane `evaluate_bmc` / `analyze_impact` | wywołanie w turze, w której wiadomość użytkownika nie prosiła o ocenę/analizę (S2, S4 tura 3, S5 tura 2; w S3 oczekiwane jest dokładnie jedno `evaluate_bmc`) | Q2 (kolumny `ocena`, `analiza`) i zużycie limitu: Q1, wiersze `evaluate_bmc`/`analyze_impact` |
 | M4 | Wycieki nazw narzędzi i identyfikatorów | w tekście asystenta pojawia się nazwa narzędzia (`ask_clarification`, `propose_block_change`, `evaluate_bmc`, `analyze_impact`), słowa `proposalId`, `evaluationId`, `analysisId` albo identyfikator w formacie cuid (np. `cm…`, 25 znaków) | zapytanie Q3 (automatyczne) plus oglądowo: zwroty typu „skorzystaj z narzędzia”, „użyj narzędzia” |
-| M5 | Nowe propozycje na prośbę o wyjaśnienie | liczba części `tool-propose_block_change` w odpowiedzi na wiadomość „Wyjaśnij…” / „Dlaczego…” (S4 tura 3, S5 tura 2; oczekiwane 0) | Q2 (kolumna `propozycje`) |
+| M5 | Nowe propozycje na prośbę o wyjaśnienie | liczba propozycji w odpowiedzi na wiadomość „Wyjaśnij…” / „Dlaczego…” (S4 tura 3, S5 tura 2; oczekiwane 0): `propozycje_ok` + `propozycje_odrzucone` | Q2 |
 | M6 | Tura z oceną bez zdania końcowego | w S3 tura 1: wiadomość asystenta z `tool-evaluate_bmc` bez żadnego niepustego tekstu po wyniku (kandydat do `prepareStep`) | Q2 (kolumna `tekst` pusta) |
 | M7 | Zużycie | wiersze `LlmCallLog`, wywołania modelu, tokeny, czas | zapytanie Q1 |
 | M8 | Opinia w skali 0/1/2 (ręcznie, opcjonalnie) | czy odpowiedź jest sensowna po polsku i zgodna z scenariuszem (0 źle, 1 częściowo, 2 dobrze) | własna ocena po przeczytaniu |
+| M9 | Błędne wywołania narzędzi | liczba części `tool-…` ze `state: output-error` (głównie `propose_block_change` z niepoprawnymi argumentami: `AI_InvalidToolInputError`); osobno: propozycje odrzucone przez serwer (`output.ok = false`). Wskazuje, czy po #35 model podaje `before: null` i `after` | Q2 (kolumny `bledy_narzedzi`, `propozycje_odrzucone`) i Q1 (`stepCount` = `MAX_STEPS` oznacza zużyty budżet kroków) |
+| M10 | Niechciane narzędzia po „Dziękuję.” | liczba części `tool-…` w odpowiedzi na turę „Dziękuję.” (S2 tura 3, S3S5 tura 3; oczekiwane 0). Czytać wyłącznie dla scenariuszy ważnych (Q1c: 0 wierszy, brak osieroconych wiadomości) | Q2 (kolumna `narzedzia_razem`) |
 
-Wycieki (M4) liczysz w tekście widocznym dla użytkownika, nie w polu argumentów narzędzi.
+Wycieki (M4) liczysz w tekście widocznym dla użytkownika, nie w polu argumentów narzędzi. **Zasada dla Q3:** zapytanie czyta wyłącznie części `type = 'text'`. Identyfikatory w wynikach narzędzi (`output`), `thoughtSignature` i inne metadane dostawcy (`providerMetadata`, `callProviderMetadata`, `resultProviderMetadata`) to dane techniczne, a nie tekst dla użytkownika, więc nie są wyciekiem i Q3 ich nie obejmuje. Przykład z próbnej rozmowy: „(identyfikator: `cmwn…`)” w tekście odpowiedzi to wyciek M4.
 
 ## Instrukcja pomiaru krok po kroku (wykonuje właściciel)
 
@@ -221,6 +245,17 @@ Wymaga: działającej bazy (`docker compose up -d db`), `npm run dev`, klucza Ge
    ```
 
    Wklej mi wynik obu zapytań **przed pierwszą serią** (bez treści wiadomości z danymi prywatnymi; to dane przykładowe). Oczekuję w pierwszym typów `text`, `tool-ask_clarification`, `tool-propose_block_change`, `tool-evaluate_bmc`, `tool-analyze_impact` (oraz ewentualnie `step-start`). Jeśli nazwy są inne, poprawię Q2, Q3 i metryki, zanim zaczniesz.
+0b. **Krok 0b: próba po naprawach (po merge #34 i #35).** Jedna próba na `gemini-3.5-flash-lite` (ustawiony w `.env`, `npm run dev` zrestartowany) w **pełnym projekcie niepomiarowym** (model z co najmniej 5 wpisami w co najmniej 3 blokach; np. jeden z projektów z Q0 uruchomionego z `\set faza 'proba'` albo projekt wpisany ręcznie; projektów `P-przed-…` do tego nie używaj). Wpisz dosłownie, po kolei, czekając na koniec odpowiedzi (bez „Zatrzymaj”, bez odświeżania strony):
+   1. `Dodaj do kanałów: dostawa przez aplikację mobilną.`
+   2. `Oceń mój model.`
+
+   Potem uruchom Q4 (przegląd tur) i Q1 dla tego projektu. Warunki zaliczenia:
+   - brak części ze `state: output-error` (czyli Gemini podaje `before: null` i `after`),
+   - powstaje część `tool-evaluate_bmc:output-available`, a karta oceny jest widoczna,
+   - wszystkie wiersze `chat` w dzienniku mają status `OK`,
+   - na konsoli `npm run dev` nie ma linii `[chat] Błąd wywołania modelu`.
+
+   Wklej mi wynik Q4 i Q1. Jeśli któryś warunek nie jest spełniony, nie zaczynaj serii „przed”: opiszemy przyczynę i ewentualną naprawę osobnym PR-em (nie zmieniamy schematów ani promptu w trakcie pomiaru). Wynik próby nie wchodzi do tabel.
 1. Potwierdź wersję promptu: w repozytorium `PROMPT_VERSION = "chat-v4"` (`src/lib/ai/prompts/system.ts`); `git status` czysty poza plikami, które już miałeś. W swoim `.env` ustaw `LLM_MODEL=gemini-3.5-flash-lite` i nie zmieniaj go do końca serii „po”.
 2. Ustaw w `.env` limity z D3: `CHAT_MAX_REQUESTS_PER_HOUR=60`, `CHAT_MAX_TOKENS_PER_DAY=600000`, zrestartuj `npm run dev`. **Po zakończeniu wszystkich pomiarów (po serii „po”) wróć do domyślnych: 30 i 200000.** Te same wartości muszą obowiązywać w „przed” i „po”.
 3. Zaloguj się na to samo konto we wszystkich seriach (limity liczą się per użytkownik).
@@ -229,10 +264,10 @@ Wymaga: działającej bazy (`docker compose up -d db`), `npm run dev`, klucza Ge
 
 ### Pojedyncza seria (powtórz 3 razy)
 
-6. Dla każdego scenariusza w kolejności S1, S2, S3+S5, S4: wejdź w odpowiedni projekt, wpisuj wiadomości dosłownie jak w scenariuszu, po każdej czekaj na koniec odpowiedzi. Nie poprawiaj agenta, nie dopowiadaj niczego poza skryptem.
-7. Po zakończeniu scenariusza uruchom Q2 (lista tur) i Q3 (wycieki) dla jego projektu; zapisz wyniki w tabeli.
-8. Po serii uruchom Q1 (zużycie) dla wszystkich projektów serii albo dla konta w oknie czasu serii.
-9. Jeśli pojawi się błąd 429 lub komunikat o limicie: zapisz to w tabeli (kolumna „Uwagi”), poczekaj na reset i powtórz **całą** turę (nie pojedyncze wywołanie). Nie licz przerwanej tury do metryk.
+6. Dla każdego scenariusza w kolejności S1, S2, S3+S5, S4: wejdź w odpowiedni projekt, wpisuj wiadomości dosłownie jak w scenariuszu, po każdej czekaj na koniec odpowiedzi (czasy bywają od kilku do ponad 90 s). Nie poprawiaj agenta, nie dopowiadaj niczego poza skryptem. **Nie klikaj „Zatrzymaj”, nie odświeżaj ani nie zamykaj karty z czatem, nie restartuj `npm run dev` w trakcie serii.**
+7. Po zakończeniu scenariusza uruchom Q4 (czy nie ma niespodzianek), Q2 (lista tur) i Q3 (wycieki) dla jego projektu; zapisz wyniki w tabeli.
+8. Po serii uruchom Q1 (zużycie) dla wszystkich projektów serii albo dla konta w oknie czasu serii oraz Q1c (**musi dać 0 wierszy**) i Q1b (**0 wierszy**).
+9. **Unieważnianie scenariusza.** Scenariusz (projekt) jest nieważny, gdy w jego dzienniku jest wiersz o statusie innym niż `OK` (Q1c): `ABORTED`, `PROVIDER_RATE_LIMIT`/429, 503, `SAVE_FAILED`, `SCHEMA_ERROR` i każdy inny, albo gdy któraś wiadomość użytkownika została bez odpowiedzi asystenta. Nie liczysz go do metryk i nie powtarzasz tury w tym samym projekcie (osierocona wiadomość zostałaby w historii i zmieniła zachowanie agenta). Zapisz zdarzenie w kolumnie „Uwagi”, poczekaj na reset limitu, jeśli to był limit, i **powtórz cały scenariusz w świeżym projekcie**: Q0 z `\set faza 'przed-powt1'` (potem `przed-powt2` itd.) zakłada projekty `P-przed-powt1-S2-seria1` itd. (użyj potrzebnego, resztę zostaw nieużytą); prefiks `P-przed-` obejmują Q1b i Q1c. W tabelach wpisz, który projekt jest ważnym wynikiem danej serii.
 
 ### Zapytania (SQL)
 
@@ -258,6 +293,18 @@ WHERE p.name LIKE 'P-przed-%'
 ORDER BY l."createdAt";
 ```
 
+Q1c: kontrola ważności scenariuszy (każdy wiersz `LlmCallLog` w projektach pomiarowych ze statusem innym niż `OK`; **oczekiwany wynik: 0 wierszy**). Niepusty wynik unieważnia scenariusz danego projektu (krok 9). Zmień prefiks na `P-po-` w pomiarze „po”:
+
+```sql
+SELECT p.name, l.operation, l.status, l."errorCode", l."durationMs", l."createdAt"
+FROM "LlmCallLog" l
+JOIN "Project" p ON p.id = l."projectId"
+WHERE p.name LIKE 'P-przed-%' AND l.status <> 'OK'
+ORDER BY l."createdAt";
+```
+
+Dodatkowo scenariusz jest nieważny, jeśli któraś wiadomość `USER` nie ma następującej po niej wiadomości `ASSISTANT` (Q4: wiersz `USER` bez wiersza `ASSISTANT` bezpośrednio po nim).
+
 Liczba wywołań modelu w scenariuszu = suma `stepCount` z wierszy `chat` + liczba wierszy `evaluate_bmc` i `analyze_impact` (każdy z nich to jedno wywołanie modelu, nie liczę ewentualnych ponowień w SDK po błędach sieci/429). Zużycie limitów konta (łącznie; aplikacja liczy wszystkie wiersze użytkownika, niezależnie od modelu, więc tu bez filtra po `model`): 
 
 ```sql
@@ -270,21 +317,43 @@ FROM "LlmCallLog" WHERE "userId" = (SELECT id FROM "User" WHERE email = 'TWÓJ_E
 
 (Wpisz swój e-mail tylko w `psql`; nie wkleja go do pliku ani do wyników w repozytorium.)
 
-Q2: lista tur z licznikami narzędzi i tekstem:
+Q2: lista tur z licznikami narzędzi i tekstem (propozycje rozbite na przyjęte i odrzucone przez serwer, błędy narzędzi osobno):
 
 ```sql
 SELECT m."createdAt", m.role,
   (SELECT count(*) FROM jsonb_array_elements(m.parts) p WHERE p->>'type' = 'tool-ask_clarification') AS ask,
-  (SELECT count(*) FROM jsonb_array_elements(m.parts) p WHERE p->>'type' = 'tool-propose_block_change') AS propozycje,
+  (SELECT count(*) FROM jsonb_array_elements(m.parts) p
+    WHERE p->>'type' = 'tool-propose_block_change' AND p->>'state' = 'output-available'
+      AND p->'output'->>'ok' = 'true') AS propozycje_ok,
+  (SELECT count(*) FROM jsonb_array_elements(m.parts) p
+    WHERE p->>'type' = 'tool-propose_block_change' AND p->>'state' = 'output-available'
+      AND p->'output'->>'ok' = 'false') AS propozycje_odrzucone,
+  (SELECT count(*) FROM jsonb_array_elements(m.parts) p
+    WHERE p->>'type' LIKE 'tool-%' AND p->>'state' = 'output-error') AS bledy_narzedzi,
   (SELECT count(*) FROM jsonb_array_elements(m.parts) p WHERE p->>'type' = 'tool-evaluate_bmc') AS ocena,
   (SELECT count(*) FROM jsonb_array_elements(m.parts) p WHERE p->>'type' = 'tool-analyze_impact') AS analiza,
+  (SELECT count(*) FROM jsonb_array_elements(m.parts) p WHERE p->>'type' LIKE 'tool-%') AS narzedzia_razem,
   (SELECT string_agg(p->>'text', ' ') FROM jsonb_array_elements(m.parts) p WHERE p->>'type' = 'text') AS tekst
 FROM "ChatMessage" m
 WHERE m."projectId" = 'ID_PROJEKTU'
 ORDER BY m."createdAt";
 ```
 
-Jeśli kolumny z licznikami wszędzie dają 0, a w czacie widać karty, sprawdź kształt części: `SELECT jsonb_pretty(parts) FROM "ChatMessage" WHERE "projectId" = 'ID_PROJEKTU' AND role = 'ASSISTANT' ORDER BY "createdAt" DESC LIMIT 1;` i daj mi znać (poprawię nazwy typów w zapytaniu i w planie).
+Q4: przegląd tur: części w kolejności ze stanem i tekst (typy części potwierdzone w kroku 0: `text`, `step-start`, `tool-…`; stany: `output-available`, `output-error`):
+
+```sql
+SELECT m."createdAt", m.role,
+  (SELECT string_agg(t.p->>'type' || coalesce(':' || (t.p->>'state'), ''), ' > ' ORDER BY t.ord)
+     FROM jsonb_array_elements(m.parts) WITH ORDINALITY AS t(p, ord)) AS czesci,
+  (SELECT string_agg(t.p->>'text', ' ' ORDER BY t.ord)
+     FROM jsonb_array_elements(m.parts) WITH ORDINALITY AS t(p, ord)
+    WHERE t.p->>'type' = 'text') AS tekst
+FROM "ChatMessage" m
+WHERE m."projectId" = 'ID_PROJEKTU'
+ORDER BY m."createdAt";
+```
+
+Kształt części został potwierdzony w kroku 0 po #34 (`tool-<nazwa>`, `step-start`, `text`). Gdyby kolumny z licznikami mimo to wszędzie dawały 0, a w czacie widać karty, sprawdź kształt części: `SELECT jsonb_pretty(parts) FROM "ChatMessage" WHERE "projectId" = 'ID_PROJEKTU' AND role = 'ASSISTANT' ORDER BY "createdAt" DESC LIMIT 1;` i daj mi znać (poprawię nazwy typów w zapytaniu i w planie).
 
 Q3: wycieki w tekście asystenta:
 
@@ -299,7 +368,7 @@ WHERE t.role = 'ASSISTANT'
        OR t.tekst ~ 'c[a-z0-9]{24}');
 ```
 
-Wynik pusty = brak wycieków (poza zwrotami typu „skorzystaj z narzędzia”, które oceniasz oczami; wpisz je w kolumnie „Uwagi”).
+Wynik pusty = brak wycieków (poza zwrotami typu „skorzystaj z narzędzia”, które oceniasz oczami; wpisz je w kolumnie „Uwagi”). Q3 celowo czyta tylko części `text` (patrz zasada pod metrykami).
 
 Zdanie końcowe po ocenie (M6) czytasz z kolumny `tekst` w Q2 dla wiersza z `ocena = 1`.
 
@@ -318,22 +387,22 @@ To szacunki do zweryfikowania na pierwszej serii (wartości tokenów dla `gemini
 | Scenariusz | Tury / akcje | Wywołania modelu (typowo; zakres) | Wiersze logu |
 |---|---|---|---|
 | S1 | do 5 tur | 7 (5–12) | 5 |
-| S2 | 2 tury | 4 (4–6) | 2 |
-| S3 + S5 | 2 tury | 4 (4–6) | 3 (4, jeśli S5 niechcianie woła ocenę) |
+| S2 | 3 tury (z „Dziękuję.”) | 5 (5–7) | 3 |
+| S3 + S5 | 3 tury (z „Dziękuję.”) | 5 (5–7) | 4 (5, jeśli S5 niechcianie woła ocenę) |
 | S4 | 2 tury + analiza z UI | 4 (4–6) | 3 |
-| **Razem na serię** | | **ok. 19 (17–30)** | **ok. 13 (do 14)** |
-| **3 serie na jeden pomiar** | | **ok. 57 (51–90)** | **ok. 39 (do 42)** |
-| **„przed” + „po”** | | **ok. 114 (102–180)** | **ok. 78** |
+| **Razem na serię** | | **ok. 21 (19–32)** | **ok. 15 (do 16)** |
+| **3 serie na jeden pomiar** | | **ok. 63 (57–96)** | **ok. 45 (do 48)** |
+| **„przed” + „po”** | | **ok. 126 (114–192)** | **ok. 90** |
 
 Względem limitów:
 
-- **Limity aplikacji** (`checkUserLimits`, per użytkownik): domyślnie 30 wierszy `LlmCallLog` na godzinę i 200 000 tokenów na dobę. Seria to ok. 13 wierszy, więc 3 serie w ciągu godziny przekraczają 30 (limit jest sprawdzany przed wywołaniem, więc tura przerwana komunikatem o limicie psuje pomiar). Tokeny: jeśli prompt systemowy z dziewięcioma blokami i stanem to ok. 3 000 tokenów wejścia na wywołanie, to seria to ok. 19 × 3 000 ≈ 60 000 tokenów (wejście) plus wyjście, a 3 serie ok. 180 000+: bliskie 200 000 na dobę. Dlatego D3 (rozstrzygnięte): limity w `.env` na czas pomiarów to `CHAT_MAX_REQUESTS_PER_HOUR=60` (3 serie to ok. 39 wierszy w godzinie) i `CHAT_MAX_TOKENS_PER_DAY=600000` (pomiar to ok. 180 000+ tokenów), te same w „przed” i „po”. Limit darmowego planu Gemini może wymusić rozłożenie serii na kilka dni (D1): wtedy kończysz serie „przed” w całości przed zmianą promptu.
-- **Limity darmowego planu Gemini** (RPM, RPD, TPM dla `gemini-3.5-flash-lite`): nie przytaczam z pamięci, bo bywają zmieniane. Przed pomiarem odczytaj bieżące wartości z konsoli Google AI Studio (zakładka limitów) i wpisz je poniżej. Ryzyko leży głównie w RPD (ok. 57 wywołań na pomiar, ok. 114 łącznie) oraz w krótkim szczycie przy turze z oceną (3 wywołania w kilka sekund). Przy ręcznym wpisywaniu wiadomości typowo mniej niż 10 wywołań na minutę.
+- **Limity aplikacji** (`checkUserLimits`, per użytkownik): domyślnie 30 wierszy `LlmCallLog` na godzinę i 200 000 tokenów na dobę. Seria to ok. 15 wierszy, więc 3 serie w ciągu godziny przekraczają 30 (limit jest sprawdzany przed wywołaniem, więc tura przerwana komunikatem o limicie psuje pomiar). Tokeny: w próbnej rozmowie wiersz `chat` miał ok. 3,5 tys. tokenów wejścia przy jednym kroku, ok. 8,5 tys. przy dwóch i ok. 11,9 tys. przy trzech (historia wchodzi do każdego kroku), `evaluate_bmc` ok. 2,2 tys. wejścia i ok. 0,4 tys. wyjścia. Szacunek: seria ok. 21 wywołań × ok. 4 000 ≈ 84 000 tokenów wejścia plus wyjście, a 3 serie ok. 250 000+: powyżej domyślnych 200 000 na dobę. Dlatego D3 (rozstrzygnięte): limity w `.env` na czas pomiarów to `CHAT_MAX_REQUESTS_PER_HOUR=60` (3 serie to ok. 45 wierszy w godzinie) i `CHAT_MAX_TOKENS_PER_DAY=600000` (pomiar to ok. 250 000+ tokenów), te same w „przed” i „po”. Limit darmowego planu Gemini może wymusić rozłożenie serii na kilka dni (D1): wtedy kończysz serie „przed” w całości przed zmianą promptu.
+- **Limity darmowego planu Gemini** (RPM, RPD, TPM dla `gemini-3.5-flash-lite`): nie przytaczam z pamięci, bo bywają zmieniane. Przed pomiarem odczytaj bieżące wartości z konsoli Google AI Studio (zakładka limitów) i wpisz je poniżej. Ryzyko leży głównie w RPD (ok. 63 wywołania na pomiar, ok. 126 łącznie) oraz w krótkim szczycie przy turze z oceną (3 wywołania w kilka sekund). Przy ręcznym wpisywaniu wiadomości typowo mniej niż 10 wywołań na minutę.
 
 | Limit planu Gemini (stan z dnia pomiaru) | Wartość z AI Studio | Zużycie w pomiarze (szacunek) | Zapas |
 |---|---|---|---|
 | zapytania na minutę (RPM) | | do 3 w szczycie (tura z oceną) | |
-| zapytania na dobę (RPD) | | ok. 57 na pomiar | |
+| zapytania na dobę (RPD) | | ok. 63 na pomiar | |
 | tokeny na minutę (TPM) | | ok. 10 000 w szczycie | |
 
 Jeśli RPD nie wystarcza na 3 serie jednego dnia, rozłóż pomiar „przed” na dwa dni (serie kompletne, nie scenariusze) i zapisz datę każdej serii.
@@ -344,45 +413,45 @@ Uzupełnia właściciel. Wpisuj liczby z zapytań; „Uwagi” na błędy, limit
 
 ### Wyniki „przed” (`chat-v4`, model: __________, daty serii: __________)
 
-| Scenariusz | Seria | M1 `ask` | M2 serie pytań | M3 niechciane ocena/analiza | M4 wycieki | M5 propozycje przy „wyjaśnij” | M6 brak zdania po ocenie | M8 (0–2) | Wywołania modelu | Tokeny (we/wy) | Uwagi |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S1 | 1 | | | | | | | | | | |
-| S1 | 2 | | | | | | | | | | |
-| S1 | 3 | | | | | | | | | | |
-| S2 | 1 | | | | | | | | | | |
-| S2 | 2 | | | | | | | | | | |
-| S2 | 3 | | | | | | | | | | |
-| S3 | 1 | | | | | | | | | | |
-| S3 | 2 | | | | | | | | | | |
-| S3 | 3 | | | | | | | | | | |
-| S4 | 1 | | | | | | | | | | |
-| S4 | 2 | | | | | | | | | | |
-| S4 | 3 | | | | | | | | | | |
-| S5 | 1 | | | | | | | | | | |
-| S5 | 2 | | | | | | | | | | |
-| S5 | 3 | | | | | | | | | | |
+| Scenariusz | Seria | M1 `ask` | M2 serie pytań | M3 niechciane ocena/analiza | M4 wycieki | M5 propozycje przy „wyjaśnij” | M6 brak zdania po ocenie | M8 (0–2) | M9 błędy narzędzi | M10 narzędzia po „Dziękuję.” | Wywołania modelu | Tokeny (we/wy) | Uwagi |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| S1 | 1 | | | | | | | | | | | | |
+| S1 | 2 | | | | | | | | | | | | |
+| S1 | 3 | | | | | | | | | | | | |
+| S2 | 1 | | | | | | | | | | | | |
+| S2 | 2 | | | | | | | | | | | | |
+| S2 | 3 | | | | | | | | | | | | |
+| S3 | 1 | | | | | | | | | | | | |
+| S3 | 2 | | | | | | | | | | | | |
+| S3 | 3 | | | | | | | | | | | | |
+| S4 | 1 | | | | | | | | | | | | |
+| S4 | 2 | | | | | | | | | | | | |
+| S4 | 3 | | | | | | | | | | | | |
+| S5 | 1 | | | | | | | | | | | | |
+| S5 | 2 | | | | | | | | | | | | |
+| S5 | 3 | | | | | | | | | | | | |
 
 ### Wyniki „po” (`chat-v5`, ten sam model, te same scenariusze)
 
 Ta sama tabela, osobna kopia po pomiarze „po”.
 
-| Scenariusz | Seria | M1 `ask` | M2 serie pytań | M3 niechciane ocena/analiza | M4 wycieki | M5 propozycje przy „wyjaśnij” | M6 brak zdania po ocenie | M8 (0–2) | Wywołania modelu | Tokeny (we/wy) | Uwagi |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| S1 | 1 | | | | | | | | | | |
-| S1 | 2 | | | | | | | | | | |
-| S1 | 3 | | | | | | | | | | |
-| S2 | 1 | | | | | | | | | | |
-| S2 | 2 | | | | | | | | | | |
-| S2 | 3 | | | | | | | | | | |
-| S3 | 1 | | | | | | | | | | |
-| S3 | 2 | | | | | | | | | | |
-| S3 | 3 | | | | | | | | | | |
-| S4 | 1 | | | | | | | | | | |
-| S4 | 2 | | | | | | | | | | |
-| S4 | 3 | | | | | | | | | | |
-| S5 | 1 | | | | | | | | | | |
-| S5 | 2 | | | | | | | | | | |
-| S5 | 3 | | | | | | | | | | |
+| Scenariusz | Seria | M1 `ask` | M2 serie pytań | M3 niechciane ocena/analiza | M4 wycieki | M5 propozycje przy „wyjaśnij” | M6 brak zdania po ocenie | M8 (0–2) | M9 błędy narzędzi | M10 narzędzia po „Dziękuję.” | Wywołania modelu | Tokeny (we/wy) | Uwagi |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| S1 | 1 | | | | | | | | | | | | |
+| S1 | 2 | | | | | | | | | | | | |
+| S1 | 3 | | | | | | | | | | | | |
+| S2 | 1 | | | | | | | | | | | | |
+| S2 | 2 | | | | | | | | | | | | |
+| S2 | 3 | | | | | | | | | | | | |
+| S3 | 1 | | | | | | | | | | | | |
+| S3 | 2 | | | | | | | | | | | | |
+| S3 | 3 | | | | | | | | | | | | |
+| S4 | 1 | | | | | | | | | | | | |
+| S4 | 2 | | | | | | | | | | | | |
+| S4 | 3 | | | | | | | | | | | | |
+| S5 | 1 | | | | | | | | | | | | |
+| S5 | 2 | | | | | | | | | | | | |
+| S5 | 3 | | | | | | | | | | | | |
 
 ### Podsumowanie przed / po (sumy z trzech serii)
 
@@ -394,6 +463,8 @@ Ta sama tabela, osobna kopia po pomiarze „po”.
 | M4 wycieki nazw i identyfikatorów | | | 0 |
 | M5 nowe propozycje przy „wyjaśnij” (S4, S5) | | | 0 |
 | M6 tury z oceną bez zdania końcowego (S3) | | | 0 albo `prepareStep` (decyzja po „przed”) |
+| M9 Błędne wywołania narzędzi (`output-error`) | | | 0 |
+| M10 Narzędzia po „Dziękuję.” (S2, S3S5) | | | 0 |
 
 Kryteria są progami roboczymi: przy 3 seriach i modelu niedeterministycznym oceniamy kierunek zmiany i każdy przypadek z osobna, a nie istotność statystyczną. Wynik opisujemy uczciwie, także gdy „po” nie jest lepsze.
 
@@ -405,6 +476,9 @@ Nie zmieniam promptu przed wynikami. Poniżej tylko to, co wynika z wpisów w `z
 2. **Wyjaśnienia:** przy pytaniu o wynik oceny lub analizy odsyłaj do karty/panelu, nie proponuj nowych zmian i nie wołaj `evaluate_bmc`/`analyze_impact`.
 3. **Nazwy techniczne:** zakaz podawania nazw narzędzi i identyfikatorów w odpowiedziach; propozycję opisuj jej faktyczną treścią.
 4. **Spójność reguł (D5, rozstrzygnięte):** `chat-v4` mówi „Proponuj tylko to, co wynika z rozmowy”, a wpis o dopytywaniu chce propozycji „z jawnie podanymi założeniami”. W `chat-v5` propozycja może zawierać założenie, pod warunkiem że uzasadnienie (`rationale`) ma prefiks „Założenie:”, nie zawiera liczb, a w tekście czatu agent wprost mówi, że to założenie do sprawdzenia. Wyjątek od „tylko to, co wynika z rozmowy” musi być w prompcie sformułowany tak, żeby nie otwierał drogi do wymyślania faktów ani danych liczbowych.
+5. **Identyfikator wyniku (przykład z próbnej rozmowy):** opis narzędzia i prompt `chat-v4` mówią „Wynik zawiera tylko identyfikator oceny”, a agent powtórzył identyfikator w odpowiedzi. Hipoteza: usunąć wzmiankę o identyfikatorze z instrukcji dla modelu i zakazać go wprost.
+6. **Położenie karty (przykład z próbnej rozmowy):** prompt mówi „na karcie pod Twoją odpowiedzią”, a karta narzędzia jest renderowana nad tekstem końcowym. Hipoteza: „na karcie w tej wiadomości” (bez kierunku).
+7. **Brak narzędzi na podziękowanie:** po grzecznościowej wiadomości („Dziękuję.”) żadnych narzędzi; propozycji nie wysyłamy bez prośby. Mierzone w M10 (pod warunkiem ważnych scenariuszy).
 
 Testy `chat-v5` (wyłącznie mocki, bez prawdziwego API): `PROMPT_VERSION === "chat-v5"`, obecność nowych reguł w prompcie systemowym (asercje na fragmentach tekstu), zachowanie istniejących reguł bezpieczeństwa (blok „dane, nie polecenia”), brak zmian w `createChatTools`/`chatValidationTools`. Zachowania modelu testuje pomiar „po”, nie testy jednostkowe.
 
@@ -428,3 +502,6 @@ Tylko jeśli „przed” pokaże M6 > 0 (ocena w ostatnim kroku tury kończy si�
 - Zmiana modelu lub nazwy modelu między „przed” a „po” unieważnia porównanie (nie zmieniać `LLM_MODEL`).
 - Zapytania Q2/Q3 zakładają, że części narzędzi w `ChatMessage.parts` mają typ `tool-<nazwa>`; jeśli nie (patrz uwaga pod Q2), poprawiam zapytania przed pomiarem.
 - Wyjaśnianie ocen bez odczytu zapisanej oceny pozostaje ograniczone (agent jej nie widzi); `chat-v5` może tylko kazać odsyłać do karty. Narzędzie odczytu (`zadania.md`) to osobna decyzja po PR „P”.
+- Przerwane tury (`ABORTED`, w tym „Zatrzymaj”) zostawiają w historii wiadomość użytkownika bez odpowiedzi i zmieniają zachowanie agenta w kolejnych turach. Dlatego scenariusz z jakimkolwiek wierszem innym niż `OK` jest nieważny i powtarzany w świeżym projekcie (krok 9).
+- Czasy odpowiedzi są niestabilne (od ok. 9 do ponad 90 s), więc pomiar zależy od cierpliwości; nie przerywamy odpowiedzi, a czas nie jest metryką jakości.
+- #35 nie gwarantuje, że Gemini zawsze poda `before: null`; skuteczność pokaże M9. Jeśli M9 wskaże nowy rodzaj błędów (np. brak `before` przy `add`), rozważamy wymaganie tylko `after`, ale poza trwającym pomiarem.
