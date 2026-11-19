@@ -43,12 +43,13 @@ beforeEach(() => {
 });
 
 describe("propose_block_change: schemat argumentów dla modelu", () => {
-  it("oznacza before i after jako wymagane w schemacie JSON wysyłanym do dostawcy", async () => {
+  it("oznacza after jako wymagane, a before jako opcjonalne w schemacie JSON wysyłanym do dostawcy", async () => {
     const tool = createProposeBlockChangeTool(context);
 
     const jsonSchema = (await asSchema(tool.inputSchema).jsonSchema) as { required?: string[] };
 
-    expect(jsonSchema.required).toEqual(expect.arrayContaining(["before", "after"]));
+    expect(jsonSchema.required).toEqual(expect.arrayContaining(["blockKey", "operation", "after", "rationale"]));
+    expect(jsonSchema.required).not.toContain("before");
   });
 });
 
