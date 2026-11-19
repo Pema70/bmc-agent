@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   createProposal: vi.fn(),
   runEvaluation: vi.fn(),
   runImpactAnalysis: vi.fn(),
+  chatCreate: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/permissions", () => ({ getProjectAccess: mocks.getProjectAccess }));
@@ -24,6 +25,8 @@ vi.mock("@/lib/db/variants", () => ({
   getVariantMeta: mocks.getVariantMeta,
 }));
 vi.mock("@/lib/db/projects", () => ({ getProject: mocks.getProject }));
+// Tylko dla testów z prawdziwym saveChatMessage (niżej); reszta modułów bazy jest zamockowana.
+vi.mock("@/lib/db/client", () => ({ prisma: { chatMessage: { create: mocks.chatCreate } } }));
 vi.mock("@/lib/ai/limits", () => ({ checkUserLimits: mocks.checkUserLimits }));
 vi.mock("@/lib/ai/models", () => ({ getChatModel: mocks.getChatModel }));
 vi.mock("@/lib/ai/log", () => ({ logLlmCall: mocks.logLlmCall }));
@@ -795,5 +798,38 @@ describe("POST /api/chat: analyze_impact", () => {
     expect(system).toContain("karta z analizą jest poniżej");
     expect(system).toContain("Dopytuj zamiast zgadywać. Gdy brakuje informacji, zadaj jedno konkretne pytanie");
     expect(system).toContain("Ocenę modelu uruchamia narzędzie evaluate_bmc.");
+  });
+});
+
+describe("POST /api/chat: zapis odpowiedzi przez prawdziwy saveChatMessage", () => {
+  // Regresja: AI SDK zostawia w częściach klucze undefined (np. providerMetadata), a walidacja zapisu
+  // odrzucała je, więc każda odpowiedź kończyła się SAVE_FAILED i nie trafiała do historii.
+  beforeEach(async () => {
+    const actual = await vi.importActual<typeof import("@/lib/db/chat")>("@/lib/db/chat");
+    mocks.chatCreate.mockResolvedValue({});
+    mocks.saveChatMessage.mockImplementation(actual.saveChatMessage);
+  });
+
+  it("zapisuje odpowiedź tekstową asystenta i loguje OK", async () => {
+    useModel(textModel());
+
+    await finish(await POST(request(validBody)));
+
+    const roles = mocks.chatCreate.mock.calls.map((call) => call[0].data.role);
+    expect(roles).toEqual(["USER", "ASSISTANT"]);
+    const assistantParts = mocks.chatCreate.mock.calls[1][0].data.parts as { type: string; text?: string }[];
+    expect(assistantParts).toContainEqual(expect.objectContaining({ type: "text", text: "Cześć! Opowiedz o swoim pomyśle." }));
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ operation: "chat", status: "OK" }));
+    expect(mocks.logLlmCall).not.toHaveBeenCalledWith(expect.objectContaining({ errorCode: "SAVE_FAILED" }));
+  });
+
+  it("zapisuje odpowiedź z narzędziem ask_clarification i loguje OK", async () => {
+    useModel(toolCallModel(JSON.stringify({ question: "Kim są Twoi klienci?" })));
+
+    await finish(await POST(request(validBody)));
+
+    const assistantParts = mocks.chatCreate.mock.calls[1][0].data.parts as { type: string }[];
+    expect(assistantParts.map((part) => part.type)).toContain("tool-ask_clarification");
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ operation: "chat", status: "OK" }));
   });
 });
