@@ -51,7 +51,9 @@ export type NewChatMessage = {
  * zamiast nadpisać cudzą wiadomość.
  */
 export async function saveChatMessage(message: NewChatMessage): Promise<void> {
-  const parts = ChatPartsJson.parse(message.parts);
+  // AI SDK zostawia w częściach klucze o wartości undefined (np. providerMetadata), a z.json() ich nie przyjmuje.
+  // Zapis do JSONB i tak ich nie zawiera, więc normalizujemy do czystego JSON-a przed walidacją kształtu.
+  const parts = ChatPartsJson.parse(JSON.parse(JSON.stringify(message.parts) ?? "null"));
   await prisma.chatMessage.create({
     data: {
       id: message.id,

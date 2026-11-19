@@ -132,6 +132,90 @@ describe("saveChatMessage", () => {
   });
 });
 
+describe("saveChatMessage: części z kluczami undefined (kształt z AI SDK)", () => {
+  // AI SDK buduje części odpowiedzi z kluczami o wartości undefined (np. providerMetadata). Zod z.json() ich
+  // nie przyjmuje, a Prisma zapisuje JSON, który takich kluczy i tak nie ma.
+  function containsUndefined(value: unknown): boolean {
+    if (value === undefined) {
+      return true;
+    }
+    if (Array.isArray(value)) {
+      return value.some(containsUndefined);
+    }
+    if (typeof value === "object" && value !== null) {
+      return Object.values(value).some(containsUndefined);
+    }
+    return false;
+  }
+
+  it("zapisuje odpowiedź asystenta z providerMetadata: undefined i step-start", async () => {
+    create.mockResolvedValue({});
+    const parts = [
+      { type: "step-start" },
+      { type: "text", text: "Cześć!", providerMetadata: undefined, state: "done" },
+    ];
+
+    await saveChatMessage({ id: newChatMessageId(), projectId: "p1", userId: null, role: "assistant", parts });
+
+    const saved = create.mock.calls[0][0].data.parts;
+    expect(saved).toEqual([
+      { type: "step-start" },
+      { type: "text", text: "Cześć!", state: "done" },
+    ]);
+    expect(containsUndefined(saved)).toBe(false);
+  });
+
+  it("zapisuje część narzędzia z polami undefined, zachowując zwykłe wartości", async () => {
+    create.mockResolvedValue({});
+    const parts = [
+      {
+        type: "tool-ask_clarification",
+        toolCallId: "call-1",
+        state: "output-available",
+        input: { question: "Kim są klienci?", suggestedAnswers: undefined },
+        output: { question: "Kim są klienci?" },
+        providerExecuted: undefined,
+        callProviderMetadata: undefined,
+        title: undefined,
+      },
+    ];
+
+    await saveChatMessage({ id: newChatMessageId(), projectId: "p1", userId: null, role: "assistant", parts });
+
+    const saved = create.mock.calls[0][0].data.parts;
+    expect(saved).toEqual([
+      {
+        type: "tool-ask_clarification",
+        toolCallId: "call-1",
+        state: "output-available",
+        input: { question: "Kim są klienci?" },
+        output: { question: "Kim są klienci?" },
+      },
+    ]);
+    expect(containsUndefined(saved)).toBe(false);
+  });
+
+  it("nadal odrzuca części bez typu także wtedy, gdy mają klucze undefined", async () => {
+    await expect(
+      saveChatMessage({
+        id: newChatMessageId(),
+        projectId: "p1",
+        userId: null,
+        role: "assistant",
+        parts: [{ text: "bez typu", providerMetadata: undefined }],
+      }),
+    ).rejects.toThrow();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("nadal odrzuca wartość, która nie jest tablicą części", async () => {
+    await expect(
+      saveChatMessage({ id: newChatMessageId(), projectId: "p1", userId: null, role: "assistant", parts: undefined }),
+    ).rejects.toThrow();
+    expect(create).not.toHaveBeenCalled();
+  });
+});
+
 describe("listChatMessages: części propose_block_change", () => {
   const proposal = { id: "pr1", blockKey: "channels", operation: "add", before: null, after: "Targi", rationale: "r" };
   const toolPart = (output: unknown) => ({
