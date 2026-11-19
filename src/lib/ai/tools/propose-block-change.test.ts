@@ -1,3 +1,4 @@
+import { asSchema } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { createProposal } = vi.hoisted(() => ({ createProposal: vi.fn() }));
@@ -39,6 +40,16 @@ const validInput: ProposeBlockChangeToolInput = {
 beforeEach(() => {
   vi.clearAllMocks();
   createProposal.mockResolvedValue({ ok: true, proposal: record });
+});
+
+describe("propose_block_change: schemat argumentów dla modelu", () => {
+  it("oznacza before i after jako wymagane w schemacie JSON wysyłanym do dostawcy", async () => {
+    const tool = createProposeBlockChangeTool(context);
+
+    const jsonSchema = (await asSchema(tool.inputSchema).jsonSchema) as { required?: string[] };
+
+    expect(jsonSchema.required).toEqual(expect.arrayContaining(["before", "after"]));
+  });
 });
 
 describe("propose_block_change", () => {

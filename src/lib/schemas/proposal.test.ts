@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ProposeBlockChangeInput, ProposeBlockChangeOutput, ResolveProposalInput } from "@/lib/schemas/proposal";
+import { z } from "zod";
+import {
+  ProposeBlockChangeInput,
+  ProposeBlockChangeModelInput,
+  ProposeBlockChangeOutput,
+  ResolveProposalInput,
+} from "@/lib/schemas/proposal";
 
 const base = { blockKey: "channels", rationale: "Klienci kupują online." };
 
@@ -77,6 +83,57 @@ describe("ProposeBlockChangeInput", () => {
 
     expect(parsed).not.toHaveProperty("proposalId");
     expect(parsed).not.toHaveProperty("status");
+  });
+});
+
+describe("ProposeBlockChangeModelInput (schemat widziany przez model)", () => {
+  // Regresja: Gemini pomijał nieobowiązkowe before/after i przy add wysyłał wejście bez after, co kończyło się
+  // AI_InvalidToolInputError. W schemacie dla modelu oba pola są wymagane (z wartością null tam, gdzie nie dotyczą).
+  const observed = {
+    blockKey: "key_partnerships",
+    operation: "add",
+    rationale: "Dodanie lokalnych dostawców produktów spożywczych.",
+  };
+
+  it("w JSON Schema wymaga before i after (wartość null dozwolona)", () => {
+    const schema = z.toJSONSchema(ProposeBlockChangeModelInput, { io: "input" }) as {
+      required?: string[];
+      properties: Record<string, unknown>;
+    };
+
+    expect(schema.required).toEqual(expect.arrayContaining(["blockKey", "operation", "before", "after", "rationale"]));
+    expect(JSON.stringify(schema.properties.after)).toContain('"null"');
+    expect(JSON.stringify(schema.properties.before)).toContain('"null"');
+  });
+
+  it("odrzuca wejście bez after i before (kształt z błędu w dzienniku)", () => {
+    expect(ProposeBlockChangeModelInput.safeParse(observed).success).toBe(false);
+  });
+
+  it("odrzuca add bez pola before, bo model ma podać je jawnie jako null", () => {
+    expect(ProposeBlockChangeModelInput.safeParse({ ...observed, after: "Rolnicy" }).success).toBe(false);
+  });
+
+  it("przyjmuje add z before: null, edit i remove z jawnymi polami", () => {
+    expect(ProposeBlockChangeModelInput.safeParse({ ...observed, before: null, after: "Rolnicy" }).success).toBe(true);
+    expect(
+      ProposeBlockChangeModelInput.safeParse({ ...observed, operation: "edit", before: "Stary", after: "Nowy" }).success,
+    ).toBe(true);
+    expect(
+      ProposeBlockChangeModelInput.safeParse({ ...observed, operation: "remove", before: "Stary", after: null }).success,
+    ).toBe(true);
+  });
+
+  it("zachowuje reguły łączące operację z polami (add z before, remove z after)", () => {
+    expect(ProposeBlockChangeModelInput.safeParse({ ...observed, before: "x", after: "y" }).success).toBe(false);
+    expect(
+      ProposeBlockChangeModelInput.safeParse({ ...observed, operation: "remove", before: "x", after: "y" }).success,
+    ).toBe(false);
+    expect(ProposeBlockChangeModelInput.safeParse({ ...observed, before: null, after: null }).success).toBe(false);
+  });
+
+  it("schemat dla historii i ponownej walidacji nadal przyjmuje zapisane wejścia bez before", () => {
+    expect(ProposeBlockChangeInput.safeParse({ ...observed, after: "Rolnicy" }).success).toBe(true);
   });
 });
 
