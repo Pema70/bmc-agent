@@ -5,6 +5,7 @@ import { createProposal, type ProposalRecord } from "@/lib/db/proposals";
 import type { BmcState } from "@/lib/schemas/bmc";
 import {
   ProposeBlockChangeInput,
+  ProposeBlockChangeModelInput,
   type ProposalView,
   type ProposeBlockChangeOutput,
 } from "@/lib/schemas/proposal";
@@ -39,7 +40,7 @@ export function createProposeBlockChangeTool(ctx: ProposeToolContext) {
   return tool({
     description:
       "Zaproponuj użytkownikowi jedną zmianę jednego wpisu w bloku BMC (dodanie, zmiana lub usunięcie). Stan modelu NIE zmienia się od razu: użytkownik zaakceptuje lub odrzuci propozycję. Przy zmianie i usunięciu pole before musi być dokładnym tekstem istniejącego wpisu. Jedna propozycja to jeden wpis.",
-    inputSchema: ProposeBlockChangeInput,
+    inputSchema: ProposeBlockChangeModelInput,
     execute: async (input): Promise<ProposeBlockChangeOutput> => {
       const parsed = ProposeBlockChangeInput.safeParse(input);
       if (!parsed.success) {

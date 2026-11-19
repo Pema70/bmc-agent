@@ -431,6 +431,7 @@ describe("POST /api/chat: propose_block_change", () => {
   const proposalInput = {
     blockKey: "channels",
     operation: "add",
+    before: null,
     after: "Sprzedaż w social media",
     rationale: "Klienci są na Instagramie.",
   };
@@ -449,6 +450,27 @@ describe("POST /api/chat: propose_block_change", () => {
 
   beforeEach(() => {
     mocks.createProposal.mockResolvedValue({ ok: true, proposal: created });
+  });
+
+  it("wejście bez after i before (kształt z dziennika) to błąd narzędzia bez zapisu, a agent poprawia je w kolejnym kroku", async () => {
+    const withoutFields = { blockKey: proposalInput.blockKey, operation: proposalInput.operation, rationale: proposalInput.rationale };
+    const model = useModel(
+      sequenceModel(
+        toolCallChunks("propose_block_change", withoutFields),
+        toolCallChunks("propose_block_change", proposalInput),
+        textChunks("Zaproponowałem dodanie nowego kanału."),
+      ),
+    );
+
+    await finish(await POST(request(validBody)));
+
+    expect(model.doStreamCalls).toHaveLength(3);
+    expect(mocks.createProposal).toHaveBeenCalledTimes(1);
+    const assistant = mocks.saveChatMessage.mock.calls.map((call) => call[0]).find((m) => m.role === "assistant");
+    const states = (assistant.parts as { type: string; state?: string }[])
+      .filter((part) => part.type === "tool-propose_block_change")
+      .map((part) => part.state);
+    expect(states).toEqual(["output-error", "output-available"]);
   });
 
   it("tworzy propozycję PENDING z kontekstem serwera, agent kontynuuje po wyniku, a stan BMC nie jest zmieniany", async () => {
