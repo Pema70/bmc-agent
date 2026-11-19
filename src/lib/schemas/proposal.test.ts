@@ -87,53 +87,78 @@ describe("ProposeBlockChangeInput", () => {
 });
 
 describe("ProposeBlockChangeModelInput (schemat widziany przez model)", () => {
-  // Regresja: Gemini pomijał nieobowiązkowe before/after i przy add wysyłał wejście bez after, co kończyło się
-  // AI_InvalidToolInputError. W schemacie dla modelu oba pola są wymagane (z wartością null tam, gdzie nie dotyczą).
-  const observed = {
+  // Regresja 1: Gemini pomijał after i przy add wysyłał wejście bez niego (AI_InvalidToolInputError), więc after
+  // jest wymagane (z jawnym null tam, gdzie nie dotyczy operacji).
+  // Regresja 2 (po wymaganiu obu pól): model podawał after, ale pomijał before przy add, co też kończyło się
+  // AI_InvalidToolInputError. before jest więc opcjonalne (brak pola = null), a reguły operacji pilnują reszty.
+  const withoutAfter = {
     blockKey: "key_partnerships",
     operation: "add",
     rationale: "Dodanie lokalnych dostawców produktów spożywczych.",
   };
+  // Wejście z dziennika próbnej rozmowy (2026-11-19, 16:22): after jest, before pominięte.
+  const fromLog = {
+    after: "Dostawa przez dedykowaną aplikację mobilną integrującą zamówienia i czas dostawy.",
+    blockKey: "channels",
+    operation: "add",
+    rationale: "Dodanie kanału cyfrowego ułatwia zamawianie.",
+  };
 
-  it("w JSON Schema wymaga before i after (wartość null dozwolona)", () => {
+  it("w JSON Schema wymaga after (z null), a before zostawia opcjonalne", () => {
     const schema = z.toJSONSchema(ProposeBlockChangeModelInput, { io: "input" }) as {
       required?: string[];
       properties: Record<string, unknown>;
     };
 
-    expect(schema.required).toEqual(expect.arrayContaining(["blockKey", "operation", "before", "after", "rationale"]));
+    expect(schema.required).toEqual(expect.arrayContaining(["blockKey", "operation", "after", "rationale"]));
+    expect(schema.required).not.toContain("before");
     expect(JSON.stringify(schema.properties.after)).toContain('"null"');
     expect(JSON.stringify(schema.properties.before)).toContain('"null"');
   });
 
-  it("odrzuca wejście bez after i before (kształt z błędu w dzienniku)", () => {
-    expect(ProposeBlockChangeModelInput.safeParse(observed).success).toBe(false);
+  it("przyjmuje wejście z dziennika (add z after i bez before)", () => {
+    const parsed = ProposeBlockChangeModelInput.safeParse(fromLog);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toMatchObject({ operation: "add", before: null, after: fromLog.after });
   });
 
-  it("odrzuca add bez pola before, bo model ma podać je jawnie jako null", () => {
-    expect(ProposeBlockChangeModelInput.safeParse({ ...observed, after: "Rolnicy" }).success).toBe(false);
+  it("odrzuca add bez after (kształt z pierwszego błędu w dzienniku)", () => {
+    expect(ProposeBlockChangeModelInput.safeParse(withoutAfter).success).toBe(false);
   });
 
   it("przyjmuje add z before: null, edit i remove z jawnymi polami", () => {
-    expect(ProposeBlockChangeModelInput.safeParse({ ...observed, before: null, after: "Rolnicy" }).success).toBe(true);
+    expect(ProposeBlockChangeModelInput.safeParse({ ...fromLog, before: null }).success).toBe(true);
     expect(
-      ProposeBlockChangeModelInput.safeParse({ ...observed, operation: "edit", before: "Stary", after: "Nowy" }).success,
+      ProposeBlockChangeModelInput.safeParse({ ...fromLog, operation: "edit", before: "Stary", after: "Nowy" }).success,
     ).toBe(true);
     expect(
-      ProposeBlockChangeModelInput.safeParse({ ...observed, operation: "remove", before: "Stary", after: null }).success,
+      ProposeBlockChangeModelInput.safeParse({ ...fromLog, operation: "remove", before: "Stary", after: null }).success,
     ).toBe(true);
   });
 
-  it("zachowuje reguły łączące operację z polami (add z before, remove z after)", () => {
-    expect(ProposeBlockChangeModelInput.safeParse({ ...observed, before: "x", after: "y" }).success).toBe(false);
+  it("zachowuje reguły łączące operację z polami (add z before, edit/remove bez before, remove z after)", () => {
+    expect(ProposeBlockChangeModelInput.safeParse({ ...fromLog, before: "x" }).success).toBe(false);
+    expect(ProposeBlockChangeModelInput.safeParse({ ...fromLog, operation: "edit", after: "y" }).success).toBe(false);
     expect(
-      ProposeBlockChangeModelInput.safeParse({ ...observed, operation: "remove", before: "x", after: "y" }).success,
+      ProposeBlockChangeModelInput.safeParse({ ...fromLog, operation: "remove", before: "x", after: "y" }).success,
     ).toBe(false);
-    expect(ProposeBlockChangeModelInput.safeParse({ ...observed, before: null, after: null }).success).toBe(false);
+    expect(ProposeBlockChangeModelInput.safeParse({ ...fromLog, after: null }).success).toBe(false);
+  });
+
+  it("znane ograniczenie: remove bez jawnego after: null jest odrzucone", () => {
+    expect(
+      ProposeBlockChangeModelInput.safeParse({
+        blockKey: "channels",
+        operation: "remove",
+        before: "Stary",
+        rationale: "Nieaktualny kanał.",
+      }).success,
+    ).toBe(false);
   });
 
   it("schemat dla historii i ponownej walidacji nadal przyjmuje zapisane wejścia bez before", () => {
-    expect(ProposeBlockChangeInput.safeParse({ ...observed, after: "Rolnicy" }).success).toBe(true);
+    expect(ProposeBlockChangeInput.safeParse(fromLog).success).toBe(true);
   });
 });
 

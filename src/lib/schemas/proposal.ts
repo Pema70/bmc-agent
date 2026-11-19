@@ -29,11 +29,11 @@ const optionalEntry = BmcEntry.nullable()
   .optional()
   .transform((value) => value ?? null);
 
-// Pole wpisu w schemacie wysyłanym do modelu: wymagane, z jawnym null tam, gdzie nie dotyczy operacji.
+// Pole after w schemacie wysyłanym do modelu: wymagane, z jawnym null, gdy nie dotyczy operacji (remove).
 const requiredEntry = BmcEntry.nullable();
 
 const BEFORE_HINT =
-  "Dokładny tekst istniejącego wpisu, który zmieniasz lub usuwasz (edit, remove). Dla add: null (zawsze podaj to pole).";
+  "Dokładny tekst istniejącego wpisu, który zmieniasz lub usuwasz (edit, remove). Dla add: pomiń to pole albo podaj null.";
 const AFTER_HINT = "Nowy tekst wpisu (add, edit). Dla remove: null. Dla add i edit to pole jest obowiązkowe.";
 
 const blockKeyField = BlockKey.describe("Klucz bloku BMC, którego dotyczy zmiana.");
@@ -88,15 +88,16 @@ export const ProposeBlockChangeInput = z
   .superRefine(checkOperationFields);
 
 /**
- * Schemat argumentów widziany przez model (inputSchema narzędzia). before i after są WYMAGANE (null, gdy nie
- * dotyczą operacji), więc trafiają do listy `required` w schemacie JSON dostawcy. Wcześniej były opcjonalne i Gemini
- * pomijał je, a przy add wysyłał wejście bez after, co kończyło się AI_InvalidToolInputError.
+ * Schemat argumentów widziany przez model (inputSchema narzędzia). after jest WYMAGANE (null przy remove), więc
+ * trafia do listy `required` w schemacie JSON dostawcy: gdy było opcjonalne, Gemini pomijał je przy add, co kończyło
+ * się AI_InvalidToolInputError. before zostaje opcjonalne (brak pola = null): gdy było wymagane, model podawał after,
+ * ale pomijał before przy add (też AI_InvalidToolInputError). Przy edit i remove brak before wyłapują reguły operacji.
  */
 export const ProposeBlockChangeModelInput = z
   .object({
     blockKey: blockKeyField,
     operation: operationField,
-    before: requiredEntry.describe(BEFORE_HINT),
+    before: optionalEntry.describe(BEFORE_HINT),
     after: requiredEntry.describe(AFTER_HINT),
     rationale: rationaleField,
   })

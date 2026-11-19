@@ -452,11 +452,40 @@ describe("POST /api/chat: propose_block_change", () => {
     mocks.createProposal.mockResolvedValue({ ok: true, proposal: created });
   });
 
-  it("wejście bez after i before (kształt z dziennika) to błąd narzędzia bez zapisu, a agent poprawia je w kolejnym kroku", async () => {
-    const withoutFields = { blockKey: proposalInput.blockKey, operation: proposalInput.operation, rationale: proposalInput.rationale };
+  it("wejście z after i bez before (kształt z dziennika) przechodzi w jednym kroku, bez błędu narzędzia", async () => {
+    const withoutBefore = {
+      blockKey: proposalInput.blockKey,
+      operation: proposalInput.operation,
+      after: proposalInput.after,
+      rationale: proposalInput.rationale,
+    };
     const model = useModel(
       sequenceModel(
-        toolCallChunks("propose_block_change", withoutFields),
+        toolCallChunks("propose_block_change", withoutBefore),
+        textChunks("Zaproponowałem dodanie nowego kanału."),
+      ),
+    );
+
+    await finish(await POST(request(validBody)));
+
+    expect(model.doStreamCalls).toHaveLength(2);
+    expect(mocks.createProposal).toHaveBeenCalledTimes(1);
+    const assistant = mocks.saveChatMessage.mock.calls.map((call) => call[0]).find((m) => m.role === "assistant");
+    const states = (assistant.parts as { type: string; state?: string }[])
+      .filter((part) => part.type === "tool-propose_block_change")
+      .map((part) => part.state);
+    expect(states).toEqual(["output-available"]);
+  });
+
+  it("wejście bez after to błąd narzędzia bez zapisu, a agent poprawia je w kolejnym kroku", async () => {
+    const withoutAfter = {
+      blockKey: proposalInput.blockKey,
+      operation: proposalInput.operation,
+      rationale: proposalInput.rationale,
+    };
+    const model = useModel(
+      sequenceModel(
+        toolCallChunks("propose_block_change", withoutAfter),
         toolCallChunks("propose_block_change", proposalInput),
         textChunks("Zaproponowałem dodanie nowego kanału."),
       ),
