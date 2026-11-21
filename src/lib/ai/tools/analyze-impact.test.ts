@@ -30,6 +30,14 @@ beforeEach(() => {
 });
 
 describe("analyze_impact: argumenty", () => {
+  it("opis dla modelu nie wskazuje położenia karty i nie podaje, że wynik to sam identyfikator", () => {
+    const { tool } = run(description);
+
+    expect(tool.description).toContain("na karcie w tej wiadomości");
+    expect(tool.description).not.toContain("poniżej");
+    expect(tool.description).not.toContain("Wynik zawiera tylko identyfikator");
+  });
+
   it("forma 1: samo proposalId; stan, projekt, wariant i użytkownik z kontekstu, nie z argumentów", async () => {
     await run({ proposalId: "pr1", projectId: "p-obcy", variantId: "v-obcy", userId: "u-obcy", state: "podrobiony" }).call();
 
