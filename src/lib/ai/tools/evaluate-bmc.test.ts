@@ -26,6 +26,14 @@ beforeEach(() => {
 });
 
 describe("evaluate_bmc", () => {
+  it("opis dla modelu nie wskazuje położenia karty i nie wspomina o identyfikatorze wyniku", () => {
+    const { tool } = run();
+
+    expect(tool.description).toContain("na karcie w tej wiadomości");
+    expect(tool.description).not.toContain("poniżej");
+    expect(tool.description).not.toContain("identyfikator");
+  });
+
   it("nie ma argumentów od modelu: pusty obiekt jest poprawny, a dodatkowe pola są ignorowane", async () => {
     const { tool, call } = run({ state: "podrobiony", projectId: "p-obcy", variantId: "v-obcy" });
 
