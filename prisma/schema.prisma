@@ -62,6 +62,21 @@ enum ProposalOperation {
   REMOVE
 }
 
+// Rodzaj załącznika ustalany po zawartości pliku (krok 7), nie z MIME od klienta.
+enum AttachmentKind {
+  PDF
+  DOCX
+  TXT
+}
+
+// Skąd wzięła się propozycja (krok 7); potrzebne do sekcji „Źródła” w raporcie (krok 9).
+enum ProposalSourceKind {
+  CONVERSATION
+  ATTACHMENT
+  REFINEMENT
+  MODEL_KNOWLEDGE
+}
+
 enum Role {
   OWNER
   EDITOR
@@ -84,6 +99,7 @@ model User {
   variantsCreated     BmcVariant[]         @relation("VariantCreatedBy")
   strategyGenerations StrategyGeneration[]
   variantComparisons  VariantComparison[]
+  attachments         Attachment[]
 }
 
 model Project {
@@ -92,6 +108,7 @@ model Project {
   description         String
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
+  attachmentSeq       Int                  @default(0) // licznik numerów załączników (Attachment.ordinal): tylko rośnie, numer nigdy nie wraca po usunięciu
   members             ProjectMember[]
   variants            BmcVariant[]
   llmCalls            LlmCallLog[]
@@ -100,6 +117,7 @@ model Project {
   impactAnalyses      ImpactAnalysis[]
   strategyGenerations StrategyGeneration[]
   variantComparisons  VariantComparison[]
+  attachments         Attachment[]
 }
 
 model ProjectMember {
@@ -186,25 +204,54 @@ model ChatMessage {
 
 // Propozycja zmiany od agenta (human-in-the-loop). Stan BMC zmienia się dopiero po akceptacji.
 model Proposal {
-  id             String            @id @default(cuid())
-  variantId      String
-  blockKey       String // BlockKey, walidowany Zod przy zapisie i odczycie
-  operation      ProposalOperation
-  before         String? // ADD: null; EDIT/REMOVE: dokładny tekst istniejącego wpisu
-  after          String? // REMOVE: null; ADD/EDIT: nowy wpis
-  rationale      String
-  status         ProposalStatus    @default(PENDING)
-  baseVersion    Int // version wariantu w chwili propozycji
-  createdById    String? // użytkownik, w którego rozmowie powstała propozycja
-  resolvedById   String? // kto zaakceptował lub odrzucił
-  resolvedAt     DateTime?
-  createdAt      DateTime          @default(now())
-  variant        BmcVariant        @relation(fields: [variantId], references: [id], onDelete: Cascade)
-  createdBy      User?             @relation("ProposalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  resolvedBy     User?             @relation("ProposalResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
-  impactAnalyses ImpactAnalysis[]
+  id                   String             @id @default(cuid())
+  variantId            String
+  blockKey             String // BlockKey, walidowany Zod przy zapisie i odczycie
+  operation            ProposalOperation
+  before               String? // ADD: null; EDIT/REMOVE: dokładny tekst istniejącego wpisu
+  after                String? // REMOVE: null; ADD/EDIT: nowy wpis
+  rationale            String
+  status               ProposalStatus     @default(PENDING)
+  baseVersion          Int // version wariantu w chwili propozycji
+  createdById          String? // użytkownik, w którego rozmowie powstała propozycja
+  resolvedById         String? // kto zaakceptował lub odrzucił
+  resolvedAt           DateTime?
+  createdAt            DateTime           @default(now())
+  sourceKind           ProposalSourceKind @default(CONVERSATION) // skąd wzięła się propozycja (rozmowa, załącznik, runda poprawek, wiedza modelu)
+  sourceAttachmentId   String? // prawdziwy id załącznika (model widzi tylko etykietę Z{ordinal})
+  sourceAttachmentName String? // migawka nazwy pliku: raport przetrwa usunięcie załącznika (niezaufany tekst)
+  variant              BmcVariant         @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  createdBy            User?              @relation("ProposalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  resolvedBy           User?              @relation("ProposalResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  impactAnalyses       ImpactAnalysis[]
+  sourceAttachment     Attachment?        @relation(fields: [sourceAttachmentId], references: [id], onDelete: SetNull)
 
   @@index([variantId, status])
+  @@index([sourceAttachmentId])
+}
+
+// Załącznik projektu (krok 7): PDF, DOCX lub TXT. Plik leży w magazynie pod storageKey, a tekst wyekstrahowany przy
+// wgraniu w extractedText. Treść i nazwa są niezaufane (dane, nie polecenia). Kaskada z Project usuwa rekordy,
+// ale nie pliki w magazynie.
+model Attachment {
+  id            String         @id @default(cuid())
+  projectId     String
+  ordinal       Int // stały numer w projekcie (etykieta Z{ordinal} dla agenta); nadawany raz, nigdy nie używany ponownie; zależy od D11
+  fileName      String // niezaufany tekst (po normalizacji, najwyżej 200 znaków): tylko do wyświetlania i bloku danych
+  kind          AttachmentKind // ustalony po zawartości pliku, nie z MIME od klienta
+  sizeBytes     Int
+  storageKey    String         @unique // losowy klucz magazynu, nigdy nazwa pliku
+  extractedText String // niepusty: skan bez warstwy tekstowej jest odrzucany przy wgraniu
+  textChars     Int // długość extractedText (lista bez ładowania tekstu)
+  truncated     Boolean        @default(false) // tekst przycięty do limitu zapisu
+  createdById   String?
+  createdAt     DateTime       @default(now())
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy     User?          @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  proposals     Proposal[]
+
+  @@unique([projectId, ordinal])
+  @@index([projectId, createdAt])
 }
 
 // Ocena modelu BMC (evaluate_bmc lub ręczna). Zapis tylko po walidacji Zod; odpowiedź modelu

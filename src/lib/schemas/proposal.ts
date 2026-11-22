@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AttachmentId } from "@/lib/schemas/attachment";
 import { BlockKey, BmcEntry } from "@/lib/schemas/bmc";
 
 export const PROPOSAL_RATIONALE_MAX_CHARS = 1000;
@@ -6,6 +7,19 @@ export const PROPOSAL_RATIONALE_MAX_CHARS = 1000;
 export const PROPOSAL_OPERATIONS = ["add", "edit", "remove"] as const;
 export const ProposalOperation = z.enum(PROPOSAL_OPERATIONS);
 export type ProposalOperation = z.infer<typeof ProposalOperation>;
+
+export const PROPOSAL_SOURCE_KINDS = ["CONVERSATION", "ATTACHMENT", "REFINEMENT", "MODEL_KNOWLEDGE"] as const;
+export const ProposalSourceKind = z.enum(PROPOSAL_SOURCE_KINDS);
+export type ProposalSourceKind = z.infer<typeof ProposalSourceKind>;
+
+// Źródło propozycji przekazywane do createProposal (krok 7). REFINEMENT ustawia dopiero cykl poprawek (krok 7e).
+// Dla załącznika przekazujemy tylko id: nazwę pliku (niezaufany tekst) serwer bierze z bazy, nie od modelu.
+export const ProposalSource = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("CONVERSATION") }),
+  z.object({ kind: z.literal("MODEL_KNOWLEDGE") }),
+  z.object({ kind: z.literal("ATTACHMENT"), attachmentId: AttachmentId }),
+]);
+export type ProposalSource = z.infer<typeof ProposalSource>;
 
 export const PROPOSAL_STATUSES = ["PENDING", "ACCEPTED", "REJECTED"] as const;
 export const ProposalStatus = z.enum(PROPOSAL_STATUSES);

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const m = vi.hoisted(() => ({
   txProposal: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   txVariant: { findFirst: vi.fn(), updateMany: vi.fn() },
+  txAttachment: { findFirst: vi.fn() },
   queryRaw: vi.fn(),
   prismaProposal: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   prismaVariant: { findFirst: vi.fn(), updateMany: vi.fn() },
@@ -26,7 +27,7 @@ import {
 } from "@/lib/db/proposals";
 import { emptyBmcState } from "@/lib/schemas/bmc";
 
-const tx = { proposal: m.txProposal, bmcVariant: m.txVariant, $queryRaw: m.queryRaw };
+const tx = { proposal: m.txProposal, bmcVariant: m.txVariant, attachment: m.txAttachment, $queryRaw: m.queryRaw };
 
 const state = { ...emptyBmcState(), channels: ["Sklep online"] };
 const row = {
@@ -133,6 +134,54 @@ describe("createProposal", () => {
 
     expect(await createProposal(createArgs, 20)).toEqual({ ok: false, error: "DUPLICATE_PENDING" });
     expect(m.txProposal.create).not.toHaveBeenCalled();
+  });
+
+  describe("źródło propozycji (krok 7)", () => {
+    it("bez źródła nie zapisuje pól źródła (działa domyślne CONVERSATION z bazy) i nie szuka załącznika", async () => {
+      await createProposal(createArgs, 20);
+
+      const data = m.txProposal.create.mock.calls[0][0].data;
+      expect(data).not.toHaveProperty("sourceKind");
+      expect(data).not.toHaveProperty("sourceAttachmentId");
+      expect(data).not.toHaveProperty("sourceAttachmentName");
+      expect(m.txAttachment.findFirst).not.toHaveBeenCalled();
+    });
+
+    it.each([["CONVERSATION"], ["MODEL_KNOWLEDGE"]] as const)("źródło %s zapisuje tylko rodzaj, bez szukania załącznika", async (kind) => {
+      await createProposal({ ...createArgs, source: { kind } }, 20);
+
+      const data = m.txProposal.create.mock.calls[0][0].data;
+      expect(data.sourceKind).toBe(kind);
+      expect(data).not.toHaveProperty("sourceAttachmentId");
+      expect(m.txAttachment.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("źródło ATTACHMENT: załącznik sprawdzany po projekcie z argumentów, nazwa migawką z bazy, nie od wywołującego", async () => {
+      m.txAttachment.findFirst.mockResolvedValue({ id: "a1", fileName: "Opis kawiarni.pdf" });
+
+      const result = await createProposal({ ...createArgs, source: { kind: "ATTACHMENT", attachmentId: "a1" } }, 20);
+
+      expect(result.ok).toBe(true);
+      expect(m.txAttachment.findFirst).toHaveBeenCalledWith({ where: { id: "a1", projectId: "p1" }, select: { id: true, fileName: true } });
+      expect(m.txProposal.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            sourceKind: "ATTACHMENT",
+            sourceAttachmentId: "a1",
+            sourceAttachmentName: "Opis kawiarni.pdf",
+          }),
+        }),
+      );
+    });
+
+    it("załącznik spoza projektu (lub nieistniejący): ATTACHMENT_NOT_FOUND i brak zapisu", async () => {
+      m.txAttachment.findFirst.mockResolvedValue(null);
+
+      const result = await createProposal({ ...createArgs, source: { kind: "ATTACHMENT", attachmentId: "a-obcy" } }, 20);
+
+      expect(result).toEqual({ ok: false, error: "ATTACHMENT_NOT_FOUND" });
+      expect(m.txProposal.create).not.toHaveBeenCalled();
+    });
   });
 });
 
