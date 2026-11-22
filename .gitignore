@@ -43,3 +43,6 @@ next-env.d.ts
 
 # prisma (klient generowany przez prisma generate)
 /src/generated/
+
+# magazyn plików załączników na dev (ATTACHMENTS_DIR)
+/.data/

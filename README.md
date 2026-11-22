@@ -69,6 +69,11 @@ Klucz Gemini (`GOOGLE_GENERATIVE_AI_API_KEY`) utworzysz za darmo w [Google AI St
 | `MAX_PENDING_PROPOSALS` | Ile propozycji agenta naraz może czekać na decyzję | `20` |
 | `MAX_VARIANTS_PER_PROJECT` | Najwyżej tyle wariantów na projekt | `10` |
 | `LLM_MAX_OUTPUT_TOKENS_LONG` | Limit tokenów dla operacji z dużym wynikiem (strategie, porównanie) | `12000` |
+| `ATTACHMENT_MAX_BYTES` | Najwyższy rozmiar jednego załącznika (bajty) | `10485760` (10 MB) |
+| `ATTACHMENT_MAX_PER_PROJECT` | Najwyżej tyle załączników na projekt | `10` |
+| `ATTACHMENT_MAX_TEXT_CHARS` | Ile znaków wyekstrahowanego tekstu zapisujemy (dalej przycięcie) | `200000` |
+| `READ_ATTACHMENT_MAX_CHARS` | Ile znaków tekstu zwraca jedno odczytanie załącznika przez agenta | `6000` |
+| `ATTACHMENTS_DIR` | Katalog magazynu plików załączników (dev) | `.data/attachments` |
 
 Pusta zmienna limitu (np. `MAX_STEPS=`) liczy się jak brak i działa wartość domyślna. Zakresy wartości: `src/lib/ai/config.ts`.
 
