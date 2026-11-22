@@ -74,6 +74,8 @@ export function createProposeBlockChangeTool(ctx: ProposeToolContext) {
             return { ok: false, reason: "Taka propozycja już czeka na decyzję użytkownika. Nie powtarzaj jej." };
           case "NOT_FOUND":
             return { ok: false, reason: "Nie udało się zapisać propozycji." };
+          case "ATTACHMENT_NOT_FOUND":
+            return { ok: false, reason: "Nie znaleziono wskazanego załącznika." };
         }
       }
       return { ok: true, proposal: toProposalView(created.proposal) };

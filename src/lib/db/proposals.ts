@@ -4,7 +4,12 @@ import { applyProposal, type ApplyError } from "@/lib/bmc/proposals";
 import { prisma } from "@/lib/db/client";
 import { writeVariantStateIfVersion } from "@/lib/db/variants";
 import { BlockKey, BmcState } from "@/lib/schemas/bmc";
-import type { ProposalOperation, ProposalStatus, ProposeBlockChangeInput } from "@/lib/schemas/proposal";
+import type {
+  ProposalOperation,
+  ProposalSource,
+  ProposalStatus,
+  ProposeBlockChangeInput,
+} from "@/lib/schemas/proposal";
 
 // Każdy odczyt i zapis propozycji jest ograniczony do wariantu (variantId) należącego do projektu
 // (variant.projectId). Przynależność do projektu sprawdza też wywołujący (Server Action / narzędzie).
@@ -61,14 +66,43 @@ function toRecord(row: ProposalRow): ProposalRecord {
   return { ...row, blockKey: blockKey.data, operation: OPERATION_FROM_DB[row.operation] };
 }
 
+type SourceData = Pick<
+  Prisma.ProposalUncheckedCreateInput,
+  "sourceKind" | "sourceAttachmentId" | "sourceAttachmentName"
+>;
+
+/** Pola źródła do zapisu; {} bez źródła (działa domyślne CONVERSATION), null, gdy załącznik nie należy do projektu. */
+async function resolveSourceData(
+  tx: Tx,
+  projectId: string,
+  source: ProposalSource | undefined,
+): Promise<SourceData | null> {
+  if (!source) {
+    return {};
+  }
+  if (source.kind !== "ATTACHMENT") {
+    return { sourceKind: source.kind };
+  }
+  const attachment = await tx.attachment.findFirst({
+    where: { id: source.attachmentId, projectId },
+    select: { id: true, fileName: true },
+  });
+  if (!attachment) {
+    return null;
+  }
+  return { sourceKind: "ATTACHMENT", sourceAttachmentId: attachment.id, sourceAttachmentName: attachment.fileName };
+}
+
 export type CreateProposalResult =
   | { ok: true; proposal: ProposalRecord }
-  | { ok: false; error: "NOT_FOUND" | "LIMIT" | "DUPLICATE_PENDING" };
+  | { ok: false; error: "NOT_FOUND" | "LIMIT" | "DUPLICATE_PENDING" | "ATTACHMENT_NOT_FOUND" };
 
 /**
  * Jedyne miejsce, które tworzy propozycje (id pochodzi z bazy, nigdy z tekstu modelu).
  * Limit oczekujących propozycji na wariant jest egzekwowany w transakcji z blokadą wiersza wariantu,
  * więc równoległe żądania nie przekroczą go o jedną.
+ * Źródło (krok 7) jest opcjonalne; bez niego obowiązuje domyślne CONVERSATION z bazy. Dla załącznika serwer sprawdza
+ * w tej samej transakcji, że należy do projektu, i zapisuje migawkę jego nazwy.
  */
 export async function createProposal(
   args: {
@@ -77,6 +111,7 @@ export async function createProposal(
     createdById: string;
     baseVersion: number;
     change: ProposeBlockChangeInput;
+    source?: ProposalSource;
   },
   maxPending: number,
 ): Promise<CreateProposalResult> {
@@ -105,6 +140,11 @@ export async function createProposal(
       return { ok: false, error: "DUPLICATE_PENDING" } as const;
     }
 
+    const sourceData = await resolveSourceData(tx, projectId, args.source);
+    if (sourceData === null) {
+      return { ok: false, error: "ATTACHMENT_NOT_FOUND" } as const;
+    }
+
     const row = await tx.proposal.create({
       data: {
         variantId,
@@ -115,6 +155,7 @@ export async function createProposal(
         rationale: change.rationale,
         baseVersion: args.baseVersion,
         createdById: args.createdById,
+        ...sourceData,
       },
       select: PROPOSAL_SELECT,
     });

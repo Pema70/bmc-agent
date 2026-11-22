@@ -132,6 +132,12 @@ describe("propose_block_change", () => {
     expect(await run(validInput)).toMatchObject({ ok: false, reason: expect.stringContaining("już czeka") });
   });
 
+  it("nieznany załącznik źródła zwraca ok: false (model może poprawić)", async () => {
+    createProposal.mockResolvedValue({ ok: false, error: "ATTACHMENT_NOT_FOUND" });
+
+    expect(await run(validInput)).toMatchObject({ ok: false, reason: expect.stringContaining("załącznik") });
+  });
+
   it("limit oczekujących pochodzi z konfiguracji kontekstu", async () => {
     await run(validInput, { ...context, maxPending: 5 });
 
