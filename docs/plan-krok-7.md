@@ -1,6 +1,6 @@
 # Plan kroku 7: załączniki, `read_attachment` i cykl poprawek
 
-> Sekcja „Zmiany po akceptacji” na końcu pliku ma pierwszeństwo przed treścią powyżej (puste do czasu akceptacji).
+> Sekcja „Zmiany po akceptacji” na końcu pliku ma pierwszeństwo przed treścią powyżej.
 
 Krok 7 z `docs/spec.md` §14. **Do akceptacji (2026-11-22).**
 
@@ -471,3 +471,5 @@ Plan zaakceptowany 2026-11-22 z poniższymi poprawkami. **Tabela decyzji (D1 do 
 6. **Schemat, część 1: dodatkowa kolumna zależna od D11.** `Attachment.ordinal Int` (stały numer w obrębie projektu, nigdy ponownie nieużywany) i `@@unique([projectId, ordinal])`, zgodnie z rekomendacją w punkcie 2. W diffie dla 7a jest oznaczona komentarzem „zależy od D11”.
 
 7. **Start 7a po tej akceptacji.** Po zapisaniu planu zaczynam PR 7a według „Kolejności startu”: kroki 1 do 4 (stan repo, gałąź `feat/zalaczniki-model`, **commit 1 `docs:` z `docs/plan-krok-7.md`**, zmiana `prisma/schema.prisma` część 1 **bez** migracji, bez `generate`, bez pushu). **Zatrzymuję się na diffie schematu (część 1) i czekam na Twoją akceptację przed migracją.**
+
+8. **Numeracja `ordinal` (warunek akceptacji schematu, 2026-11-22): numer nadawany jako największy dotychczas wydany w projekcie plus 1, w transakcji z blokadą, i nigdy nieużywany ponownie po usunięciu załącznika** (w historii czatu zostają odczyty ze starą etykietą). Samo `max(ordinal) + 1` po istniejących rekordach tego nie gwarantuje (po usunięciu załącznika z najwyższym numerem numer wróciłby), dlatego **do schematu dochodzi `Project.attachmentSeq Int @default(0)`**: licznik, który tylko rośnie. `createAttachment` w jednej transakcji wykonuje atomowe `UPDATE "Project" SET "attachmentSeq" = "attachmentSeq" + 1 WHERE id = … RETURNING "attachmentSeq"` (to samo polecenie blokuje wiersz projektu, więc chroni też limit liczby załączników i równoległe wgrania) i używa zwróconej wartości jako `ordinal`; unikalność `(projectId, ordinal)` zostaje jako druga linia obrony. Ta poprawka zastępuje opis „`max(ordinal) + 1`” z punktów 2 i 6. **Testy (7a), prawdziwa `createAttachment` z zamockowanym klientem:** (a) wgrane Z1 i Z2, usunięcie Z2, nowy plik dostaje **Z3**; (b) usunięcie załącznika z najwyższym numerem (Z3), nowy plik dostaje **Z4**, nie Z3; (c) pierwszy załącznik w projekcie z `attachmentSeq = 0` dostaje Z1; (d) numer pochodzi z wyniku `UPDATE … RETURNING`, a nie z `count` ani `max` po rekordach; (e) przy błędzie zapisu rekordu transakcja się wycofuje i licznik nie rośnie; (f) kolizja `(projectId, ordinal)` jest mapowana na błąd, a nie na cichy zapis. Zmiana schematu: dodatkowa kolumna w `Project` (część 1), pokazana w diffie przed migracją.
