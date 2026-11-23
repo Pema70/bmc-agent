@@ -309,3 +309,97 @@ export async function getProposalInVariant(
 export async function countPendingProposals(projectId: string, variantId: string): Promise<number> {
   return prisma.proposal.count({ where: { variantId, status: "PENDING", variant: { projectId } } });
 }
+
+export type BatchFailure = { proposalId: string; error: ApplyError };
+
+export type AcceptRoundBatchResult =
+  | { ok: true; state: BmcState; version: number; acceptedCount: number }
+  | { ok: false; error: "NOT_FOUND" | "NOTHING_PENDING" | "ALREADY_RESOLVED" | "VERSION_CONFLICT" }
+  // Którejś propozycji nie da się zastosować na bieżącym stanie: brak jakichkolwiek zmian, lista powodów.
+  | { ok: false; error: "CONFLICTS"; failures: BatchFailure[] };
+
+/**
+ * „Zastosuj poprawki” (krok 7, D19): wszystkie propozycje PENDING rundy stosowane po kolei w JEDNEJ transakcji, albo
+ * wszystkie, albo żadna. Kolejność: numer pytania, potem id (paczka jest zapisywana w tej kolejności).
+ * Jeśli którakolwiek jest STALE, DUPLICATE lub LIMIT na bieżącym stanie, nic się nie zmienia, a wynik wymienia
+ * propozycje i powody (użytkownik rozstrzyga je pojedynczo istniejącymi „Zaakceptuj” / „Odrzuć”). Stan zapisywany jest
+ * tylko przy zgodnej wersji (`expectedVersion`), wersja rośnie o 1 niezależnie od liczby propozycji.
+ */
+export async function acceptRoundBatch(args: {
+  projectId: string;
+  variantId: string;
+  roundId: string;
+  expectedVersion: number;
+  userId: string;
+}): Promise<AcceptRoundBatchResult> {
+  const { projectId, variantId, roundId, expectedVersion, userId } = args;
+
+  try {
+    return await prisma.$transaction(async (tx): Promise<AcceptRoundBatchResult> => {
+      const round = await tx.refinementRound.findFirst({ where: { id: roundId, variantId, projectId }, select: { id: true } });
+      if (!round) {
+        return { ok: false, error: "NOT_FOUND" };
+      }
+
+      const rows = await tx.proposal.findMany({
+        where: { refinementRoundId: roundId, variantId, status: "PENDING" },
+        orderBy: [{ refinementQuestionIndex: "asc" }, { id: "asc" }],
+        select: PROPOSAL_SELECT,
+      });
+      if (rows.length === 0) {
+        return { ok: false, error: "NOTHING_PENDING" };
+      }
+      const proposals = rows.map(toRecord);
+
+      const variant = await tx.bmcVariant.findFirst({
+        where: { id: variantId, projectId },
+        select: { version: true, state: true },
+      });
+      if (!variant) {
+        return { ok: false, error: "NOT_FOUND" };
+      }
+      if (variant.version !== expectedVersion) {
+        return { ok: false, error: "VERSION_CONFLICT" };
+      }
+      const parsed = BmcState.safeParse(variant.state);
+      if (!parsed.success) {
+        throw new Error(`Niepoprawny stan BMC w wariancie ${variantId}: ${z.prettifyError(parsed.error)}`);
+      }
+
+      // Sprawdzenie wszystkich przed zapisem: niestosowalna propozycja nie przesuwa stanu, ale reszta jest dalej sprawdzana,
+      // żeby odpowiedź wymieniła wszystkie problemy naraz.
+      let working = parsed.data;
+      const failures: BatchFailure[] = [];
+      for (const proposal of proposals) {
+        const applied = applyProposal(working, proposal);
+        if (applied.ok) {
+          working = applied.state;
+        } else {
+          failures.push({ proposalId: proposal.id, error: applied.error });
+        }
+      }
+      if (failures.length > 0) {
+        return { ok: false, error: "CONFLICTS", failures };
+      }
+
+      if ((await writeVariantStateIfVersion(tx, variantId, expectedVersion, working)) === 0) {
+        throw new RollbackSignal("VERSION_CONFLICT");
+      }
+      const resolved = await tx.proposal.updateMany({
+        where: { id: { in: proposals.map((proposal) => proposal.id) }, variantId, status: "PENDING" },
+        data: { status: "ACCEPTED", resolvedById: userId, resolvedAt: new Date() },
+      });
+      if (resolved.count !== proposals.length) {
+        // Któraś propozycja została rozstrzygnięta równolegle: wycofujemy też zapis stanu.
+        throw new RollbackSignal("ALREADY_RESOLVED");
+      }
+
+      return { ok: true, state: working, version: expectedVersion + 1, acceptedCount: proposals.length };
+    });
+  } catch (error) {
+    if (error instanceof RollbackSignal) {
+      return { ok: false, error: error.reason };
+    }
+    throw error;
+  }
+}

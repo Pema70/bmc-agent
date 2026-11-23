@@ -79,7 +79,7 @@ const rationaleField = z
   .describe("Krótkie uzasadnienie zmiany po polsku.");
 
 // Reguły łączące operację z polami before i after; wspólne dla obu schematów poniżej.
-function checkOperationFields(
+export function checkOperationFields(
   value: { operation: ProposalOperation; before: string | null; after: string | null },
   ctx: z.core.$RefinementCtx,
 ): void {

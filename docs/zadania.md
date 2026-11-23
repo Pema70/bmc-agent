@@ -33,7 +33,7 @@ Decyzje właściciela repozytorium, opisane w `docs/spec.md` (nagłówek, §1, �
 ## Projekty
 
 - **Usuwanie projektu (OWNER).** Kaskadowo usuwa członkostwo, warianty i dalsze dane projektu (w tym `StrategyGeneration`, `VariantComparison`, a od kroku 7 załączniki i rundy poprawek), więc wymaga potwierdzenia w interfejsie (np. wpisanie nazwy projektu).
-- **Ręczny indeks częściowy `BmcVariant_projectId_main_key` (D2).** Dopisany ręcznie do SQL migracji `bmc_variant`, bo Prisma 7.10 obsługuje indeksy częściowe tylko w preview (`partialIndexes`). Gdy funkcja będzie stabilna, przenieść go do `schema.prisma` i sprawdzić, że `migrate diff` jest pusty.
+- **Ręczny indeks częściowy `BmcVariant_projectId_main_key` (D2).** Dopisany ręcznie do SQL migracji `bmc_variant`, bo Prisma 7.10 obsługuje indeksy częściowe tylko w preview (`partialIndexes`). Gdy funkcja będzie stabilna, przenieść go do `schema.prisma` i sprawdzić, że `migrate diff` jest pusty. **Dopisek (2026-11-23, PR 7e):** migracja `rundy_poprawek` ma drugi ręczny element nieznany Prismie: `CHECK ("roundNumber" BETWEEN 1 AND 3)` w tabeli `RefinementRound` (nazwa `RefinementRound_roundNumber_check`). Każda przyszła migracja jest sprawdzana przed zastosowaniem pod kątem **obu**: `DROP INDEX "BmcVariant_projectId_main_key"` oraz `DROP CONSTRAINT "RefinementRound_roundNumber_check"`; jeśli któryś się pojawi, zatrzymać się i zapytać.
 - **Uzupełnienie wariantów głównych przy wdrożeniu produkcyjnym.** Projekty utworzone przed PR 2b nie mają wariantu głównego (na dev to tylko dane testowe). Przed pierwszym wdrożeniem produkcyjnym, jeśli takie projekty będą istnieć, dodać jednorazowe uzupełnienie pustego „Wariantu głównego”.
 
 ## Edytor BMC
