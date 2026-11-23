@@ -50,6 +50,23 @@ const BEFORE_HINT =
   "Dokładny tekst istniejącego wpisu, który zmieniasz lub usuwasz (edit, remove). Dla add: pomiń to pole albo podaj null.";
 const AFTER_HINT = "Nowy tekst wpisu (add, edit). Dla remove: null. Dla add i edit to pole jest obowiązkowe.";
 
+export const PROPOSAL_MODEL_SOURCE_KINDS = ["conversation", "attachment", "model_knowledge"] as const;
+export const ProposalModelSourceKind = z.enum(PROPOSAL_MODEL_SOURCE_KINDS);
+export type ProposalModelSourceKind = z.infer<typeof ProposalModelSourceKind>;
+
+// Źródło w schemacie widzianym przez model jest łagodne (.nullish(), lekcje #35 i #37): reguły łączące pola
+// i weryfikację odczytu sprawdza execute narzędzia i zwraca { ok: false, reason }, a nie błąd walidacji wejścia.
+const sourceKindField = ProposalModelSourceKind.nullish().describe(
+  "Skąd pochodzi propozycja: conversation (z rozmowy z użytkownikiem), attachment (z załącznika, który przeczytałeś narzędziem read_attachment; wymaga sourceAttachmentId) albo model_knowledge (z Twojej ogólnej wiedzy, nie od użytkownika). Pomiń, gdy propozycja wynika z rozmowy.",
+);
+const sourceAttachmentIdField = z
+  .string()
+  .trim()
+  .min(1)
+  .max(20)
+  .nullish()
+  .describe("Etykieta załącznika z listy (np. Z1), gdy sourceKind to attachment. Pomiń w pozostałych przypadkach.");
+
 const blockKeyField = BlockKey.describe("Klucz bloku BMC, którego dotyczy zmiana.");
 const operationField = ProposalOperation.describe("add (dodaj wpis), edit (zmień wpis) lub remove (usuń wpis).");
 const rationaleField = z
@@ -98,6 +115,8 @@ export const ProposeBlockChangeInput = z
     before: optionalEntry.describe(BEFORE_HINT),
     after: optionalEntry.describe(AFTER_HINT),
     rationale: rationaleField,
+    sourceKind: sourceKindField,
+    sourceAttachmentId: sourceAttachmentIdField,
   })
   .superRefine(checkOperationFields);
 
@@ -114,6 +133,8 @@ export const ProposeBlockChangeModelInput = z
     before: optionalEntry.describe(BEFORE_HINT),
     after: requiredEntry.describe(AFTER_HINT),
     rationale: rationaleField,
+    sourceKind: sourceKindField,
+    sourceAttachmentId: sourceAttachmentIdField,
   })
   .superRefine(checkOperationFields);
 export type ProposeBlockChangeInput = z.output<typeof ProposeBlockChangeInput>;
@@ -128,6 +149,9 @@ export const ProposalView = z.object({
   before: z.string().nullable(),
   after: z.string().nullable(),
   rationale: z.string(),
+  // Źródło (krok 7): opcjonalne, bo starsze zapisane wyniki narzędzia go nie mają. Nazwa pliku to niezaufany tekst.
+  sourceKind: ProposalSourceKind.optional(),
+  sourceAttachmentName: z.string().nullable().optional(),
 });
 export type ProposalView = z.infer<typeof ProposalView>;
 

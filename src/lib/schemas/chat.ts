@@ -2,6 +2,7 @@ import type { UIDataTypes, UIMessage } from "ai";
 import { z } from "zod";
 import { VariantId } from "@/lib/schemas/bmc";
 import { EvaluateBmcOutput } from "@/lib/schemas/evaluation";
+import { ReadAttachmentOutput, ReadAttachmentToolInput } from "@/lib/schemas/attachment";
 import { AnalyzeImpactOutput, AnalyzeImpactToolInput } from "@/lib/schemas/impact";
 import { ProjectId } from "@/lib/schemas/project";
 import {
@@ -54,6 +55,7 @@ export type ChatTools = {
   propose_block_change: { input: ProposeBlockChangeToolInput; output: ProposeBlockChangeOutput };
   evaluate_bmc: { input: Record<string, never>; output: EvaluateBmcOutput };
   analyze_impact: { input: AnalyzeImpactToolInput; output: AnalyzeImpactOutput };
+  read_attachment: { input: ReadAttachmentToolInput; output: ReadAttachmentOutput };
 };
 
 // Schematy narzędzi do walidacji zapisanych wiadomości (historia z bazy, odpowiedź przed zapisem).
@@ -62,6 +64,7 @@ export const chatValidationTools = {
   propose_block_change: { inputSchema: ProposeBlockChangeInput, outputSchema: ProposeBlockChangeOutput },
   evaluate_bmc: { inputSchema: z.object({}), outputSchema: EvaluateBmcOutput },
   analyze_impact: { inputSchema: AnalyzeImpactToolInput, outputSchema: AnalyzeImpactOutput },
+  read_attachment: { inputSchema: ReadAttachmentToolInput, outputSchema: ReadAttachmentOutput },
 };
 export type ChatUIMessage = UIMessage<unknown, UIDataTypes, ChatTools>;
 

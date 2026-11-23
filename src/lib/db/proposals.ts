@@ -7,6 +7,7 @@ import { BlockKey, BmcState } from "@/lib/schemas/bmc";
 import type {
   ProposalOperation,
   ProposalSource,
+  ProposalSourceKind,
   ProposalStatus,
   ProposeBlockChangeInput,
 } from "@/lib/schemas/proposal";
@@ -27,6 +28,9 @@ export type ProposalRecord = {
   status: ProposalStatus;
   baseVersion: number;
   createdAt: Date;
+  sourceKind: ProposalSourceKind;
+  // Migawka nazwy pliku (niezaufany tekst), zostaje po usunięciu załącznika.
+  sourceAttachmentName: string | null;
 };
 
 type ProposalRow = {
@@ -40,6 +44,8 @@ type ProposalRow = {
   status: ProposalStatus;
   baseVersion: number;
   createdAt: Date;
+  sourceKind: ProposalSourceKind;
+  sourceAttachmentName: string | null;
 };
 
 const PROPOSAL_SELECT = {
@@ -53,6 +59,8 @@ const PROPOSAL_SELECT = {
   status: true,
   baseVersion: true,
   createdAt: true,
+  sourceKind: true,
+  sourceAttachmentName: true,
 } as const;
 
 const OPERATION_TO_DB = { add: "ADD", edit: "EDIT", remove: "REMOVE" } as const;
