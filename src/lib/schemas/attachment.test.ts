@@ -87,13 +87,13 @@ describe("ReadAttachmentToolInput (schemat widziany przez model)", () => {
 
 describe("ReadAttachmentOutput", () => {
   it("przyjmuje wynik ok z nextOffset liczbą albo null oraz błąd", () => {
-    expect(ReadAttachmentOutput.safeParse({ ok: true, content: "x", totalChars: 10, nextOffset: 6 }).success).toBe(true);
-    expect(ReadAttachmentOutput.safeParse({ ok: true, content: "x", totalChars: 1, nextOffset: null }).success).toBe(true);
+    expect(ReadAttachmentOutput.safeParse({ ok: true, label: "Z1", name: "opis.txt", content: "x", totalChars: 10, nextOffset: 6 }).success).toBe(true);
+    expect(ReadAttachmentOutput.safeParse({ ok: true, label: "Z1", name: "opis.txt", content: "x", totalChars: 1, nextOffset: null }).success).toBe(true);
     expect(ReadAttachmentOutput.safeParse({ ok: false, error: "Nie znaleziono załącznika." }).success).toBe(true);
   });
 
   it("odrzuca wynik ok bez treści", () => {
-    expect(ReadAttachmentOutput.safeParse({ ok: true, totalChars: 1, nextOffset: null }).success).toBe(false);
+    expect(ReadAttachmentOutput.safeParse({ ok: true, label: "Z1", name: "opis.txt", totalChars: 1, nextOffset: null }).success).toBe(false);
   });
 });
 

@@ -10,6 +10,7 @@ import {
 } from "ai";
 import { z } from "zod";
 import { loadAiLimits } from "@/lib/ai/config";
+import { loadAttachmentLimits } from "@/lib/attachments/config";
 import { classifyLlmError, toUserFacingError } from "@/lib/ai/errors";
 import { checkUserLimits } from "@/lib/ai/limits";
 import { logLlmCall, type TokenUsage } from "@/lib/ai/log";
@@ -17,9 +18,11 @@ import { getChatModel } from "@/lib/ai/models";
 import { PROMPT_VERSION, buildSystemPrompt } from "@/lib/ai/prompts/system";
 import { createChatTools } from "@/lib/ai/tools";
 import { getProjectAccess } from "@/lib/auth/permissions";
+import { listAttachmentsForProject } from "@/lib/db/attachments";
 import { listChatMessages, newChatMessageId, saveChatMessage } from "@/lib/db/chat";
 import { getProject } from "@/lib/db/projects";
 import { getVariantForProject, getVariantMeta } from "@/lib/db/variants";
+import { attachmentLabel } from "@/lib/schemas/attachment";
 import { chatRequestSchema, chatValidationTools, type ChatUIMessage } from "@/lib/schemas/chat";
 
 const MAX_RETRIES = 2;
@@ -110,6 +113,21 @@ export async function POST(req: Request): Promise<Response> {
     return jsonError(404, "NOT_FOUND", "Nie znaleziono projektu.");
   }
   const history = await listChatMessages(projectId, limits.historyLimit);
+  // Lista załączników (bez treści) do kontekstu; etykieta Z{n}, nie id z bazy. Odczyt zawsze po projectId z uprawnień.
+  let attachmentLimits: ReturnType<typeof loadAttachmentLimits>;
+  try {
+    attachmentLimits = loadAttachmentLimits();
+  } catch (error) {
+    console.error("[chat] Błędna konfiguracja załączników:", error instanceof Error ? error.message : "nieznany błąd");
+    return jsonError(500, "CONFIG", "Agent jest źle skonfigurowany. Sprawdź konfigurację serwera.");
+  }
+  const attachmentList = (await listAttachmentsForProject(projectId)).map((item) => ({
+    label: attachmentLabel(item.ordinal),
+    name: item.fileName,
+    kind: item.kind,
+    textChars: item.textChars,
+    truncated: item.truncated,
+  }));
 
   // 6. Zapis wiadomości użytkownika z id nadanym przez serwer.
   const userMessageId = newChatMessageId();
@@ -138,10 +156,11 @@ export async function POST(req: Request): Promise<Response> {
     version: variant.version,
     state: variant.state,
     maxPending: limits.maxPendingProposals,
+    readMaxChars: attachmentLimits.readMaxChars,
   });
   const result = streamText({
     model: resolved.model,
-    system: buildSystemPrompt(project, variant.state),
+    system: buildSystemPrompt(project, variant.state, attachmentList),
     messages: await convertToModelMessages(messages, { tools: chatTools }),
     tools: chatTools,
     stopWhen: [isStepCount(limits.maxSteps), hasToolCall("ask_clarification")],

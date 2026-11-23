@@ -101,6 +101,9 @@ export type ReadAttachmentToolInput = z.input<typeof ReadAttachmentToolInput>;
 export const ReadAttachmentOutput = z.discriminatedUnion("ok", [
   z.object({
     ok: z.literal(true),
+    // Etykieta (Z{n}) i nazwa pliku: serwer weryfikuje po etykiecie, że załącznik został przeczytany (źródło propozycji).
+    label: z.string(),
+    name: z.string(),
     content: z.string(),
     totalChars: z.number().int().min(0),
     nextOffset: z.number().int().min(0).nullable(),

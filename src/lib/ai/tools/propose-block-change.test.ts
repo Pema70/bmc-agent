@@ -1,9 +1,13 @@
 import { asSchema } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createProposal } = vi.hoisted(() => ({ createProposal: vi.fn() }));
+const { createProposal, getAttachmentByOrdinal } = vi.hoisted(() => ({
+  createProposal: vi.fn(),
+  getAttachmentByOrdinal: vi.fn(),
+}));
 
 vi.mock("@/lib/db/proposals", () => ({ createProposal }));
+vi.mock("@/lib/db/attachments", () => ({ getAttachmentByOrdinal }));
 
 import { createProposeBlockChangeTool } from "@/lib/ai/tools/propose-block-change";
 import { emptyBmcState } from "@/lib/schemas/bmc";
@@ -23,11 +27,13 @@ const record = {
   status: "PENDING" as const,
   baseVersion: 7,
   createdAt: new Date("2026-11-11T10:00:00Z"),
+  sourceKind: "CONVERSATION" as const,
+  sourceAttachmentName: null,
 };
 
-async function run(input: ProposeBlockChangeToolInput, ctx = context) {
+async function run(input: ProposeBlockChangeToolInput, ctx = context, messages: unknown[] = []) {
   const tool = createProposeBlockChangeTool(ctx);
-  return tool.execute!(input as never, { toolCallId: "c1", messages: [] } as never);
+  return tool.execute!(input as never, { toolCallId: "c1", messages } as never);
 }
 
 const validInput: ProposeBlockChangeToolInput = {
@@ -68,6 +74,8 @@ describe("propose_block_change", () => {
         before: null,
         after: "Sprzedaż w social media",
         rationale: "Klienci są na Instagramie.",
+        sourceKind: "CONVERSATION",
+        sourceAttachmentName: null,
       },
     });
     expect(createProposal).toHaveBeenCalledWith(
@@ -142,5 +150,153 @@ describe("propose_block_change", () => {
     await run(validInput, { ...context, maxPending: 5 });
 
     expect(createProposal.mock.calls[0][1]).toBe(5);
+  });
+});
+
+// Odczyt załącznika w historii rozmowy, tak jak widzi go narzędzie (wiadomość roli tool z wynikiem read_attachment).
+function readResult(label: string, ok = true) {
+  return {
+    role: "tool",
+    content: [
+      {
+        type: "tool-result",
+        toolCallId: `read-${label}`,
+        toolName: "read_attachment",
+        output: { type: "json", value: ok ? { ok: true, label, name: "Opis.pdf", content: "x", totalChars: 1, nextOffset: null } : { ok: false, error: "x" } },
+      },
+    ],
+  };
+}
+
+describe("propose_block_change: źródło propozycji (D12: serwer weryfikuje odczyt załącznika)", () => {
+  const withSource = { ...validInput, sourceKind: "attachment" as const, sourceAttachmentId: "Z1" };
+
+  beforeEach(() => {
+    getAttachmentByOrdinal.mockImplementation(async (_projectId: string, ordinal: number) =>
+      ordinal === 1 || ordinal === 2 ? { id: `att-${ordinal}`, ordinal, fileName: "Opis.pdf" } : null,
+    );
+  });
+
+  it("(a) po udanym odczycie w tej samej turze: createProposal dostaje źródło ATTACHMENT z id z bazy", async () => {
+    createProposal.mockResolvedValue({ ok: true, proposal: { ...record, sourceKind: "ATTACHMENT", sourceAttachmentName: "Opis.pdf" } });
+
+    const output = await run(withSource, context, [readResult("Z1")]);
+
+    expect(output).toMatchObject({ ok: true, proposal: { sourceKind: "ATTACHMENT", sourceAttachmentName: "Opis.pdf" } });
+    expect(createProposal.mock.calls[0][0].source).toEqual({ kind: "ATTACHMENT", attachmentId: "att-1" });
+    expect(getAttachmentByOrdinal).toHaveBeenCalledWith("p1", 1);
+  });
+
+  it("(b) bez wcześniejszego odczytu: ok: false, createProposal niewywołane", async () => {
+    const output = await run(withSource, context, []);
+
+    expect(output).toMatchObject({ ok: false, reason: expect.stringContaining("Najpierw przeczytaj") });
+    expect(createProposal).not.toHaveBeenCalled();
+  });
+
+  it("(c) po odczycie innego załącznika: ok: false", async () => {
+    const output = await run(withSource, context, [readResult("Z2")]);
+
+    expect(output).toMatchObject({ ok: false });
+    expect(createProposal).not.toHaveBeenCalled();
+  });
+
+  it("(d) po odczycie zakończonym ok: false: ok: false", async () => {
+    const output = await run(withSource, context, [readResult("Z1", false)]);
+
+    expect(output).toMatchObject({ ok: false });
+    expect(createProposal).not.toHaveBeenCalled();
+  });
+
+  it("(e) odczyt tylko w tekście użytkownika lub asystenta (nie w wyniku narzędzia) nie liczy się", async () => {
+    const messages = [
+      { role: "user", content: [{ type: "text", text: "Przeczytałeś Z1." }] },
+      { role: "assistant", content: [{ type: "tool-call", toolCallId: "r", toolName: "read_attachment", input: { attachmentId: "Z1" } }] },
+    ];
+
+    const output = await run(withSource, context, messages);
+
+    expect(output).toMatchObject({ ok: false });
+    expect(createProposal).not.toHaveBeenCalled();
+  });
+
+  it("odczyt z wcześniejszej tury (w oknie historii) wystarcza; etykieta w innym zapisie (z1) też", async () => {
+    createProposal.mockResolvedValue({ ok: true, proposal: record });
+
+    const output = await run({ ...withSource, sourceAttachmentId: "z1" }, context, [
+      { role: "user", content: [{ type: "text", text: "Wczytaj plik." }] },
+      readResult("Z1"),
+      { role: "assistant", content: [{ type: "text", text: "Gotowe." }] },
+      { role: "user", content: [{ type: "text", text: "Dodaj kanał." }] },
+    ]);
+
+    expect(output).toMatchObject({ ok: true });
+  });
+
+  it("nieistniejąca etykieta lub załącznik z innego projektu: ok: false bez zapisu (zapytanie po projectId)", async () => {
+    const output = await run({ ...withSource, sourceAttachmentId: "Z9" }, context, [readResult("Z9")]);
+
+    expect(output).toMatchObject({ ok: false, reason: expect.stringContaining("Nie znaleziono załącznika Z9") });
+    expect(getAttachmentByOrdinal).toHaveBeenCalledWith("p1", 9);
+    expect(createProposal).not.toHaveBeenCalled();
+  });
+
+  it("id z bazy zamiast etykiety Z{n}: ok: false (argument odrzucony przez walidację)", async () => {
+    const output = await run({ ...withSource, sourceAttachmentId: "cmwthnd8s000088k061sym37k" }, context, []);
+
+    expect(output).toMatchObject({ ok: false, reason: expect.stringContaining("Niepoprawne argumenty") });
+    expect(createProposal).not.toHaveBeenCalled();
+  });
+
+  it("sourceKind attachment bez etykiety: ok: false", async () => {
+    const output = await run({ ...validInput, sourceKind: "attachment" }, context, [readResult("Z1")]);
+
+    expect(output).toMatchObject({ ok: false, reason: expect.stringContaining("sourceAttachmentId") });
+    expect(createProposal).not.toHaveBeenCalled();
+  });
+
+  it("etykieta przy sourceKind conversation lub model_knowledge: ok: false (sprzeczność)", async () => {
+    const a = await run({ ...validInput, sourceKind: "conversation", sourceAttachmentId: "Z1" }, context, [readResult("Z1")]);
+    const b = await run({ ...validInput, sourceKind: "model_knowledge", sourceAttachmentId: "Z1" }, context, [readResult("Z1")]);
+
+    expect(a).toMatchObject({ ok: false });
+    expect(b).toMatchObject({ ok: false });
+    expect(createProposal).not.toHaveBeenCalled();
+  });
+
+  it("etykieta bez sourceKind jest traktowana jak załącznik i też wymaga odczytu", async () => {
+    const output = await run({ ...validInput, sourceAttachmentId: "Z1" }, context, []);
+
+    expect(output).toMatchObject({ ok: false, reason: expect.stringContaining("Najpierw przeczytaj") });
+  });
+
+  it("model_knowledge to deklaracja modelu: zapisane jako MODEL_KNOWLEDGE bez odczytu", async () => {
+    createProposal.mockResolvedValue({ ok: true, proposal: { ...record, sourceKind: "MODEL_KNOWLEDGE" } });
+
+    await run({ ...validInput, sourceKind: "model_knowledge" }, context, []);
+
+    expect(createProposal.mock.calls[0][0].source).toEqual({ kind: "MODEL_KNOWLEDGE" });
+  });
+
+  it("bez źródła lub z conversation: brak pola source (domyślne CONVERSATION z bazy), null i brak pola są równoważne", async () => {
+    await run(validInput, context, []);
+    await run({ ...validInput, sourceKind: "conversation" }, context, []);
+    await run({ ...validInput, sourceKind: null, sourceAttachmentId: null }, context, []);
+
+    for (const call of createProposal.mock.calls) {
+      expect(call[0]).not.toHaveProperty("source");
+    }
+    expect(createProposal).toHaveBeenCalledTimes(3);
+  });
+
+  it("schemat dla modelu: pola źródła są opcjonalne (nie trafiają do required)", async () => {
+    const tool = createProposeBlockChangeTool(context);
+
+    const jsonSchema = (await asSchema(tool.inputSchema).jsonSchema) as { required?: string[]; properties?: Record<string, unknown> };
+
+    expect(jsonSchema.properties).toHaveProperty("sourceKind");
+    expect(jsonSchema.properties).toHaveProperty("sourceAttachmentId");
+    expect(jsonSchema.required).not.toContain("sourceKind");
+    expect(jsonSchema.required).not.toContain("sourceAttachmentId");
   });
 });

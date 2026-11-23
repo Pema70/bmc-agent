@@ -107,6 +107,8 @@ export default async function ProjectPage({
     before: proposal.before,
     after: proposal.after,
     rationale: proposal.rationale,
+    sourceKind: proposal.sourceKind,
+    sourceAttachmentName: proposal.sourceAttachmentName,
     status: proposal.status,
   }));
   // Odczyt ocen dla każdego członka (VIEWER i wyżej): rola sprawdzona wyżej, zapytanie po projectId I variantId,
