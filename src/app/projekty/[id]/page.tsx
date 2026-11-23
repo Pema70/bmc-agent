@@ -6,6 +6,7 @@ import { updateProjectAction } from "@/app/projekty/actions";
 import { BmcCanvas } from "@/components/bmc/bmc-canvas";
 import { CanvasEditor } from "@/components/bmc/canvas-editor";
 import { VariantWorkspaceProvider, type VariantWorkspaceProviderProps } from "@/components/bmc/variant-workspace";
+import { AttachmentsPanel } from "@/components/attachments/attachments-panel";
 import { AgentChat } from "@/components/chat/agent-chat";
 import { EvaluationPanel } from "@/components/evaluation/evaluation-panel";
 import { ImpactPanel } from "@/components/impact/impact-panel";
@@ -17,6 +18,8 @@ import { VariantActions } from "@/components/variants/variant-actions";
 import { VariantSwitcher } from "@/components/variants/variant-switcher";
 import { hasRole, requireProjectRole } from "@/lib/auth/permissions";
 import { loadAiLimits } from "@/lib/ai/config";
+import { loadAttachmentLimits } from "@/lib/attachments/config";
+import { listAttachmentsForProject } from "@/lib/db/attachments";
 import { listChatMessages } from "@/lib/db/chat";
 import { listEvaluationsForVariant } from "@/lib/db/evaluations";
 import { listImpactAnalysesForVariant } from "@/lib/db/impact";
@@ -122,6 +125,12 @@ export default async function ProjectPage({
       ? await countPendingProposals(access.projectId, mainListed.id)
       : 0;
   const variantSummaries = variantList.map(toVariantSummary);
+  // Załączniki: lista bez treści, odczyt dla każdego członka (VIEWER i wyżej), zapytanie po projectId z uprawnień.
+  const attachmentLimits = loadAttachmentLimits();
+  const attachments = (await listAttachmentsForProject(access.projectId)).map((item) => ({
+    ...item,
+    createdAt: item.createdAt.toISOString(),
+  }));
   const workspaceProvider =
     variant && canEditCanvas
       ? {
@@ -236,6 +245,14 @@ export default async function ProjectPage({
         {variant ? <ImpactPanel /> : null}
         </ImpactProvider>
       </Workspace>
+
+      <AttachmentsPanel
+        projectId={access.projectId}
+        canEdit={canEditCanvas}
+        items={attachments}
+        maxPerProject={attachmentLimits.maxPerProject}
+        maxMegabytes={Math.floor(attachmentLimits.maxBytes / (1024 * 1024))}
+      />
 
       {canEdit ? (
         <section className="flex flex-col gap-4">
