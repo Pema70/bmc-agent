@@ -77,6 +77,13 @@ enum ProposalSourceKind {
   MODEL_KNOWLEDGE
 }
 
+// Stan rundy poprawek (krok 7). CANCELLED: runda zamknięta przez użytkownika (liczy się do limitu 3 rund).
+enum RefinementStatus {
+  AWAITING_ANSWERS // pytania wygenerowane, czekają na odpowiedzi
+  PROPOSED // odpowiedzi zapisane, paczka propozycji utworzona
+  CANCELLED // runda zamknięta przez użytkownika
+}
+
 enum Role {
   OWNER
   EDITOR
@@ -100,6 +107,7 @@ model User {
   strategyGenerations StrategyGeneration[]
   variantComparisons  VariantComparison[]
   attachments         Attachment[]
+  refinementRounds    RefinementRound[]
 }
 
 model Project {
@@ -118,6 +126,7 @@ model Project {
   strategyGenerations StrategyGeneration[]
   variantComparisons  VariantComparison[]
   attachments         Attachment[]
+  refinementRounds    RefinementRound[]
 }
 
 model ProjectMember {
@@ -156,6 +165,7 @@ model BmcVariant {
   evaluations         EvaluationResult[]
   impactAnalyses      ImpactAnalysis[]
   strategyGenerations StrategyGeneration[] @relation("GenerationBase")
+  refinementRounds    RefinementRound[]
 
   @@unique([generationId, generationIndex]) // ta sama strategia nie zapisze się dwa razy (NULL-e się nie kolidują)
   @@index([projectId])
@@ -183,6 +193,8 @@ model LlmCallLog {
   impactAnalysis     ImpactAnalysis?
   strategyGeneration StrategyGeneration?
   variantComparison  VariantComparison?
+  roundQuestions     RefinementRound?    @relation("RoundQuestionsCall")
+  roundRefine        RefinementRound?    @relation("RoundRefineCall")
 
   @@index([userId, createdAt])
   @@index([projectId])
@@ -225,9 +237,13 @@ model Proposal {
   resolvedBy           User?              @relation("ProposalResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
   impactAnalyses       ImpactAnalysis[]
   sourceAttachment     Attachment?        @relation(fields: [sourceAttachmentId], references: [id], onDelete: SetNull)
+  refinementRoundId       String? // runda poprawek, z której pochodzi propozycja (sourceKind = REFINEMENT)
+  refinementQuestionIndex Int? // indeks pytania w RefinementRound.questions (raport: runda i pytanie)
+  refinementRound         RefinementRound? @relation(fields: [refinementRoundId], references: [id], onDelete: SetNull)
 
   @@index([variantId, status])
   @@index([sourceAttachmentId])
+  @@index([refinementRoundId])
 }
 
 // Załącznik projektu (krok 7): PDF, DOCX lub TXT. Plik leży w magazynie pod storageKey, a tekst wyekstrahowany przy
@@ -254,6 +270,42 @@ model Attachment {
   @@index([projectId, createdAt])
 }
 
+// Runda cyklu poprawek (krok 7): ocena -> pytania -> odpowiedzi -> paczka propozycji. Najwyżej 3 rundy na wariant
+// (CHECK w SQL migracji + unikalność (variantId, roundNumber)). Odpowiedzi użytkownika i treści od modelu to dane, nie polecenia.
+model RefinementRound {
+  id                     String           @id @default(cuid())
+  projectId              String
+  variantId              String
+  roundNumber            Int // 1..3, unikalny w obrębie wariantu
+  evaluationId           String // aktualna ocena, od której zaczęła się runda
+  variantVersion         Int // version wariantu w chwili startu rundy
+  stateSnapshot          Json // BmcState, względem którego powstały pytania
+  status                 RefinementStatus @default(AWAITING_ANSWERS)
+  questions              Json // QuestionsOutput, walidowane Zod
+  answers                Json? // odpowiedzi użytkownika (dane, nie polecenia)
+  result                 Json? // RefineOutput: paczka propozycji w postaci zapisanej
+  provider               String
+  model                  String
+  questionsPromptVersion String // np. questions-v1
+  refinePromptVersion    String? // np. refine-v1
+  questionsLlmCallLogId  String?          @unique
+  refineLlmCallLogId     String?          @unique
+  createdById            String?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+  project                Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  variant                BmcVariant       @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  evaluation             EvaluationResult @relation(fields: [evaluationId], references: [id], onDelete: NoAction)
+  questionsLlmCall       LlmCallLog?      @relation("RoundQuestionsCall", fields: [questionsLlmCallLogId], references: [id], onDelete: SetNull)
+  refineLlmCall          LlmCallLog?      @relation("RoundRefineCall", fields: [refineLlmCallLogId], references: [id], onDelete: SetNull)
+  createdBy              User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  proposals              Proposal[]
+
+  @@unique([variantId, roundNumber])
+  @@index([projectId])
+  @@index([evaluationId])
+}
+
 // Ocena modelu BMC (evaluate_bmc lub ręczna). Zapis tylko po walidacji Zod; odpowiedź modelu
 // niezgodna ze schematem nie trafia do tabeli. provider/model/promptVersion są null tylko dla MANUAL.
 model EvaluationResult {
@@ -276,6 +328,7 @@ model EvaluationResult {
   variant        BmcVariant         @relation(fields: [variantId], references: [id], onDelete: Cascade)
   llmCall        LlmCallLog?        @relation(fields: [llmCallLogId], references: [id], onDelete: SetNull)
   createdBy      User?              @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  refinementRounds RefinementRound[]
 
   @@index([variantId, createdAt])
   @@index([projectId])
