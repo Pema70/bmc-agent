@@ -73,6 +73,10 @@ Klucz Gemini (`GOOGLE_GENERATIVE_AI_API_KEY`) utworzysz za darmo w [Google AI St
 | `ATTACHMENT_MAX_PER_PROJECT` | Najwyżej tyle załączników na projekt | `10` |
 | `ATTACHMENT_MAX_TEXT_CHARS` | Ile znaków wyekstrahowanego tekstu zapisujemy (dalej przycięcie) | `200000` |
 | `READ_ATTACHMENT_MAX_CHARS` | Ile znaków tekstu zwraca jedno odczytanie załącznika przez agenta | `6000` |
+| `ATTACHMENT_ZIP_MAX_UNCOMPRESSED_BYTES` | Łączny rozmiar plików w DOCX po rozpakowaniu (ochrona przed „bombą ZIP”) | `104857600` (100 MB) |
+| `ATTACHMENT_ZIP_MAX_ENTRIES` | Najwyżej tyle plików w archiwum DOCX | `1000` |
+| `ATTACHMENT_PDF_MAX_PAGES` | Ile stron PDF czytamy (dalej przycięcie) | `200` |
+| `ATTACHMENT_EXTRACT_TIMEOUT_MS` | Limit czasu ekstrakcji tekstu (ms; ochrona częściowa) | `15000` |
 | `ATTACHMENTS_DIR` | Katalog magazynu plików załączników (dev) | `.data/attachments` |
 
 Pusta zmienna limitu (np. `MAX_STEPS=`) liczy się jak brak i działa wartość domyślna. Zakresy wartości: `src/lib/ai/config.ts`.
