@@ -19,6 +19,20 @@ type ProposalCardProps = {
   compact?: boolean;
 };
 
+// Źródło propozycji; nazwa pliku to niezaufany tekst, wyświetlany wyłącznie jako węzeł tekstowy.
+function describeProposalSource(proposal: ProposalView): string | null {
+  switch (proposal.sourceKind) {
+    case "ATTACHMENT":
+      return `Źródło: załącznik ${proposal.sourceAttachmentName ?? "(usunięty)"}`;
+    case "MODEL_KNOWLEDGE":
+      return "Źródło: ogólna wiedza modelu (nie dane użytkownika)";
+    case "REFINEMENT":
+      return "Źródło: cykl poprawek";
+    default:
+      return null;
+  }
+}
+
 const buttonClass =
   "rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800";
 
@@ -35,6 +49,7 @@ export function ProposalCard({ proposal, status, compact = false }: ProposalCard
   const staleReason = check && !check.ok ? check.error : null;
   const canAccept = pending && staleReason === null && !dirty && !anyBusy;
   const message = feedback[proposal.id];
+  const sourceText = describeProposalSource(proposal);
   // Analiza wpływu: tylko dla oczekującej propozycji, którą da się zastosować, i bez niezapisanych zmian.
   const scope = `proposal:${proposal.id}` as const;
   const canAnalyze = impact !== null && impact.canAnalyze && pending && staleReason === null;
@@ -76,6 +91,7 @@ export function ProposalCard({ proposal, status, compact = false }: ProposalCard
       <p className="whitespace-pre-wrap break-words text-xs text-zinc-700 dark:text-zinc-300">
         Uzasadnienie: {proposal.rationale}
       </p>
+      {sourceText ? <p className="break-words text-xs text-zinc-700 dark:text-zinc-300">{sourceText}</p> : null}
 
       {compact && pending ? null : (
         <p className="text-xs font-medium">{status ? PROPOSAL_STATUS_LABELS[status] : "Status nieznany"}</p>

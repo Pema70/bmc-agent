@@ -269,6 +269,30 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
                       );
                   }
                 }
+                if (part.type === "tool-read_attachment") {
+                  switch (part.state) {
+                    case "output-available":
+                      return (
+                        <p key={index} className="text-xs text-zinc-500">
+                          {part.output.ok
+                            ? `Agent przeczytał załącznik: ${part.output.name}`
+                            : "Agent próbował przeczytać załącznik, ale się nie udało."}
+                        </p>
+                      );
+                    case "output-error":
+                      return (
+                        <p key={index} className="text-xs text-red-700 dark:text-red-400">
+                          Nie udało się odczytać załącznika.
+                        </p>
+                      );
+                    default:
+                      return (
+                        <p key={index} className="text-xs text-zinc-500">
+                          Agent czyta załącznik…
+                        </p>
+                      );
+                  }
+                }
                 if (part.type === "tool-analyze_impact") {
                   switch (part.state) {
                     case "output-available":
