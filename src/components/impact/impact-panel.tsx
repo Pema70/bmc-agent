@@ -10,7 +10,7 @@ import { BLOCK_INFO, BLOCK_KEYS, type BlockKey } from "@/lib/schemas/bmc";
 import { IMPACT_DESCRIPTION_MAX_LENGTH, IMPACT_DESCRIPTION_MIN_LENGTH } from "@/lib/schemas/impact";
 
 const canvasButtonClass =
-  "rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800";
+  "rounded-lg border border-border px-3 py-1.5 text-sm font-bold hover:bg-tint";
 
 export function ImpactPanel() {
   const impact = useImpact();
@@ -39,10 +39,10 @@ export function ImpactPanel() {
   return (
     <section className="flex flex-col gap-4" aria-labelledby="impact-heading">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 id="impact-heading" className="text-lg font-semibold">
+        <h2 id="impact-heading" className="sr-only">
           Analiza wpływu zmiany
         </h2>
-        <span className="rounded-full border border-amber-600 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300">
+        <span className="rounded-full border border-ai-border bg-ai-bg px-2 py-0.5 text-xs font-bold text-ai-fg">
           Analiza AI
         </span>
       </div>
@@ -58,10 +58,10 @@ export function ImpactPanel() {
               value={blockKey}
               onChange={(event) => setBlockKey(event.target.value as BlockKey)}
               disabled={busy}
-              className="rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 dark:border-zinc-700"
+              className="rounded-lg border border-border bg-transparent px-2 py-1.5"
             >
               {BLOCK_KEYS.map((key) => (
-                <option key={key} value={key} className="bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
+                <option key={key} value={key} className="bg-surface text-text">
                   {BLOCK_INFO[key].label}
                 </option>
               ))}
@@ -76,22 +76,22 @@ export function ImpactPanel() {
               rows={3}
               disabled={busy}
               placeholder="np. sprzedaż wyłącznie przez sklep internetowy"
-              className="rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 dark:border-zinc-700"
+              className="rounded-lg border border-border bg-transparent px-2 py-1.5"
             />
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-muted">
               {trimmedLength}/{IMPACT_DESCRIPTION_MAX_LENGTH} znaków (minimum {IMPACT_DESCRIPTION_MIN_LENGTH})
             </span>
           </label>
           <button
             type="submit"
             disabled={busy || impact.dirty || !validDescription}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            className="rounded-lg bg-cta px-4 py-2 text-sm font-bold hover:bg-tint disabled:opacity-50"
           >
             {impact.pendingScope === "form" ? "Analizuję…" : "Analizuj wpływ"}
           </button>
-          {impact.dirty ? <p className="text-sm text-zinc-600 dark:text-zinc-400">{DIRTY_MESSAGE}</p> : null}
+          {impact.dirty ? <p className="text-sm text-muted">{DIRTY_MESSAGE}</p> : null}
           {formError ? (
-            <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+            <p role="alert" className="text-sm text-danger">
               {formError}
             </p>
           ) : null}
@@ -114,7 +114,7 @@ export function ImpactPanel() {
           <ImpactResult analysis={analysis} currentVersion={impact.currentVersion} />
         </div>
       ) : (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted">
           {impact.items.length === 0 ? "Ten wariant nie ma jeszcze żadnej analizy wpływu." : "Wybierz analizę z historii."}
         </p>
       )}
@@ -130,7 +130,7 @@ export function ImpactPanel() {
                     type="button"
                     onClick={() => impact.select(item.analysis.id)}
                     aria-pressed={item.analysis.id === impact.selectedId}
-                    className="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-left text-sm break-words hover:bg-zinc-100 aria-pressed:border-zinc-900 aria-pressed:font-medium dark:border-zinc-700 dark:hover:bg-zinc-800 dark:aria-pressed:border-zinc-300"
+                    className="w-full rounded-lg border border-border px-3 py-1.5 text-left text-sm break-words hover:bg-tint aria-pressed:border-primary-from aria-pressed:font-medium"
                   >
                     {formatEvaluationDate(item.analysis.createdAt)} · {describeChange(item.analysis.change)}
                   </button>
@@ -138,7 +138,7 @@ export function ImpactPanel() {
               ) : (
                 <li
                   key={item.id}
-                  className="rounded-md border border-red-600 px-3 py-1.5 text-sm text-red-700 dark:text-red-400"
+                  className="rounded-lg border border-danger px-3 py-1.5 text-sm text-danger"
                 >
                   Nie można wyświetlić zapisanej analizy ({item.id}): {item.error}
                 </li>

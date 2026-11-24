@@ -35,14 +35,14 @@ export function FormField({
         defaultValue={defaultValue}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
-        className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-900 aria-invalid:border-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-300"
+        className="rounded-lg border border-border bg-surface px-3 py-2 text-text outline-none focus:border-ring aria-invalid:border-danger"
       />
       {error ? (
-        <p id={`${name}-error`} className="text-sm text-red-600">
+        <p id={`${name}-error`} className="text-sm text-danger">
           {error}
         </p>
       ) : hint ? (
-        <p id={`${name}-hint`} className="text-sm text-zinc-500">
+        <p id={`${name}-hint`} className="text-sm text-muted">
           {hint}
         </p>
       ) : null}

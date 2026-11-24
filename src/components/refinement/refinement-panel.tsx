@@ -11,6 +11,7 @@ import {
 import { AiBadge, AiNotice } from "@/components/ai/ai-notice";
 import { useVariantWorkspace } from "@/components/bmc/variant-workspace";
 import { ProposalCard } from "@/components/chat/proposal-card";
+import { useOpenPanel } from "@/components/project/panel-context";
 import type { RefinementRoundListItem } from "@/lib/db/refinement";
 import { formatEvaluationDate } from "@/lib/evaluation/format";
 import {
@@ -52,9 +53,9 @@ type Message = { kind: "error" | "note"; text: string };
 
 const GENERIC_ERROR = "Nie udało się wykonać operacji. Sprawdź połączenie i spróbuj ponownie.";
 const buttonClass =
-  "rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800";
+  "rounded-lg border border-border px-3 py-1.5 text-sm font-bold hover:bg-tint disabled:opacity-50";
 const primaryButtonClass =
-  "rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300";
+  "rounded-lg bg-cta px-4 py-2 text-sm font-bold hover:bg-tint disabled:opacity-50";
 
 /**
  * Panel „Cykl poprawek” (krok 7g): ocena → pytania → odpowiedzi → paczka propozycji → „Zastosuj poprawki” → ocena „po”.
@@ -65,6 +66,7 @@ const primaryButtonClass =
  */
 export function RefinementPanel({ initialRounds, initialRoundProposalIds, latestEvaluationVersion }: Props) {
   const workspace = useVariantWorkspace();
+  const openPanel = useOpenPanel();
   const { projectId, variantId, version, dirty } = workspace;
 
   const [rounds, setRounds] = useState<RefinementRoundListItem[]>(initialRounds);
@@ -209,11 +211,11 @@ export function RefinementPanel({ initialRounds, initialRoundProposalIds, latest
   return (
     <section className="flex flex-col gap-4" aria-labelledby="refinement-heading">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 id="refinement-heading" className="text-lg font-semibold">
+        <h2 id="refinement-heading" className="sr-only">
           Cykl poprawek
         </h2>
         <AiBadge label={REFINEMENT_LABEL} />
-        <span className="text-sm text-zinc-600 dark:text-zinc-400">
+        <span className="text-sm text-muted">
           Wykorzystano {Math.min(roundsUsed, MAX_REFINEMENT_ROUNDS)} z {MAX_REFINEMENT_ROUNDS} rund
         </span>
       </div>
@@ -224,17 +226,17 @@ export function RefinementPanel({ initialRounds, initialRoundProposalIds, latest
           {busy === "start" ? "Przygotowuję pytania…" : "Rozpocznij rundę"}
         </button>
         {roundsUsed < MAX_REFINEMENT_ROUNDS ? (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">{startNotice(roundsUsed)}</p>
+          <p className="text-sm text-muted">{startNotice(roundsUsed)}</p>
         ) : null}
         {start.reason ? (
-          <p role="status" className="text-sm text-zinc-700 dark:text-zinc-300">
+          <p role="status" className="text-sm text-muted">
             {start.reason}
             {start.needsEvaluation ? (
               <>
                 {" "}
-                <a href="#evaluation-heading" className="font-medium underline">
+                <button type="button" onClick={() => openPanel("ocena")} className="cursor-pointer font-bold underline">
                   Przejdź do oceny modelu
-                </a>
+                </button>
               </>
             ) : null}
           </p>
@@ -244,29 +246,29 @@ export function RefinementPanel({ initialRounds, initialRoundProposalIds, latest
       {message ? (
         <p
           role={message.kind === "error" ? "alert" : "status"}
-          className={message.kind === "error" ? "text-sm text-red-700 dark:text-red-400" : "text-sm text-green-800 dark:text-green-300"}
+          className={message.kind === "error" ? "text-sm text-danger" : "text-sm text-low-fg"}
         >
           {message.text}
         </p>
       ) : null}
 
       {showReevaluate ? (
-        <p role="status" className="rounded-md border border-amber-500 bg-amber-50 p-3 text-sm dark:border-amber-400 dark:bg-amber-950/30">
+        <p role="status" className="rounded-xl border border-ai-border bg-ai-bg p-3 text-sm">
           {REEVALUATE_MESSAGE}{" "}
-          <a href="#evaluation-heading" className="font-medium underline">
+          <button type="button" onClick={() => openPanel("ocena")} className="cursor-pointer font-bold underline">
             Przejdź do oceny modelu
-          </a>
+          </button>
         </p>
       ) : null}
 
       {rounds.length === 0 ? (
-        <p className="text-sm text-zinc-500">Ten wariant nie miał jeszcze rundy poprawek.</p>
+        <p className="text-sm text-muted">Ten wariant nie miał jeszcze rundy poprawek.</p>
       ) : (
         <ul className="flex flex-col gap-4">
           {[...rounds].reverse().map((item) => {
             if (!item.ok) {
               return (
-                <li key={item.id} className="rounded-md border border-red-600 p-3 text-sm text-red-700 dark:text-red-400">
+                <li key={item.id} className="rounded-xl border border-danger p-3 text-sm text-danger">
                   Nie można wyświetlić zapisanej rundy {item.roundNumber} ({item.id}): zapis jest uszkodzony.
                 </li>
               );
@@ -281,10 +283,10 @@ export function RefinementPanel({ initialRounds, initialRoundProposalIds, latest
             const confirming = confirmingCancel === round.id;
 
             return (
-              <li key={round.id} className="flex flex-col gap-3 rounded-md border border-zinc-200 p-3 dark:border-zinc-800">
+              <li key={round.id} className="flex flex-col gap-3 rounded-xl border border-border p-3">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <h3 className="font-semibold">{roundLabel(round.roundNumber)}</h3>
-                  <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                  <span className="text-xs text-muted">
                     {PHASE_LABELS[phase]} · {formatEvaluationDate(round.createdAt)} · wersja modelu: {round.variantVersion}
                   </span>
                 </div>
@@ -299,7 +301,7 @@ export function RefinementPanel({ initialRounds, initialRoundProposalIds, latest
                             <label htmlFor={fieldId} className="text-sm font-medium">
                               {index + 1}. {question.question}
                             </label>
-                            <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                            <span className="text-xs text-muted">
                               Blok: {BLOCK_INFO[question.blockKey].label} · kryterium: {CRITERION_LABELS[question.criterion]}
                             </span>
                             <textarea
@@ -310,7 +312,7 @@ export function RefinementPanel({ initialRounds, initialRoundProposalIds, latest
                               maxLength={ANSWER_MAX_CHARS}
                               rows={2}
                               placeholder="Odpowiedź (puste pole = pomiń pytanie)"
-                              className="rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 text-sm dark:border-zinc-700"
+                              className="rounded-lg border border-border bg-transparent px-2 py-1.5 text-sm"
                             />
                             {question.suggestedAnswers.length > 0 ? (
                               <div className="flex flex-col gap-1">
@@ -327,7 +329,7 @@ export function RefinementPanel({ initialRounds, initialRoundProposalIds, latest
                                   </button>
                                 ))}
                               </div>
-                              <p className="text-xs text-zinc-600 dark:text-zinc-400">{SUGGESTION_NOTICE}</p>
+                              <p className="text-xs text-muted">{SUGGESTION_NOTICE}</p>
                               </div>
                             ) : null}
                           </li>
@@ -343,15 +345,15 @@ export function RefinementPanel({ initialRounds, initialRoundProposalIds, latest
                       >
                         {busy === "submit" ? "Przygotowuję poprawki…" : "Przygotuj poprawki"}
                       </button>
-                      <p className="text-sm text-zinc-600 dark:text-zinc-400">{submitNotice(round.roundNumber)}</p>
-                      {submit.reason ? <p className="text-sm text-zinc-700 dark:text-zinc-300">{submit.reason}</p> : null}
+                      <p className="text-sm text-muted">{submitNotice(round.roundNumber)}</p>
+                      {submit.reason ? <p className="text-sm text-muted">{submit.reason}</p> : null}
                     </div>
                   </div>
                 ) : null}
 
                 {phase === "EMPTY" ? <p className="text-sm">{EMPTY_BATCH_NOTE}</p> : null}
                 {phase === "CANCELLED" ? (
-                  <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                  <p className="text-sm text-muted">
                     Runda zamknięta i wliczona do limitu {MAX_REFINEMENT_ROUNDS} rund.
                     {proposalIds.length > 0 ? " Propozycje, których nie rozstrzygnięto, nadal możesz zaakceptować lub odrzucić." : ""}
                   </p>
@@ -377,12 +379,12 @@ export function RefinementPanel({ initialRounds, initialRoundProposalIds, latest
                     >
                       {busy === "apply" ? "Stosuję…" : `Zastosuj poprawki (${pendingCount})`}
                     </button>
-                    {apply.reason ? <p className="text-sm text-zinc-700 dark:text-zinc-300">{apply.reason}</p> : null}
+                    {apply.reason ? <p className="text-sm text-muted">{apply.reason}</p> : null}
                   </div>
                 ) : null}
 
                 {failures && failures.roundId === round.id ? (
-                  <ul className="flex flex-col gap-1 text-sm text-red-700 dark:text-red-400" aria-label="Propozycje, których nie da się zastosować">
+                  <ul className="flex flex-col gap-1 text-sm text-danger" aria-label="Propozycje, których nie da się zastosować">
                     {failures.items.map((failure) => {
                       const proposal = workspace.proposals[failure.proposalId];
                       return (
@@ -404,7 +406,7 @@ export function RefinementPanel({ initialRounds, initialRoundProposalIds, latest
                           <span>
                             {index + 1}. {question.question}
                           </span>
-                          <span className="whitespace-pre-wrap break-words text-zinc-600 dark:text-zinc-400">
+                          <span className="whitespace-pre-wrap break-words text-muted">
                             Odpowiedź: {round.answers?.[index] ? round.answers[index] : "(pominięto)"}
                           </span>
                         </li>

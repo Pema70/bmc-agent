@@ -66,12 +66,12 @@ export default async function ComparisonPage({
   return (
     <main className="mx-auto flex w-full max-w-[96rem] flex-1 flex-col gap-10 px-6 py-16">
       <header className="flex flex-col gap-2">
-        <Link href={`/projekty/${access.projectId}`} className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
+        <Link href={`/projekty/${access.projectId}`} className="text-sm text-muted hover:underline">
           ← Wróć do projektu
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight break-words">Porównanie wariantów</h1>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400 break-words">Projekt: {project.name}</p>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted break-words">Projekt: {project.name}</p>
+        <p className="text-sm text-muted">
           Porównanie dotyczy zapisanych stanów wariantów; niezapisane zmiany w edytorze nie są uwzględniane.
         </p>
       </header>
@@ -80,7 +80,7 @@ export default async function ComparisonPage({
         <h2 id="diff-heading" className="text-lg font-semibold">
           Różnice we wpisach
         </h2>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted">
           Różnice wylicza aplikacja (porównanie dosłownego tekstu wpisów, nie ich znaczenia), względem pierwszego wariantu.
           Przeredagowany wpis jest pokazany jako „− brak” i „+ dodano”.
         </p>

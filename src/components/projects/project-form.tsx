@@ -50,21 +50,21 @@ export function ProjectForm({ action, submitLabel, pendingLabel, initial }: Proj
           defaultValue={initial?.description}
           aria-invalid={descriptionError ? true : undefined}
           aria-describedby={descriptionError ? "description-error" : "description-hint"}
-          className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-900 aria-invalid:border-red-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:focus:border-zinc-300"
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-text outline-none focus:border-ring aria-invalid:border-danger"
         />
         {descriptionError ? (
-          <p id="description-error" className="text-sm text-red-600">
+          <p id="description-error" className="text-sm text-danger">
             {descriptionError}
           </p>
         ) : (
-          <p id="description-hint" className="text-sm text-zinc-500">
+          <p id="description-hint" className="text-sm text-muted">
             Najwyżej {PROJECT_DESCRIPTION_MAX_LENGTH} znaków.
           </p>
         )}
       </div>
 
       {state ? (
-        <p role={state.ok ? "status" : "alert"} className={state.ok ? "text-sm text-green-700" : "text-sm text-red-600"}>
+        <p role={state.ok ? "status" : "alert"} className={state.ok ? "text-sm text-low-fg" : "text-sm text-danger"}>
           {state.message}
         </p>
       ) : null}
@@ -72,7 +72,7 @@ export function ProjectForm({ action, submitLabel, pendingLabel, initial }: Proj
       <button
         type="submit"
         disabled={pending}
-        className="self-start rounded-md bg-zinc-900 px-4 py-2 font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+        className="self-start rounded-lg bg-cta px-4 py-2 font-bold disabled:opacity-60"
       >
         {pending ? pendingLabel : submitLabel}
       </button>

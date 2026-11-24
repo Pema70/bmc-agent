@@ -34,7 +34,7 @@ function describeProposalSource(proposal: ProposalView): string | null {
 }
 
 const buttonClass =
-  "rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800";
+  "rounded-lg border border-border px-2 py-1 text-xs font-bold hover:bg-tint disabled:opacity-50";
 
 export function ProposalCard({ proposal, status, compact = false }: ProposalCardProps) {
   const workspace = useVariantWorkspace();
@@ -59,50 +59,46 @@ export function ProposalCard({ proposal, status, compact = false }: ProposalCard
   // Wszystkie treści (uzasadnienie, before, after) to zwykły tekst: węzły tekstowe React, bez HTML.
   return (
     <div
-      className={`flex flex-col gap-2 rounded-md border-2 p-2 text-sm ${
-        staleReason
-          ? "border-zinc-400 bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-900"
-          : "border-amber-500 bg-amber-50 dark:border-amber-400 dark:bg-amber-950/30"
-      }`}
+      className={`flex flex-col gap-2 rounded-xl border-2 p-2 text-sm ${ staleReason ? "border-border bg-tint" : "border-ai-border bg-ai-bg" }`}
     >
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="rounded bg-amber-500 px-1.5 py-0.5 font-semibold text-black">Propozycja AI</span>
+        <span className="rounded border border-ai-border bg-ai-bg px-1.5 py-0.5 font-semibold text-ai-fg">Propozycja AI</span>
         <span className="font-medium">{PROPOSAL_OPERATION_LABELS[proposal.operation]}</span>
         {compact ? null : (
-          <span className="text-zinc-600 dark:text-zinc-400">w bloku: {BLOCK_INFO[proposal.blockKey].label}</span>
+          <span className="text-muted">w bloku: {BLOCK_INFO[proposal.blockKey].label}</span>
         )}
         {staleReason ? (
-          <span className="rounded bg-zinc-500 px-1.5 py-0.5 font-semibold text-white">Nieaktualna</span>
+          <span className="rounded border border-border bg-tint px-1.5 py-0.5 font-semibold text-text">Nieaktualna</span>
         ) : null}
       </div>
 
       {proposal.before !== null && !compact ? (
-        <p className="whitespace-pre-wrap break-words rounded bg-red-100 px-2 py-1 text-red-900 line-through dark:bg-red-950/50 dark:text-red-200">
+        <p className="whitespace-pre-wrap break-words rounded bg-high-bg px-2 py-1 text-high-fg line-through">
           <span className="sr-only">Usuwany wpis: </span>
           {proposal.before}
         </p>
       ) : null}
       {proposal.after !== null ? (
-        <p className="whitespace-pre-wrap break-words rounded bg-green-100 px-2 py-1 text-green-900 dark:bg-green-950/50 dark:text-green-200">
+        <p className="whitespace-pre-wrap break-words rounded bg-low-bg px-2 py-1 text-low-fg">
           <span className="sr-only">Nowy wpis: </span>
           {proposal.after}
         </p>
       ) : null}
-      <p className="whitespace-pre-wrap break-words text-xs text-zinc-700 dark:text-zinc-300">
+      <p className="whitespace-pre-wrap break-words text-xs text-muted">
         Uzasadnienie: {proposal.rationale}
       </p>
-      {sourceText ? <p className="break-words text-xs text-zinc-700 dark:text-zinc-300">{sourceText}</p> : null}
+      {sourceText ? <p className="break-words text-xs text-muted">{sourceText}</p> : null}
 
       {compact && pending ? null : (
         <p className="text-xs font-medium">{status ? PROPOSAL_STATUS_LABELS[status] : "Status nieznany"}</p>
       )}
 
       {staleReason ? (
-        <p className="text-xs text-zinc-700 dark:text-zinc-300">{APPLY_ERROR_MESSAGES[staleReason]}</p>
+        <p className="text-xs text-muted">{APPLY_ERROR_MESSAGES[staleReason]}</p>
       ) : null}
 
       {pending && dirty && !staleReason ? (
-        <p role="status" className="text-xs text-amber-900 dark:text-amber-200">
+        <p role="status" className="text-xs text-medium-fg">
           {DIRTY_MESSAGE}
         </p>
       ) : null}
@@ -139,7 +135,7 @@ export function ProposalCard({ proposal, status, compact = false }: ProposalCard
       ) : null}
 
       {impactError ? (
-        <p role="alert" className="text-xs text-red-700 dark:text-red-400">
+        <p role="alert" className="text-xs text-danger">
           {impactError}
         </p>
       ) : null}
@@ -147,7 +143,7 @@ export function ProposalCard({ proposal, status, compact = false }: ProposalCard
       {message ? (
         <p
           role={message.kind === "error" ? "alert" : "status"}
-          className={`text-xs ${message.kind === "error" ? "text-red-700 dark:text-red-400" : "text-green-800 dark:text-green-300"}`}
+          className={`text-xs ${message.kind === "error" ? "text-danger" : "text-low-fg"}`}
         >
           {message.text}
         </p>

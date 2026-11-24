@@ -8,10 +8,21 @@ export function Card({ children, className }: { children: ReactNode; className?:
 }
 
 /** Nagłówek panelu i bloku: gradient (30%) z białym tekstem o kontraście sprawdzonym na obu końcach gradientu. */
-export function PanelHeader({ id, title, children }: { id: string; title: string; children?: ReactNode }) {
+export function PanelHeader({
+  id,
+  title,
+  children,
+  headingRef,
+}: {
+  id: string;
+  title: string;
+  children?: ReactNode;
+  /** Gdy podany, nagłówek można sfokusować programowo (np. po otwarciu panelu z paska). */
+  headingRef?: (node: HTMLHeadingElement | null) => void;
+}) {
   return (
     <header className="bg-head flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-      <h2 id={id} className="text-lg font-bold">
+      <h2 id={id} ref={headingRef} tabIndex={headingRef ? -1 : undefined} className="text-lg font-bold outline-none">
         {title}
       </h2>
       {children}

@@ -91,10 +91,10 @@ export function AttachmentsPanel({ projectId, canEdit, items, maxPerProject, max
 
   return (
     <section className="flex flex-col gap-3" aria-labelledby="attachments-heading">
-      <h2 id="attachments-heading" className="text-lg font-semibold">
+      <h2 id="attachments-heading" className="sr-only">
         Załączniki
       </h2>
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="text-sm text-muted">
         Pliki PDF (z warstwą tekstową), DOCX i TXT (UTF-8), do {maxMegabytes} MB każdy, najwyżej {maxPerProject} w projekcie.
         Z pliku zapisujemy wyłącznie tekst. Skany bez warstwy tekstowej nie są obsługiwane. Załączniki mają stałe numery
         (Z1, Z2, …), które nie wracają po usunięciu pliku.
@@ -115,12 +115,12 @@ export function AttachmentsPanel({ projectId, canEdit, items, maxPerProject, max
                   void upload(file);
                 }
               }}
-              className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-zinc-900 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white disabled:opacity-50 dark:file:bg-zinc-100 dark:file:text-zinc-900"
+              className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-cta file:px-3 file:py-1.5 file:text-sm file:font-medium disabled:opacity-50"
             />
           </label>
-          {uploading ? <p className="text-sm text-zinc-600 dark:text-zinc-400">Wgrywanie i odczyt tekstu…</p> : null}
+          {uploading ? <p className="text-sm text-muted">Wgrywanie i odczyt tekstu…</p> : null}
           {limitReached ? (
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            <p className="text-sm text-muted">
               Osiągnięto limit załączników. Usuń któryś, żeby dodać kolejny.
             </p>
           ) : null}
@@ -128,28 +128,28 @@ export function AttachmentsPanel({ projectId, canEdit, items, maxPerProject, max
       ) : null}
 
       {error ? (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       ) : null}
 
       {items.length === 0 ? (
-        <p className="text-sm text-zinc-500">Brak załączników.</p>
+        <p className="text-sm text-muted">Brak załączników.</p>
       ) : (
-        <ul className="flex flex-col divide-y divide-zinc-200 rounded-md border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+        <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
           {items.map((item) => (
             <li key={item.id} className="flex flex-col gap-2 p-3 text-sm">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <span className="min-w-0 break-words font-medium">
                   {attachmentLabel(item.ordinal)}: {item.fileName}
                 </span>
-                <span className="shrink-0 text-xs text-zinc-500">
+                <span className="shrink-0 text-xs text-muted">
                   {item.kind} · {formatFileSize(item.sizeBytes)} · {item.textChars} znaków ·{" "}
                   {DATE_FORMAT.format(new Date(item.createdAt))}
                 </span>
               </div>
               {item.truncated ? (
-                <p className="text-xs text-amber-800 dark:text-amber-300">
+                <p className="text-xs text-medium-fg">
                   Tekst został przycięty do limitu; agent zobaczy tylko jego początek.
                 </p>
               ) : null}
@@ -164,7 +164,7 @@ export function AttachmentsPanel({ projectId, canEdit, items, maxPerProject, max
                         type="button"
                         onClick={() => remove(item.id)}
                         disabled={deletingId === item.id}
-                        className="rounded-md bg-red-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-50"
+                        className="rounded-lg bg-danger px-3 py-1.5 text-sm font-bold text-on-primary hover:shadow-md disabled:opacity-50"
                       >
                         {deletingId === item.id ? "Usuwanie…" : "Potwierdź usunięcie"}
                       </button>
@@ -172,7 +172,7 @@ export function AttachmentsPanel({ projectId, canEdit, items, maxPerProject, max
                         type="button"
                         onClick={() => setConfirmingId(null)}
                         disabled={deletingId === item.id}
-                        className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                        className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold hover:bg-tint disabled:opacity-50"
                       >
                         Anuluj
                       </button>
@@ -186,7 +186,7 @@ export function AttachmentsPanel({ projectId, canEdit, items, maxPerProject, max
                         setError(null);
                         setConfirmingId(item.id);
                       }}
-                      className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                      className="rounded-lg border border-border px-3 py-1.5 text-sm font-bold hover:bg-tint"
                     >
                       Usuń
                     </button>

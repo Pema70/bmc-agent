@@ -62,7 +62,7 @@ export function RegisterForm() {
       />
 
       {state?.message ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {state.message}
         </p>
       ) : null}
@@ -70,12 +70,12 @@ export function RegisterForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-zinc-900 px-4 py-2 font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+        className="rounded-lg bg-cta px-4 py-2 font-bold disabled:opacity-60"
       >
         {pending ? "Tworzenie konta…" : "Załóż konto"}
       </button>
 
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="text-sm text-muted">
         Masz już konto?{" "}
         <Link href="/logowanie" className="font-medium underline">
           Zaloguj się

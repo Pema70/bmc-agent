@@ -20,9 +20,9 @@ type VariantActionsProps = {
 
 const GENERIC_ERROR = "Nie udało się wykonać operacji. Sprawdź połączenie i spróbuj ponownie.";
 const buttonClass =
-  "rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800";
+  "rounded-lg border border-border px-3 py-1.5 text-sm font-bold hover:bg-tint disabled:opacity-50";
 const inputClass =
-  "min-w-0 flex-1 basis-48 rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-300";
+  "min-w-0 flex-1 basis-48 rounded-lg border border-border bg-surface px-2 py-1 text-sm text-text outline-none focus:border-ring";
 
 type Feedback = { kind: "error" | "note"; text: string } | null;
 
@@ -130,7 +130,7 @@ export function VariantActions({ projectId, current, mainVariantId, canEdit, isO
           </button>
         ) : null}
         {copyBlocked ? (
-          <span role="status" className="text-xs text-amber-900 dark:text-amber-200">
+          <span role="status" className="text-xs text-medium-fg">
             Kopia z niezapisanego płótna jest zablokowana. {copyBlocked}.
           </span>
         ) : null}
@@ -158,7 +158,7 @@ export function VariantActions({ projectId, current, mainVariantId, canEdit, isO
       {feedback ? (
         <p
           role={feedback.kind === "error" ? "alert" : "status"}
-          className={`text-sm ${feedback.kind === "error" ? "text-red-700 dark:text-red-400" : "text-green-800 dark:text-green-300"}`}
+          className={`text-sm ${feedback.kind === "error" ? "text-danger" : "text-low-fg"}`}
         >
           {feedback.text}
         </p>

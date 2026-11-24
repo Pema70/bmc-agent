@@ -98,18 +98,18 @@ export function ComparisonPanel({ projectId, variantIds, current, canCompare, in
             type="button"
             onClick={() => void compare()}
             disabled={comparing}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            className="rounded-lg bg-cta px-4 py-2 text-sm font-bold hover:bg-tint disabled:opacity-50"
           >
             {comparing ? "Porównuję…" : "Porównaj z AI"}
           </button>
           {error ? (
-            <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+            <p role="alert" className="text-sm text-danger">
               {error}
             </p>
           ) : null}
         </div>
       ) : (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted">
           Uruchamianie porównania z AI jest dostępne dla edytorów i właścicieli projektu.
         </p>
       )}
@@ -117,7 +117,7 @@ export function ComparisonPanel({ projectId, variantIds, current, canCompare, in
       {comparison ? (
         <ComparisonResult comparison={comparison} current={current} />
       ) : (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted">
           {items.length === 0 ? "Ten zestaw wariantów nie ma jeszcze porównania z AI." : "Wybierz porównanie z historii."}
         </p>
       )}
@@ -133,7 +133,7 @@ export function ComparisonPanel({ projectId, variantIds, current, canCompare, in
                     type="button"
                     onClick={() => setSelectedId(item.comparison.id)}
                     aria-pressed={item.comparison.id === selectedId}
-                    className="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-left text-sm break-words hover:bg-zinc-100 aria-pressed:border-zinc-900 aria-pressed:font-medium dark:border-zinc-700 dark:hover:bg-zinc-800 dark:aria-pressed:border-zinc-300"
+                    className="w-full rounded-lg border border-border px-3 py-1.5 text-left text-sm break-words hover:bg-tint aria-pressed:border-primary-from aria-pressed:font-medium"
                   >
                     {describeComparison(item.comparison)}
                   </button>
@@ -141,7 +141,7 @@ export function ComparisonPanel({ projectId, variantIds, current, canCompare, in
               ) : (
                 <li
                   key={item.id}
-                  className="rounded-md border border-red-600 px-3 py-1.5 text-sm break-words text-red-700 dark:text-red-400"
+                  className="rounded-lg border border-danger px-3 py-1.5 text-sm break-words text-danger"
                 >
                   Nie można wyświetlić zapisanego porównania ({item.id}): {item.error}
                 </li>

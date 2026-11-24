@@ -44,30 +44,30 @@ export function EvaluationCard({
   }, [projectId, variantId, evaluationId]);
 
   if (state.status === "loading") {
-    return <p className="text-zinc-500">Wczytuję ocenę…</p>;
+    return <p className="text-muted">Wczytuję ocenę…</p>;
   }
   if (state.status === "error") {
-    return <p className="text-red-700 dark:text-red-400">{state.message}</p>;
+    return <p className="text-danger">{state.message}</p>;
   }
   if (!state.item.ok) {
-    return <p className="text-red-700 dark:text-red-400">Nie można wyświetlić zapisanej oceny: {state.item.error}</p>;
+    return <p className="text-danger">Nie można wyświetlić zapisanej oceny: {state.item.error}</p>;
   }
 
   const evaluation = state.item.evaluation;
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-zinc-300 p-3 dark:border-zinc-700">
+    <div className="flex flex-col gap-2 rounded-xl border border-border p-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold">Ocena modelu</span>
-        <span className="rounded-full border border-amber-600 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300">
+        <span className="rounded-full border border-ai-border bg-ai-bg px-2 py-0.5 text-xs font-bold text-ai-fg">
           Ocena AI
         </span>
       </div>
-      <p className="text-xs text-zinc-600 dark:text-zinc-400">
+      <p className="text-xs text-muted">
         Oceniono zapisany stan modelu, wersja {evaluation.variantVersion}. Niezapisane zmiany w edytorze nie były brane
         pod uwagę. {formatEvaluationSource(evaluation)} · prompt: {evaluation.promptVersion ?? "brak"} ·{" "}
         {formatEvaluationDate(evaluation.createdAt)}
       </p>
-      <p className="text-xs text-zinc-600 dark:text-zinc-400">
+      <p className="text-xs text-muted">
         To subiektywna opinia modelu językowego, a nie weryfikacja biznesowa.
       </p>
       <EvaluationTable result={evaluation.result} />

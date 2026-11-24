@@ -16,7 +16,7 @@ export type ComparedColumn = {
 const GRID_COLUMNS = { 2: "md:grid-cols-2", 3: "md:grid-cols-3" } as const;
 
 const badgeClass =
-  "rounded border border-zinc-500 px-1.5 py-0.5 text-xs font-semibold text-zinc-800 dark:border-zinc-400 dark:text-zinc-200";
+  "rounded border border-border px-1.5 py-0.5 text-xs font-semibold text-muted";
 
 function gridClass(count: number): string {
   return `grid gap-3 ${count === 3 ? GRID_COLUMNS[3] : GRID_COLUMNS[2]}`;
@@ -41,10 +41,10 @@ export function StateComparisonView({ columns, comparison }: { columns: Compared
           {columns.map((column, index) => {
             const totals = index === 0 ? null : comparison.others[index - 1]?.totals;
             return (
-              <div key={column.id} className="flex min-w-0 flex-col gap-1 rounded-md border border-zinc-300 p-3 dark:border-zinc-700">
+              <div key={column.id} className="flex min-w-0 flex-col gap-1 rounded-xl border border-border p-3">
                 <ColumnHeader column={column} reference={index === 0} />
                 {totals ? (
-                  <p className="text-xs text-zinc-600 dark:text-zinc-400">
+                  <p className="text-xs text-muted">
                     wspólnych: {totals.shared} · + dodano: {totals.added} · − brak: {totals.missing}
                   </p>
                 ) : null}
@@ -60,8 +60,8 @@ export function StateComparisonView({ columns, comparison }: { columns: Compared
             </h3>
             <div className={gridClass(columns.length)}>
               {columns.map((column, index) => (
-                <div key={column.id} className="flex min-w-0 flex-col gap-1 rounded-md border border-zinc-200 p-2 text-sm dark:border-zinc-800">
-                  <p className="text-xs font-medium text-zinc-600 md:hidden dark:text-zinc-400">
+                <div key={column.id} className="flex min-w-0 flex-col gap-1 rounded-xl border border-border p-2 text-sm">
+                  <p className="text-xs font-medium text-muted md:hidden">
                     {column.name}
                     {index === 0 ? " (odniesienie)" : ""}
                   </p>
@@ -92,14 +92,14 @@ function ColumnHeader({ column, reference }: { column: ComparedColumn; reference
         ))}
         {reference ? <span className={badgeClass}>Odniesienie</span> : null}
       </div>
-      <p className="text-xs text-zinc-600 dark:text-zinc-400">Wersja {column.version}</p>
+      <p className="text-xs text-muted">Wersja {column.version}</p>
     </>
   );
 }
 
 function EntryList({ entries }: { entries: readonly string[] }) {
   if (entries.length === 0) {
-    return <p className="text-zinc-400 italic">Brak wpisów.</p>;
+    return <p className="text-muted italic">Brak wpisów.</p>;
   }
   return (
     <ul className="flex list-disc flex-col gap-1 pl-4 break-words">
@@ -112,7 +112,7 @@ function EntryList({ entries }: { entries: readonly string[] }) {
 
 function DiffList({ block }: { block: BlockComparison | undefined }) {
   if (!block || block.shared.length + block.added.length + block.missing.length === 0) {
-    return <p className="text-zinc-400 italic">Brak wpisów.</p>;
+    return <p className="text-muted italic">Brak wpisów.</p>;
   }
   return (
     <ul className="flex flex-col gap-1 break-words">
@@ -123,7 +123,7 @@ function DiffList({ block }: { block: BlockComparison | undefined }) {
       ))}
       {block.added.map((entry, index) => (
         <li key={`a${index}`}>
-          <span className="rounded bg-green-100 px-1 text-green-900 underline decoration-2 underline-offset-2 dark:bg-green-950/50 dark:text-green-200">
+          <span className="rounded bg-low-bg px-1 text-low-fg underline decoration-2 underline-offset-2">
             <span className="mr-1 font-semibold no-underline">+ dodano:</span>
             {entry}
           </span>
@@ -131,7 +131,7 @@ function DiffList({ block }: { block: BlockComparison | undefined }) {
       ))}
       {block.missing.map((entry, index) => (
         <li key={`m${index}`}>
-          <span className="rounded bg-red-100 px-1 text-red-900 line-through dark:bg-red-950/50 dark:text-red-200">
+          <span className="rounded bg-high-bg px-1 text-high-fg line-through">
             <span className="mr-1 font-semibold no-underline">− brak:</span>
             {entry}
           </span>

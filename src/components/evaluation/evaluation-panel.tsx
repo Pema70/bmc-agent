@@ -69,15 +69,15 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
   return (
     <section className="flex flex-col gap-4" aria-labelledby="evaluation-heading">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 id="evaluation-heading" className="text-lg font-semibold">
+        <h2 id="evaluation-heading" className="sr-only">
           Ocena modelu
         </h2>
-        <span className="rounded-full border border-amber-600 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300">
+        <span className="rounded-full border border-ai-border bg-ai-bg px-2 py-0.5 text-xs font-bold text-ai-fg">
           Ocena AI
         </span>
       </div>
 
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="text-sm text-muted">
         To subiektywna opinia modelu językowego na podstawie wpisów w płótnie, a nie weryfikacja biznesowa. Model nie
         sprawdza rynku ani danych liczbowych. Ocena dotyczy zapisanego stanu wariantu, nie niezapisanych zmian w edytorze.
       </p>
@@ -88,13 +88,13 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
             type="button"
             onClick={evaluate}
             disabled={pending || dirty}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            className="rounded-lg bg-cta px-4 py-2 text-sm font-bold hover:bg-tint disabled:opacity-50"
           >
             {pending ? "Oceniam…" : "Oceń model"}
           </button>
-          {dirty ? <p className="text-sm text-zinc-600 dark:text-zinc-400">{DIRTY_MESSAGE}</p> : null}
+          {dirty ? <p className="text-sm text-muted">{DIRTY_MESSAGE}</p> : null}
           {error ? (
-            <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+            <p role="alert" className="text-sm text-danger">
               {error}
             </p>
           ) : null}
@@ -103,12 +103,12 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
 
       {evaluation ? (
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-muted">
             {formatEvaluationSource(evaluation)} · prompt: {evaluation.promptVersion ?? "brak"} ·{" "}
             {formatEvaluationDate(evaluation.createdAt)} · wersja modelu: {evaluation.variantVersion}
           </p>
           {isEvaluationStale(evaluation.variantVersion, version) ? (
-            <p className="text-sm text-amber-800 dark:text-amber-300">
+            <p className="text-sm text-medium-fg">
               Ocena dotyczy wersji {evaluation.variantVersion} modelu, aktualna wersja to {version}.
             </p>
           ) : null}
@@ -119,11 +119,11 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
               <select
                 value={overlay ? overlay.id : ""}
                 onChange={(event) => setCompareId(event.target.value)}
-                className="rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 dark:border-zinc-700"
+                className="rounded-lg border border-border bg-transparent px-2 py-1.5"
               >
                 <option value="">Bez nakładki</option>
                 {comparable.map((item) => (
-                  <option key={item.id} value={item.id} className="bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
+                  <option key={item.id} value={item.id} className="bg-surface text-text">
                     {describe(item)}
                   </option>
                 ))}
@@ -133,7 +133,7 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
           <EvaluationTable result={evaluation.result} />
         </div>
       ) : (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted">
           {items.length === 0 ? "Ten wariant nie ma jeszcze żadnej oceny." : "Wybierz ocenę z historii."}
         </p>
       )}
@@ -149,7 +149,7 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
                     type="button"
                     onClick={() => setSelectedId(item.evaluation.id)}
                     aria-pressed={item.evaluation.id === selectedId}
-                    className="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-left text-sm hover:bg-zinc-100 aria-pressed:border-zinc-900 aria-pressed:font-medium dark:border-zinc-700 dark:hover:bg-zinc-800 dark:aria-pressed:border-zinc-300"
+                    className="w-full rounded-lg border border-border px-3 py-1.5 text-left text-sm hover:bg-tint aria-pressed:border-primary-from aria-pressed:font-medium"
                   >
                     {formatEvaluationDate(item.evaluation.createdAt)} · {formatEvaluationSource(item.evaluation)} · wersja
                     modelu: {item.evaluation.variantVersion}
@@ -158,7 +158,7 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
               ) : (
                 <li
                   key={item.id}
-                  className="rounded-md border border-red-600 px-3 py-1.5 text-sm text-red-700 dark:text-red-400"
+                  className="rounded-lg border border-danger px-3 py-1.5 text-sm text-danger"
                 >
                   Nie można wyświetlić zapisanej oceny ({item.id}): {item.error}
                 </li>

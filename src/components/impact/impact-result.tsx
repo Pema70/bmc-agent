@@ -6,7 +6,7 @@ import { IMPACT_LEVEL_LABELS, type ImpactView } from "@/lib/schemas/impact";
 /** Stałe oznaczenie: to jakościowa analiza AI, a nie weryfikacja biznesowa. */
 export function ImpactNotice() {
   return (
-    <p className="text-sm text-zinc-600 dark:text-zinc-400">
+    <p className="text-sm text-muted">
       To jakościowa opinia modelu językowego o możliwych zależnościach między blokami, a nie weryfikacja biznesowa ani
       prognoza liczbowa. Model nie sprawdza rynku i nie liczy kosztów ani przychodów. Analiza dotyczy zapisanego stanu
       wariantu, nie niezapisanych zmian w edytorze.
@@ -21,8 +21,8 @@ export function ImpactResult({ analysis, currentVersion }: { analysis: ImpactVie
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-400">
-        <span className="rounded-full border border-amber-600 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300">
+      <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
+        <span className="rounded-full border border-ai-border bg-ai-bg px-2 py-0.5 text-xs font-bold text-ai-fg">
           Analiza AI
         </span>
         <span>
@@ -31,7 +31,7 @@ export function ImpactResult({ analysis, currentVersion }: { analysis: ImpactVie
         </span>
       </p>
       {isImpactStale(analysis.variantVersion, currentVersion) ? (
-        <p className="text-sm text-amber-800 dark:text-amber-300">
+        <p className="text-sm text-medium-fg">
           Analiza dotyczy wersji {analysis.variantVersion} modelu, aktualna wersja to {currentVersion}.
         </p>
       ) : null}
@@ -46,12 +46,12 @@ export function ImpactResult({ analysis, currentVersion }: { analysis: ImpactVie
       </p>
 
       {affected.length === 0 ? (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">Model nie wskazał innych dotkniętych bloków.</p>
+        <p className="text-sm text-muted">Model nie wskazał innych dotkniętych bloków.</p>
       ) : (
         <table className="w-full border-collapse text-left text-sm">
           <caption className="sr-only">Bloki BMC dotknięte analizowaną zmianą</caption>
           <thead>
-            <tr className="border-b border-zinc-300 dark:border-zinc-700">
+            <tr className="border-b border-border">
               <th scope="col" className="py-2 pr-4 font-medium">
                 Blok
               </th>
@@ -65,7 +65,7 @@ export function ImpactResult({ analysis, currentVersion }: { analysis: ImpactVie
           </thead>
           <tbody>
             {affected.map((item) => (
-              <tr key={item.blockKey} className="border-b border-zinc-200 align-top dark:border-zinc-800">
+              <tr key={item.blockKey} className="border-b border-border align-top">
                 <th scope="row" className="py-2 pr-4 font-medium">
                   {BLOCK_INFO[item.blockKey].label}
                 </th>
