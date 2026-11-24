@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 
 // Kontrast tokenów wyglądu (plan `docs/plan-design.md`): pary tekst/tło w trybie jasnym i ciemnym muszą spełniać WCAG AA
 // (4,5:1 dla tekstu, 3:1 dla pierścienia fokusa). Test czyta prawdziwe pliki: `globals.css` (paleta A, obecnie w aplikacji)
-// oraz statyczny podgląd palety D (`docs/design-preview/d.html`, kandydat), w którym bloki tokenów mają znaczniki
-// `/* tokens:dark */` i `/* tokens:light */`.
+// oraz statyczny podgląd palety D (`docs/design-preview/d.html`, kandydat; wyłącznie tryb ciemny), w którym blok tokenów ma znacznik
+// `/* tokens:dark */`.
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8").replace(/\r\n/g, "\n");
 
@@ -35,7 +35,6 @@ const globalsDark = { ...globalsLight, ...declarations(blockAfter(globals.slice(
 
 const previewD = read("docs/design-preview/d.html");
 const dDark = declarations(blockAfter(previewD, "/* tokens:dark */"));
-const dLight = declarations(blockAfter(previewD, "/* tokens:light */"));
 
 function luminance(hex: string): number {
   const [r, g, b] = [1, 3, 5]
@@ -70,7 +69,7 @@ const REQUIRED = ["bg-from", "bg-to", "surface", "tint", "text", "muted", "borde
 
 const PALETTES: Array<{ name: string; modes: Record<string, Tokens> }> = [
   { name: "A (globals.css, w aplikacji)", modes: { jasny: globalsLight, ciemny: globalsDark } },
-  { name: "D (docs/design-preview/d.html)", modes: { ciemny: dDark, jasny: dLight } },
+  { name: "D (docs/design-preview/d.html, tylko tryb ciemny)", modes: { ciemny: dDark } },
 ];
 
 describe("tokeny wyglądu: kontrast WCAG AA", () => {
@@ -144,25 +143,57 @@ describe("tokeny wyglądu: kontrast WCAG AA", () => {
   }
 
   describe("paleta D: odróżnialność kolorów i struktura", () => {
-    it("koral akcentu jest wyraźnie inny niż czerwień stanu „wpływ wysoki” (odległość barwy ≥ 28°), w obu trybach", () => {
-      for (const tokens of [dDark, dLight]) {
-        expect(hueDistance(tokens["accent-from"], tokens["high-fg"])).toBeGreaterThanOrEqual(28);
-        expect(hueDistance(tokens["accent-to"], tokens["high-border"])).toBeGreaterThanOrEqual(28);
-      }
+    it("koral akcentu jest wyraźnie inny niż czerwień stanu „wpływ wysoki” (odległość barwy ≥ 28°)", () => {
+      expect(hueDistance(dDark["accent-from"], dDark["high-fg"])).toBeGreaterThanOrEqual(28);
+      expect(hueDistance(dDark["accent-to"], dDark["high-border"])).toBeGreaterThanOrEqual(28);
     });
 
-    it("fiolet oznaczenia AI jest wyraźnie inny niż niebieski przycisków i stanu „Główny” (≥ 40°), w obu trybach", () => {
-      for (const tokens of [dDark, dLight]) {
-        expect(hueDistance(tokens["ai-fg"], tokens["primary-from"])).toBeGreaterThanOrEqual(40);
-        expect(hueDistance(tokens["ai-fg"], tokens["main-fg"])).toBeGreaterThanOrEqual(40);
-        expect(hueDistance(tokens["ai-border"], tokens["main-border"])).toBeGreaterThanOrEqual(40);
-      }
+    it("fiolet oznaczenia AI jest wyraźnie inny niż niebieski przycisków i stanu „Główny” (≥ 40°)", () => {
+      expect(hueDistance(dDark["ai-fg"], dDark["primary-from"])).toBeGreaterThanOrEqual(40);
+      expect(hueDistance(dDark["ai-fg"], dDark["main-fg"])).toBeGreaterThanOrEqual(40);
+      expect(hueDistance(dDark["ai-border"], dDark["main-border"])).toBeGreaterThanOrEqual(40);
     });
 
-    it("tryb ciemny jest domyślny (blok `:root`), jasny tylko przez `data-theme=\"light\"`; bez zależności od ustawienia systemu", () => {
+    it("jest tylko tryb ciemny: brak bloku jasnego, przełącznika motywu i zależności od ustawienia systemu", () => {
       expect(previewD).toMatch(/\/\* tokens:dark \*\/\n:root \{/);
-      expect(previewD).toMatch(/\/\* tokens:light \*\/\n:root\[data-theme="light"\] \{/);
+      expect(previewD).not.toContain("tokens:light");
+      expect(previewD).not.toContain("data-theme");
       expect(previewD).not.toContain("prefers-color-scheme");
+      expect(previewD).not.toContain("Przełącz");
+    });
+
+    it("wykres radarowy: siatka ≥ 3:1 na powierzchni, linie serii ≥ 3:1 na powierzchni i tincie, etykiety osi tekstem podstawowym", () => {
+      expect(contrast(dDark.grid, dDark.surface)).toBeGreaterThanOrEqual(3);
+      for (const background of ["surface", "tint"]) {
+        expect(contrast(dDark["primary-from"], dDark[background]), `seria bieżąca na ${background}`).toBeGreaterThanOrEqual(3);
+        expect(contrast(dDark["accent-from"], dDark[background]), `seria poprzednia na ${background}`).toBeGreaterThanOrEqual(3);
+      }
+      expect(previewD).toContain('<g fill="var(--text)" font-size="13" font-weight="700">');
+    });
+
+    it("serie radaru różnią się nie tylko kolorem: linia ciągła i kółka vs linia przerywana i romby, z legendą tekstową", () => {
+      expect(previewD).toMatch(/stroke="var\(--primary-from\)" stroke-width="2\.5"/);
+      expect(previewD).toMatch(/stroke="var\(--accent-from\)" stroke-width="2" stroke-dasharray="6 4"/);
+      expect(previewD).toContain("<circle");
+      expect(previewD).toContain("linia ciągła, kółka");
+      expect(previewD).toContain("linia przerywana, romby");
+    });
+
+    it("pasek przycisków jest przyklejony u góry (sticky), ma szklane tło i leży przed tytułem projektu; na wąskim ekranie przewija się poziomo", () => {
+      expect(previewD).toMatch(/\.nav \{ position: sticky; top: 0;/);
+      expect(previewD).toContain("backdrop-filter: blur(");
+      expect(previewD).toMatch(/\.nav \.toolbar \{[^}]*flex-wrap: nowrap[^}]*overflow-x: auto/);
+      expect(previewD.indexOf('<nav class="nav"')).toBeGreaterThan(-1);
+      expect(previewD.indexOf('<nav class="nav"')).toBeLessThan(previewD.indexOf("<h1"));
+      for (const label of ["Czat", "Ocena", "Wpływ", "Warianty i strategie", "Porównanie", "Cykl poprawek", "Załączniki", "Eksport i raport"]) {
+        expect(previewD, label).toMatch(new RegExp(`<button class="tbtn"[^>]*>${label}[ <]`));
+      }
+    });
+
+    it("plakietki paska mają pełny opis dla czytników ekranu, a skrócony tekst jest dla nich ukryty", () => {
+      expect(previewD).toContain('<span class="sr">ocena nieaktualna</span>');
+      expect(previewD).toContain('<span class="sr">niezapisane zmiany nie są uwzględnione</span>');
+      expect(previewD).toContain('aria-hidden="true">nieaktualna</span>');
     });
 
     it("tło strony jest prawie czarne, a poświata ma granat i koral", () => {

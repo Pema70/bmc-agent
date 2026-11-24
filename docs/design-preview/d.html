@@ -53,51 +53,7 @@
   --main-bg: #12285A;
   --main-fg: #AFCBFF;
   --main-border: #3F5FB5;
-}
-/* tokens:light */
-:root[data-theme="light"] {
-  color-scheme: light;
-  --bg-from: #F4F6FB;
-  --bg-to: #E9EEF8;
-  --surface: #FFFFFF;
-  --tint: #EEF2FB;
-  --text: #0E1630;
-  --muted: #3F4D75;
-  --border: #CBD5EA;
-  --head-from: #EAF0FC;
-  --head-to: #F3F6FD;
-  --on-head: #0E1630;
-  --primary-from: #2F6BEA;
-  --primary-to: #2057D0;
-  --on-primary: #FFFFFF;
-  --accent-from: #CC4318;
-  --accent-to: #B6360F;
-  --on-accent: #FFFFFF;
-  --ring: #2057D0;
-  --danger: #B4233A;
-  --title-from: #1B45B0;
-  --title-to: #9A2B08;
-  --glow-navy-peak: #C3D0F5;
-  --glow-coral-peak: #F7D5D1;
-  --glow-navy: rgba(80, 120, 230, 0.3);
-  --glow-coral: rgba(255, 120, 90, 0.26);
-  --glass: rgba(255, 255, 255, 0.66);
-  --glass-border: rgba(14, 22, 48, 0.16);
-  --ai-bg: #F3E9FE;
-  --ai-fg: #6B21A8;
-  --ai-border: #D0A8F0;
-  --low-bg: #E3F6E9;
-  --low-fg: #166534;
-  --low-border: #86D3A0;
-  --medium-bg: #FEF3D6;
-  --medium-fg: #92400E;
-  --medium-border: #F2C14E;
-  --high-bg: #FDE8F0;
-  --high-fg: #9D174D;
-  --high-border: #F08CB0;
-  --main-bg: #E3ECFD;
-  --main-fg: #1D3F94;
-  --main-border: #9DB8EE;
+  --grid: #5068BC;
 }
 
 * { box-sizing: border-box; }
@@ -114,11 +70,11 @@ body { margin: 0; font-family: "BMC Noto", "Segoe UI", system-ui, sans-serif; fo
 h1, h2, h3, .display { font-family: "BMC Grotesk", "BMC Noto", "Segoe UI", sans-serif; letter-spacing: -0.01em; }
 a, button, input { font: inherit; }
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 32px; background: var(--glass); border-bottom: 1px solid var(--glass-border); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
-.top strong { font-family: "BMC Grotesk", "BMC Noto", sans-serif; font-size: 20px; }
-.top .grow { flex: 1; color: var(--muted); font-size: 14px; }
-.theme-btn { border: 1px solid var(--border); background: var(--tint); color: var(--text); border-radius: 10px; padding: 6px 12px; cursor: pointer; }
-main { padding: 32px; display: flex; flex-direction: column; gap: 28px; max-width: 120rem; margin: 0 auto; }
+.nav { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 14px; padding: 10px 32px; background: var(--glass); border-bottom: 1px solid var(--glass-border); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); }
+.nav .brand { font-family: "BMC Grotesk", "BMC Noto", sans-serif; font-weight: 700; font-size: 20px; white-space: nowrap; flex: none; }
+.nav .toolbar { flex: 1; min-width: 0; display: flex; flex-wrap: nowrap; gap: 8px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; padding: 2px 2px 4px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent 100%); }
+.nav .tbtn { flex: none; scroll-snap-align: start; white-space: nowrap; min-height: 42px; padding: 5px 11px; font-size: 14px; gap: 6px; }
+main { padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 28px; max-width: 120rem; margin: 0 auto; }
 h1.grad-title { margin: 0; font-size: clamp(2.25rem, 5vw, 3.75rem); line-height: 1.1; font-weight: 700; background: linear-gradient(90deg, var(--title-from), var(--title-to)); -webkit-background-clip: text; background-clip: text; color: transparent; display: inline-block; }
 .sub { color: var(--muted); margin: 6px 0 0; font-size: 17px; }
 .variantbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
@@ -130,10 +86,10 @@ h1.grad-title { margin: 0; font-size: clamp(2.25rem, 5vw, 3.75rem); line-height:
 .chip-medium { background: var(--medium-bg); color: var(--medium-fg); border-color: var(--medium-border); }
 .chip-high { background: var(--high-bg); color: var(--high-fg); border-color: var(--high-border); }
 .chip-main { background: var(--main-bg); color: var(--main-fg); border-color: var(--main-border); }
-.toolbar { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 16px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28); }
 .tbtn { display: inline-flex; flex-wrap: wrap; max-width: 100%; align-items: center; gap: 8px; min-height: 44px; border: 1px solid var(--border); background: var(--tint); color: var(--text); border-radius: 12px; padding: 6px 14px; cursor: pointer; transition: box-shadow .15s, border-color .15s; }
 .tbtn:hover { border-color: var(--primary-from); box-shadow: 0 0 0 3px rgba(125, 178, 255, 0.16); }
 .tbtn[aria-expanded="true"] { background: linear-gradient(135deg, var(--accent-from), var(--accent-to)); color: var(--on-accent); border-color: transparent; font-weight: 700; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .pill { display: inline-block; min-width: 20px; text-align: center; border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 700; background: var(--accent-from); color: var(--on-accent); }
 .tbtn[aria-expanded="true"] .pill { background: var(--on-accent); color: var(--accent-from); }
 .btn { display: inline-block; border: 1px solid transparent; border-radius: 12px; padding: 9px 18px; font-weight: 700; cursor: pointer; transition: box-shadow .15s; }
@@ -171,6 +127,12 @@ h1.grad-title { margin: 0; font-size: clamp(2.25rem, 5vw, 3.75rem); line-height:
 .dock input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; background: var(--surface); color: var(--text); }
 .panel > header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; }
 .panel > header h2 { margin: 0; font-size: 22px; }
+.evalrow { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.evalrow > table { flex: 1 1 22rem; min-width: 0; }
+.radar { margin: 0; flex: 0 1 30rem; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.radar > svg { width: 100%; height: auto; display: block; }
+.legendlist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.legendlist li { display: flex; align-items: center; gap: 10px; }
 .panel .content { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 table { border-collapse: collapse; width: 100%; font-size: 15px; }
 th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -181,14 +143,23 @@ th { background: var(--tint); }
 .sw { width: 130px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; font-size: 12px; }
 .sw i { display: block; height: 36px; }
 .sw span { display: block; padding: 4px 8px; background: var(--surface); color: var(--text); }
-@media (max-width: 600px) { main { padding: 16px; } .top { padding: 10px 16px; } .dock .chatbody { height: 22rem; } }
+@media (max-width: 600px) { main { padding: 16px; } .nav { padding: 8px 12px; gap: 8px; } .nav .brand { font-size: 17px; } .dock .chatbody { height: 22rem; } }
 </style>
 </head>
 <body>
-<div class="top">
-  <strong>BMC Agent</strong><span class="grow">Podgląd palety D, wersja 2 (statyczny, dane przykładowe)</span>
-  <button class="theme-btn" type="button" onclick="var r=document.documentElement;r.setAttribute('data-theme', r.getAttribute('data-theme')==='light'?'dark':'light')">Przełącz ciemny / jasny (domyślnie ciemny)</button>
-</div>
+<nav class="nav" aria-label="Menu projektu">
+  <span class="brand">BMC Agent</span>
+  <div class="toolbar" role="toolbar" aria-label="Narzędzia modelu">
+    <button class="tbtn" id="tb-chat" type="button" aria-expanded="true" aria-controls="chatbody" onclick="toggleChat()">Czat <span class="pill"><span aria-hidden="true">2</span><span class="sr">2 oczekujące propozycje</span></span></button>
+    <button class="tbtn" type="button" aria-expanded="true">Ocena <span class="pill"><span aria-hidden="true">nieaktualna</span><span class="sr">ocena nieaktualna</span></span></button>
+    <button class="tbtn" type="button" aria-expanded="false">Wpływ <span class="pill"><span aria-hidden="true">aktywna</span><span class="sr">aktywna analiza wpływu</span></span></button>
+    <button class="tbtn" type="button" aria-expanded="false">Warianty i strategie <span class="pill"><span aria-hidden="true">3</span><span class="sr">3 warianty</span></span></button>
+    <button class="tbtn" type="button" aria-expanded="false">Porównanie</button>
+    <button class="tbtn" type="button" aria-expanded="false">Cykl poprawek <span class="pill"><span aria-hidden="true">1/3</span><span class="sr">runda 1 z 3</span></span></button>
+    <button class="tbtn" type="button" aria-expanded="false">Załączniki <span class="pill"><span aria-hidden="true">3/10</span><span class="sr">3 z 10 załączników</span></span></button>
+    <button class="tbtn" type="button" aria-expanded="false">Eksport i raport <span class="pill"><span aria-hidden="true">niezapisane</span><span class="sr">niezapisane zmiany nie są uwzględnione</span></span></button>
+  </div>
+</nav>
 <main>
   <div>
     <h1 class="grad-title">Kawiarnia Ziarno</h1>
@@ -198,16 +169,6 @@ th { background: var(--tint); }
     <span class="name">Wariant główny</span><span class="chip chip-main">Główny</span>
     <span class="hint">wersja 7 · zapisany stan</span>
     <span class="chip chip-ai">Strategia AI</span><span class="hint">(przykład znacznika wariantu ze strategii)</span>
-  </div>
-  <div class="toolbar" role="toolbar" aria-label="Narzędzia modelu">
-    <button class="tbtn" id="tb-chat" type="button" aria-expanded="true" aria-controls="chatbody" onclick="toggleChat()">Czat <span class="pill">2 propozycje</span></button>
-    <button class="tbtn" type="button" aria-expanded="true">Ocena <span class="pill">nieaktualna</span></button>
-    <button class="tbtn" type="button" aria-expanded="false">Wpływ <span class="pill">aktywna analiza</span></button>
-    <button class="tbtn" type="button" aria-expanded="false">Warianty i strategie <span class="pill">3</span></button>
-    <button class="tbtn" type="button" aria-expanded="false">Porównanie</button>
-    <button class="tbtn" type="button" aria-expanded="false">Cykl poprawek <span class="pill">runda 1 z 3</span></button>
-    <button class="tbtn" type="button" aria-expanded="false">Załączniki <span class="pill">3/10</span></button>
-    <button class="tbtn" type="button" aria-expanded="false">Eksport i raport <span class="pill">niezapisane zmiany</span></button>
   </div>
 
   <div class="canvas" aria-label="Płótno modelu biznesowego (cała szerokość strony)">
@@ -247,7 +208,20 @@ th { background: var(--tint); }
     <header><h2 id="p-ocena">Ocena modelu</h2><span class="chip chip-ai">AI</span></header>
     <div class="content">
       <p class="hint" style="margin:0">Ocena AI: google / gemini-3.5-flash-lite · prompt evaluate-v1 · dotyczy wersji 5 (bieżąca: 7), ocena może być nieaktualna.</p>
-      <table>
+
+      <div class="evalrow">
+        <figure class="radar">
+          <svg role="img" viewBox="0 0 420 330" aria-label="Wykres radarowy ocen w skali 1-10. Ocena bieżąca (wersja 7): Spójność 8, Ryzyko 4, Realność 7, Innowacyjność 5. Ocena poprzednia (wersja 5): Spójność 6, Ryzyko 3, Realność 6, Innowacyjność 5.">
+            <g fill="none" stroke="var(--grid)" stroke-width="1"><polygon points="210.0,146.0 229.0,165.0 210.0,184.0 191.0,165.0"/><polygon points="210.0,127.0 248.0,165.0 210.0,203.0 172.0,165.0"/><polygon points="210.0,108.0 267.0,165.0 210.0,222.0 153.0,165.0"/><polygon points="210.0,89.0 286.0,165.0 210.0,241.0 134.0,165.0"/><polygon points="210.0,70.0 305.0,165.0 210.0,260.0 115.0,165.0" stroke-width="1.5"/><line x1="210" y1="165" x2="210.0" y2="70.0"/><line x1="210" y1="165" x2="305.0" y2="165.0"/><line x1="210" y1="165" x2="210.0" y2="260.0"/><line x1="210" y1="165" x2="115.0" y2="165.0"/></g><g fill="var(--muted)" font-size="10"><text x="213.0" y="144.0">2</text><text x="213.0" y="125.0">4</text><text x="213.0" y="106.0">6</text><text x="213.0" y="87.0">8</text><text x="213.0" y="68.0">10</text></g><g><polygon points="210.0,108.0 238.5,165.0 210.0,222.0 162.5,165.0" fill="var(--accent-from)" fill-opacity="0.10" stroke="var(--accent-from)" stroke-width="2" stroke-dasharray="6 4" stroke-linejoin="round"/><polygon points="210.0,103.0 215.0,108.0 210.0,113.0 205.0,108.0" fill="var(--accent-from)"/><polygon points="238.5,160.0 243.5,165.0 238.5,170.0 233.5,165.0" fill="var(--accent-from)"/><polygon points="210.0,217.0 215.0,222.0 210.0,227.0 205.0,222.0" fill="var(--accent-from)"/><polygon points="162.5,160.0 167.5,165.0 162.5,170.0 157.5,165.0" fill="var(--accent-from)"/></g><g><polygon points="210.0,89.0 248.0,165.0 210.0,231.5 162.5,165.0" fill="var(--primary-from)" fill-opacity="0.18" stroke="var(--primary-from)" stroke-width="2.5" stroke-linejoin="round"/><circle cx="210.0" cy="89.0" r="4.5" fill="var(--primary-from)"/><circle cx="248.0" cy="165.0" r="4.5" fill="var(--primary-from)"/><circle cx="210.0" cy="231.5" r="4.5" fill="var(--primary-from)"/><circle cx="162.5" cy="165.0" r="4.5" fill="var(--primary-from)"/></g><g fill="var(--text)" font-size="13" font-weight="700"><text x="210" y="54" text-anchor="middle">Spójność</text><text x="321" y="161" text-anchor="start">Ryzyko</text><text x="321" y="176" text-anchor="start">(10 = niskie)</text><text x="210" y="286" text-anchor="middle">Realność</text><text x="99" y="169" text-anchor="end">Innowacyjność</text></g>
+          </svg>
+          <figcaption>
+            <ul class="legendlist">
+              <li><svg viewBox="0 0 32 12" width="32" height="12" aria-hidden="true"><line x1="0" y1="6" x2="32" y2="6" stroke="var(--primary-from)" stroke-width="2.5"/><circle cx="16" cy="6" r="4" fill="var(--primary-from)"/></svg>Ocena bieżąca (wersja 7): linia ciągła, kółka</li>
+              <li><svg viewBox="0 0 32 12" width="32" height="12" aria-hidden="true"><line x1="0" y1="6" x2="32" y2="6" stroke="var(--accent-from)" stroke-width="2" stroke-dasharray="6 4"/><polygon points="16,1 21,6 16,11 11,6" fill="var(--accent-from)"/></svg>Ocena poprzednia (wersja 5): linia przerywana, romby</li>
+            </ul>
+          </figcaption>
+        </figure>
+        <table>
         <thead><tr><th>Kryterium</th><th>Ocena</th><th>Uzasadnienie (AI)</th></tr></thead>
         <tbody>
           <tr><td>Spójność</td><td>8/10</td><td>Segmenty i kanały pasują do propozycji wartości.</td></tr>
@@ -255,7 +229,8 @@ th { background: var(--tint); }
           <tr><td>Realność</td><td>7/10</td><td>Zasoby są dostępne: palarnia i lokal.</td></tr>
           <tr><td>Innowacyjność</td><td>5/10</td><td>Subskrypcja jest znana na rynku.</td></tr>
         </tbody>
-      </table>
+        </table>
+      </div>
       <span class="row"><button class="btn btn-primary" type="button">Oceń model</button><button class="btn btn-secondary" type="button">Dodaj ocenę ręczną</button>
       <span class="chip chip-low">Wpływ niski</span><span class="chip chip-medium">Wpływ średni</span><span class="chip chip-high">Wpływ wysoki</span></span>
     </div>
