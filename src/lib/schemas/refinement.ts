@@ -31,7 +31,9 @@ export const RefinementQuestion = z.strictObject({
   suggestedAnswers: z
     .array(z.string().trim().min(1).max(SUGGESTED_ANSWER_MAX_CHARS))
     .max(SUGGESTED_ANSWERS_MAX)
-    .describe("Krótkie propozycje odpowiedzi (może być pusta tablica)."),
+    .describe(
+      "Neutralne formy odpowiedzi (np. Tak, Nie, Jeszcze nie wiem) lub ogólne kategorie bez twierdzeń o firmie; bez liczb i faktów. Może być pusta tablica.",
+    ),
 });
 export type RefinementQuestion = z.infer<typeof RefinementQuestion>;
 
@@ -68,12 +70,11 @@ export const RefineProposal = z
   .superRefine(checkOperationFields);
 export type RefineProposal = z.output<typeof RefineProposal>;
 
-/** Paczka poprawek dla rundy z `questionCount` pytaniami: 1 do 8 propozycji, `questionIndex` w zakresie pytań. */
+/** Paczka poprawek dla rundy z `questionCount` pytaniami: 0 do 8 propozycji (pusta, gdy odpowiedzi nie dają podstaw do zmian), `questionIndex` w zakresie pytań. */
 export function refineOutputSchema(questionCount: number) {
   return z.strictObject({
     proposals: z
       .array(RefineProposal)
-      .min(1)
       .max(REFINE_PROPOSALS_MAX)
       .superRefine((proposals, ctx) => {
         proposals.forEach((proposal, index) => {

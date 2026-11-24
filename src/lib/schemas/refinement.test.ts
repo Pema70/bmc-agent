@@ -102,10 +102,11 @@ describe("RefineProposal i RefineOutput", () => {
     expect(RefineProposal.safeParse({ ...proposal, operation: "remove", before: "Stary", after: null }).success).toBe(true);
   });
 
-  it("do 8 propozycji, co najmniej jedna", () => {
+  it("od 0 do 8 propozycji: pusta paczka to poprawny wynik (odpowiedzi bez podstaw do zmian)", () => {
     expect(RefineOutput.safeParse({ proposals: Array(8).fill(proposal) }).success).toBe(true);
+    expect(RefineOutput.safeParse({ proposals: [] }).success).toBe(true);
     expect(RefineOutput.safeParse({ proposals: Array(9).fill(proposal) }).success).toBe(false);
-    expect(RefineOutput.safeParse({ proposals: [] }).success).toBe(false);
+    expect(refineOutputSchema(3).safeParse({ proposals: [] }).success).toBe(true);
   });
 
   it("questionIndex musi mieścić się w liczbie pytań rundy", () => {
