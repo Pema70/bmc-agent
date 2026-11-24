@@ -1,26 +1,143 @@
 @import "tailwindcss";
 
+/*
+ * Tokeny wyglądu (plan `docs/plan-design.md`): paleta A „błękit i bursztyn” (60% tło i powierzchnie, 30% tint i nagłówki,
+ * 10% akcent). Komponenty używają wyłącznie tokenów semantycznych (klasy `bg-surface`, `text-muted`, `bg-head`…), więc zamiana
+ * palety to zmiana tego bloku. Kontrasty par tekst/tło sprawdza `src/app/design-tokens.test.ts` (WCAG AA). Tryb ciemny
+ * wynika z ustawienia systemu (bez przełącznika, decyzja D7).
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg-from: #F3F6FC;
+  --bg-to: #E6EDF9;
+  --surface: #FFFFFF;
+  --tint: #E8EEFA;
+  --text: #0F1B3D;
+  --muted: #4A5878;
+  --border: #C9D5EC;
+  --head-from: #1E3A8A;
+  --head-to: #2B55C4;
+  --on-head: #FFFFFF;
+  --accent-from: #B45309;
+  --accent-to: #92400E;
+  --on-accent: #FFFFFF;
+  --ring: #1E40AF;
+  --danger: #B91C1C;
+  --ai-bg: #F1EBFE;
+  --ai-fg: #5B21B6;
+  --ai-border: #C4B5FD;
+  --low-bg: #E3F6E9;
+  --low-fg: #166534;
+  --low-border: #86D3A0;
+  --medium-bg: #FEF3D6;
+  --medium-fg: #92400E;
+  --medium-border: #F2C14E;
+  --high-bg: #FDE6E6;
+  --high-fg: #991B1B;
+  --high-border: #F29B9B;
+  --main-bg: #E1E9FB;
+  --main-fg: #1E3A8A;
+  --main-border: #9DB4EC;
+  --grad-bg: linear-gradient(160deg, var(--bg-from), var(--bg-to));
+  --grad-head: linear-gradient(135deg, var(--head-from), var(--head-to));
+  --grad-accent: linear-gradient(135deg, var(--accent-from), var(--accent-to));
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg-from: #0B1226;
+    --bg-to: #111B38;
+    --surface: #16213F;
+    --tint: #1C2A52;
+    --text: #E8EDFA;
+    --muted: #A7B3D1;
+    --border: #2B3B66;
+    --head-from: #1E3A8A;
+    --head-to: #2B55C4;
+    --on-head: #FFFFFF;
+    --accent-from: #FBBF24;
+    --accent-to: #F59E0B;
+    --on-accent: #1A1203;
+    --ring: #FBBF24;
+    --danger: #FCA5A5;
+    --ai-bg: #2A1F52;
+    --ai-fg: #D8CCFF;
+    --ai-border: #5B47A8;
+    --low-bg: #123524;
+    --low-fg: #9BE2B5;
+    --low-border: #2F7A4C;
+    --medium-bg: #3A2A0A;
+    --medium-fg: #FCD679;
+    --medium-border: #8A6516;
+    --high-bg: #3F1616;
+    --high-fg: #FFB4B4;
+    --high-border: #8F3333;
+    --main-bg: #1B2C5E;
+    --main-fg: #C9D7FF;
+    --main-border: #3F5FB5;
   }
 }
 
+@theme inline {
+  --color-bg-from: var(--bg-from);
+  --color-bg-to: var(--bg-to);
+  --color-surface: var(--surface);
+  --color-tint: var(--tint);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-head-from: var(--head-from);
+  --color-head-to: var(--head-to);
+  --color-on-head: var(--on-head);
+  --color-accent-from: var(--accent-from);
+  --color-accent-to: var(--accent-to);
+  --color-on-accent: var(--on-accent);
+  --color-ring: var(--ring);
+  --color-danger: var(--danger);
+  --color-ai-bg: var(--ai-bg);
+  --color-ai-fg: var(--ai-fg);
+  --color-ai-border: var(--ai-border);
+  --color-low-bg: var(--low-bg);
+  --color-low-fg: var(--low-fg);
+  --color-low-border: var(--low-border);
+  --color-medium-bg: var(--medium-bg);
+  --color-medium-fg: var(--medium-fg);
+  --color-medium-border: var(--medium-border);
+  --color-high-bg: var(--high-bg);
+  --color-high-fg: var(--high-fg);
+  --color-high-border: var(--high-border);
+  --color-main-bg: var(--main-bg);
+  --color-main-fg: var(--main-fg);
+  --color-main-border: var(--main-border);
+  --font-sans: var(--font-noto-sans), "Segoe UI", system-ui, sans-serif;
+}
+
+/* Gradienty wyłącznie na tłach, nagłówkach i przyciskach głównych; tekst treści leży na jednolitej powierzchni. */
+@utility bg-app {
+  background-color: var(--bg-from);
+  background-image: var(--grad-bg);
+}
+
+@utility bg-head {
+  background-color: var(--head-from);
+  background-image: var(--grad-head);
+  color: var(--on-head);
+}
+
+@utility bg-cta {
+  background-color: var(--accent-from);
+  background-image: var(--grad-accent);
+  color: var(--on-accent);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--bg-from);
+  background-image: var(--grad-bg);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }

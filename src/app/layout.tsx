@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { SiteHeader } from "@/components/site-header";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/app-info";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin", "latin-ext"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+// Noto Sans z plików repozytorium (te same co w PDF; bez pobierania z sieci przy buildzie). Tylko wagi 400 i 700.
+const notoSans = localFont({
+  variable: "--font-noto-sans",
+  display: "swap",
+  src: [
+    { path: "../lib/export/fonts/NotoSans-Regular.ttf", weight: "400", style: "normal" },
+    { path: "../lib/export/fonts/NotoSans-Bold.ttf", weight: "700", style: "normal" },
+  ],
 });
 
 export const metadata: Metadata = {
@@ -23,7 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="pl"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${notoSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <SiteHeader />
