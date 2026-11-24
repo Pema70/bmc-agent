@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Podgląd palety A. Błękit i bursztyn</title>
 <style>
-@font-face { font-family: "Noto Sans"; font-weight: 400; src: local("Noto Sans"), url("../../src/lib/export/fonts/NotoSans-Regular.ttf") format("truetype"); }
-@font-face { font-family: "Noto Sans"; font-weight: 700; src: local("Noto Sans Bold"), url("../../src/lib/export/fonts/NotoSans-Bold.ttf") format("truetype"); }
+@font-face { font-family: "BMC Noto"; font-style: normal; font-weight: 400; src: url("../../src/lib/export/fonts/NotoSans-Regular.ttf") format("truetype"); }
+@font-face { font-family: "BMC Noto"; font-style: normal; font-weight: 700; src: url("../../src/lib/export/fonts/NotoSans-Bold.ttf") format("truetype"); }
 :root {
   --bg-from: #F3F6FC;
   --bg-to: #E6EDF9;
@@ -109,7 +109,7 @@
   }
 }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: "Noto Sans", "Segoe UI", system-ui, sans-serif; font-size: 16px; line-height: 1.5; color: var(--text); background: var(--bg-from); background-image: var(--grad-bg); background-attachment: fixed; min-height: 100vh; }
+body { margin: 0; font-family: "BMC Noto", "Segoe UI", system-ui, sans-serif; font-style: normal; font-size: 16px; line-height: 1.5; color: var(--text); background: var(--bg-from); background-image: var(--grad-bg); background-attachment: fixed; min-height: 100vh; }
 a, button { font: inherit; }
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 24px; background: var(--grad-head); color: var(--on-head); }
@@ -131,7 +131,7 @@ h1 { font-size: 24px; margin: 0 0 4px; }
 .chip-high { background: var(--high-bg); color: var(--high-fg); border-color: var(--high-border); }
 .chip-main { background: var(--main-bg); color: var(--main-fg); border-color: var(--main-border); }
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; padding: 8px; background: var(--tint); border: 1px solid var(--border); border-radius: 10px; }
-.tbtn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.tbtn { display: inline-flex; flex-wrap: wrap; max-width: 100%; align-items: center; gap: 8px; min-height: 40px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
 .tbtn:hover { border-color: var(--head-from); }
 .tbtn[aria-expanded="true"] { background: var(--grad-accent); color: var(--on-accent); border-color: transparent; font-weight: 700; }
 .pill { display: inline-block; min-width: 20px; text-align: center; border-radius: 999px; padding: 0 7px; font-size: 12px; font-weight: 700; background: var(--tint); color: var(--text); border: 1px solid var(--border); }
