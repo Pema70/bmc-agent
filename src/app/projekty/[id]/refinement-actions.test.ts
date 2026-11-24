@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   runGenerateQuestions: vi.fn(),
   runRefineFromAnswers: vi.fn(),
   acceptRoundBatch: vi.fn(),
+  listProposalsForRound: vi.fn(),
   cancelRound: vi.fn(),
   revalidatePath: vi.fn(),
 }));
@@ -14,7 +15,10 @@ vi.mock("@/lib/auth/permissions", () => ({ requireProjectRole: mocks.requireProj
 vi.mock("@/lib/db/variants", () => ({ getVariantProjectId: mocks.getVariantProjectId }));
 vi.mock("@/lib/ai/generate-questions", () => ({ runGenerateQuestions: mocks.runGenerateQuestions }));
 vi.mock("@/lib/ai/refine-from-answers", () => ({ runRefineFromAnswers: mocks.runRefineFromAnswers }));
-vi.mock("@/lib/db/proposals", () => ({ acceptRoundBatch: mocks.acceptRoundBatch }));
+vi.mock("@/lib/db/proposals", () => ({
+  acceptRoundBatch: mocks.acceptRoundBatch,
+  listProposalsForRound: mocks.listProposalsForRound,
+}));
 vi.mock("@/lib/db/refinement", () => ({ cancelRound: mocks.cancelRound }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 
@@ -30,6 +34,23 @@ const session = { user: { id: "u1", email: "jan@example.com", name: null } };
 const editorAccess = { ok: true, session, projectId: "p1", role: "EDITOR" };
 const viewerAccess = { ok: false, error: "FORBIDDEN", session, projectId: "p1", role: "VIEWER" };
 
+function proposalRecord(id: string) {
+  return {
+    id,
+    variantId: "v1",
+    blockKey: "customer_segments" as const,
+    operation: "add" as const,
+    before: null,
+    after: "Pracownicy biur",
+    rationale: "Z odpowiedzi użytkownika.",
+    status: "PENDING" as const,
+    baseVersion: 3,
+    createdAt: new Date("2026-11-24T10:00:00Z"),
+    sourceKind: "REFINEMENT" as const,
+    sourceAttachmentName: null,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.requireProjectRole.mockResolvedValue(editorAccess);
@@ -39,6 +60,7 @@ beforeEach(() => {
   mocks.runRefineFromAnswers.mockResolvedValue({ ok: false, error: "NOT_FOUND", message: "x" });
   mocks.acceptRoundBatch.mockResolvedValue({ ok: false, error: "NOT_FOUND" });
   mocks.cancelRound.mockResolvedValue({ ok: false, error: "NOT_FOUND" });
+  mocks.listProposalsForRound.mockResolvedValue([]);
 });
 
 // Wspólne dla wszystkich czterech akcji: kolejność sprawdzeń sesja → rola → wariant → Zod → operacja.
@@ -120,10 +142,13 @@ describe("submitAnswersAction", () => {
 
   it("przekazuje przycięte odpowiedzi i projekt z uprawnień; po sukcesie odświeża stronę", async () => {
     mocks.runRefineFromAnswers.mockResolvedValue({ ok: true, roundId: "r1", proposalIds: ["pr1"] });
+    mocks.listProposalsForRound.mockResolvedValue([proposalRecord("pr1")]);
 
     const result = await submitAnswersAction("p1", "v1", { roundId: "r1", expectedVersion: 3, answers: ["  Tak  ", ""] });
 
-    expect(result).toEqual({ ok: true, roundId: "r1", proposalIds: ["pr1"] });
+    // Widoki propozycji pochodzą z bazy (id, źródło REFINEMENT), a nie z tekstu modelu; odczyt po projekcie z uprawnień i wariancie.
+    expect(result).toEqual({ ok: true, roundId: "r1", proposalIds: ["pr1"], proposals: [expect.objectContaining({ id: "pr1", sourceKind: "REFINEMENT" })] });
+    expect(mocks.listProposalsForRound).toHaveBeenCalledWith("p1", "v1", "r1");
     expect(mocks.runRefineFromAnswers).toHaveBeenCalledWith({
       projectId: "p1",
       variantId: "v1",
@@ -142,17 +167,21 @@ describe("submitAnswersAction", () => {
       ok: true,
       roundId: "r1",
       proposalIds: [],
+      proposals: [],
       message: "Na podstawie odpowiedzi nie ma czego zmienić.",
     });
+    expect(mocks.listProposalsForRound).not.toHaveBeenCalled();
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/projekty/p1");
   });
 
   it("niepusta paczka nie ma komunikatu o braku zmian", async () => {
     mocks.runRefineFromAnswers.mockResolvedValue({ ok: true, roundId: "r1", proposalIds: ["pr1"] });
+    mocks.listProposalsForRound.mockResolvedValue([proposalRecord("pr1")]);
 
     const result = await submitAnswersAction("p1", "v1", { roundId: "r1", expectedVersion: 3, answers: ["Tak"] });
 
-    expect(result).toEqual({ ok: true, roundId: "r1", proposalIds: ["pr1"] });
+    expect(result).toMatchObject({ ok: true, roundId: "r1", proposalIds: ["pr1"] });
+    expect(result).not.toHaveProperty("message");
   });
 
   it("błąd operacji (np. limit użytkownika z retryAfterSec) przechodzi bez zmian", async () => {
@@ -171,9 +200,15 @@ describe("submitAnswersAction", () => {
 describe("applyRoundAction", () => {
   it("sukces: wersja, stan i liczba zastosowanych; odświeża stronę", async () => {
     const state = emptyBmcState();
-    mocks.acceptRoundBatch.mockResolvedValue({ ok: true, state, version: 4, acceptedCount: 3 });
+    mocks.acceptRoundBatch.mockResolvedValue({ ok: true, state, version: 4, acceptedCount: 3, proposalIds: ["pr1", "pr2", "pr3"] });
 
-    expect(await applyRoundAction("p1", "v1", "r1", 3)).toEqual({ ok: true, version: 4, state, acceptedCount: 3 });
+    expect(await applyRoundAction("p1", "v1", "r1", 3)).toEqual({
+      ok: true,
+      version: 4,
+      state,
+      acceptedCount: 3,
+      acceptedProposalIds: ["pr1", "pr2", "pr3"],
+    });
     expect(mocks.acceptRoundBatch).toHaveBeenCalledWith({ projectId: "p1", variantId: "v1", roundId: "r1", expectedVersion: 3, userId: "u1" });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/projekty/p1");
   });

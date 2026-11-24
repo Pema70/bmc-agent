@@ -32,7 +32,7 @@ export const RefinementQuestion = z.strictObject({
     .array(z.string().trim().min(1).max(SUGGESTED_ANSWER_MAX_CHARS))
     .max(SUGGESTED_ANSWERS_MAX)
     .describe(
-      "Neutralne formy odpowiedzi (np. Tak, Nie, Jeszcze nie wiem) lub ogólne kategorie bez twierdzeń o firmie; bez liczb i faktów. Może być pusta tablica.",
+      "Tylko same słowa Tak, Nie, Jeszcze nie wiem, Nie dotyczy albo krótkie nazwy rodzaju opcji; bez zdań w pierwszej osobie, twierdzeń o firmie i cyfr. Może być pusta tablica.",
     ),
 });
 export type RefinementQuestion = z.infer<typeof RefinementQuestion>;
@@ -41,6 +41,26 @@ export const QuestionsOutput = z.strictObject({
   questions: z.array(RefinementQuestion).min(QUESTIONS_MIN).max(QUESTIONS_MAX),
 });
 export type QuestionsOutput = z.infer<typeof QuestionsOutput>;
+
+/**
+ * Liczniki strażnika podpowiedzi (krok 7g): ile podpowiedzi wygenerował model, ile usunięto i z jakiego powodu (powody mogą się
+ * nakładać). Zapisywane w RefinementRound.questions (Json, bez migracji) i niewidoczne dla modelu (nie ma ich w QuestionsOutput).
+ */
+export const SuggestionsGuard = z.strictObject({
+  generated: z.number().int().min(0),
+  removed: z.number().int().min(0),
+  reasons: z.strictObject({
+    digits: z.number().int().min(0),
+    length: z.number().int().min(0),
+    firstPerson: z.number().int().min(0),
+    yesNoContinuation: z.number().int().min(0),
+  }),
+});
+export type SuggestionsGuard = z.infer<typeof SuggestionsGuard>;
+
+/** Kształt zapisany w bazie: pytania jak wyżej plus (opcjonalnie, dla rund sprzed strażnika brak) liczniki strażnika. */
+export const StoredQuestions = QuestionsOutput.extend({ suggestionsGuard: SuggestionsGuard.optional() });
+export type StoredQuestions = z.infer<typeof StoredQuestions>;
 
 /**
  * Odpowiedzi użytkownika (D20): tablica równoległa do pytań (indeks = numer pytania), pusty tekst = pytanie pominięte.

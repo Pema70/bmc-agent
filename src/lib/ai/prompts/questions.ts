@@ -2,12 +2,12 @@ import { BLOCK_GUIDELINES } from "@/lib/ai/prompts/blocks";
 import { buildContext, dataBlock } from "@/lib/ai/prompts/context";
 import { BLOCK_INFO, BLOCK_KEYS, type BmcState } from "@/lib/schemas/bmc";
 import { CRITERION_LABELS, type EvaluationOutput } from "@/lib/schemas/evaluation";
+import { SUGGESTION_MAX_CHARS } from "@/lib/refinement/suggestions";
 import {
   QUESTIONS_MAX,
   QUESTIONS_MIN,
   QUESTION_MAX_CHARS,
   SUGGESTED_ANSWERS_MAX,
-  SUGGESTED_ANSWER_MAX_CHARS,
 } from "@/lib/schemas/refinement";
 
 // Zapisywana w LlmCallLog.promptVersion i RefinementRound.questionsPromptVersion; zmieniaj przy każdej zmianie treści
@@ -19,8 +19,8 @@ const INSTRUCTIONS = `Jesteś doradcą biznesowym prowadzącym użytkownika prze
 Zasady:
 - Pytania mają wynikać z oceny w <evaluation>: celuj w kryteria z najniższymi punktami i w uwagi z uzasadnień. Każde pytanie dotyczy jednego bloku BMC (blockKey) i jednego kryterium (criterion), które ma poprawić. Pytania mają być różne i nie powtarzać informacji, które już są w <bmc_state>.
 - Pytaj o rzeczy, które wie lub obserwuje użytkownik: jego klientów, zasoby, ograniczenia, doświadczenia, plany, a także otoczenie, które zna z własnej obserwacji (np. kto jest jego najbliższą konkurencją w okolicy, na co skarżą się jego klienci). Nie pytaj o ogólne dane rynkowe (wielkość rynku, średnie ceny, statystyki branży), bo odpowiedź nie byłaby jego danymi. Wolno pytać o liczby (np. ceny, koszty, liczbę klientów), jeśli zna je tylko użytkownik, ale nie zakładaj ich za niego: ani w treści pytania, ani w podpowiedziach nie podawaj liczb, kwot ani faktów o firmie.
-- Jedno pytanie to jedna konkretna sprawa, jedno lub dwa krótkie zdania (najwyżej ${QUESTION_MAX_CHARS} znaków), bez wyliczanek i bez kilku pytań w jednym.
-- Pole suggestedAnswers jest wymagane. Kliknięta podpowiedź zostaje zapisana jako odpowiedź użytkownika, więc podpowiedź nie może być gotowym opisem jego firmy ani twierdzeniem o niej. Dozwolone są wyłącznie neutralne formy odpowiedzi (np. „Tak”, „Nie”, „Jeszcze nie wiem”) albo ogólne kategorie bez twierdzeń o konkretnej firmie (np. „Osoby prywatne”, „Firmy”): najwyżej ${SUGGESTED_ANSWERS_MAX}, każda do ${SUGGESTED_ANSWER_MAX_CHARS} znaków. Gdy nic takiego nie pasuje do pytania, podaj pustą tablicę.
+- Jedno pytanie to jedna konkretna sprawa, jedno lub dwa krótkie zdania (najwyżej ${QUESTION_MAX_CHARS} znaków), bez wyliczanek i bez kilku pytań w jednym. Zwracaj się do użytkownika w liczbie pojedynczej (na „ty”).
+- Pole suggestedAnswers jest wymagane. Kliknięta podpowiedź zostaje zapisana jako odpowiedź użytkownika, więc podpowiedź nie może być twierdzeniem o jego firmie. Dozwolone są wyłącznie: (a) same słowa „Tak”, „Nie”, „Jeszcze nie wiem” albo „Nie dotyczy”, bez dalszego ciągu zdania; (b) krótkie nazwy rodzaju opcji, które użytkownik może wybrać lub rozwinąć (np. „Wydarzenia tematyczne”, „Osoby prywatne”). Zabronione są zdania w pierwszej osobie i opisy firmy, np. „Tak, mam alternatywne opcje” albo „Nie, jestem zależny od obecnych partnerów”. Podpowiedzi nie zawierają cyfr; jest ich najwyżej ${SUGGESTED_ANSWERS_MAX}, a każda ma najwyżej ${SUGGESTION_MAX_CHARS} znaków. Gdy nic takiego nie pasuje do pytania, podaj pustą tablicę.
 - Nie wymyślaj danych liczbowych ani faktów o firmie, rynku czy konkurencji. Pisz zwykłym tekstem, bez formatowania Markdown i HTML.
 - To pytania modelu językowego pomagające uporządkować model, a nie weryfikacja biznesowa.
 

@@ -313,7 +313,7 @@ export async function countPendingProposals(projectId: string, variantId: string
 export type BatchFailure = { proposalId: string; error: ApplyError };
 
 export type AcceptRoundBatchResult =
-  | { ok: true; state: BmcState; version: number; acceptedCount: number }
+  | { ok: true; state: BmcState; version: number; acceptedCount: number; proposalIds: string[] }
   | { ok: false; error: "NOT_FOUND" | "NOTHING_PENDING" | "ALREADY_RESOLVED" | "VERSION_CONFLICT" }
   // Którejś propozycji nie da się zastosować na bieżącym stanie: brak jakichkolwiek zmian, lista powodów.
   | { ok: false; error: "CONFLICTS"; failures: BatchFailure[] };
@@ -394,7 +394,13 @@ export async function acceptRoundBatch(args: {
         throw new RollbackSignal("ALREADY_RESOLVED");
       }
 
-      return { ok: true, state: working, version: expectedVersion + 1, acceptedCount: proposals.length };
+      return {
+        ok: true,
+        state: working,
+        version: expectedVersion + 1,
+        acceptedCount: proposals.length,
+        proposalIds: proposals.map((proposal) => proposal.id),
+      };
     });
   } catch (error) {
     if (error instanceof RollbackSignal) {
@@ -402,4 +408,14 @@ export async function acceptRoundBatch(args: {
     }
     throw error;
   }
+}
+
+/** Propozycje jednej rundy poprawek (dowolnego statusu) w kolejności paczki, tylko z wariantu należącego do projektu. */
+export async function listProposalsForRound(projectId: string, variantId: string, roundId: string): Promise<ProposalRecord[]> {
+  const rows = await prisma.proposal.findMany({
+    where: { refinementRoundId: roundId, variantId, variant: { projectId } },
+    orderBy: [{ refinementQuestionIndex: "asc" }, { id: "asc" }],
+    select: PROPOSAL_SELECT,
+  });
+  return rows.map(toRecord);
 }

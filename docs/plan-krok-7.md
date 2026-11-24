@@ -588,3 +588,102 @@ Plan zaakceptowany 2026-11-22 z poniższymi poprawkami. **Tabela decyzji (D1 do 
      ORDER BY p.name, r."roundNumber", q.ord;
      ```
    - Reguły ważności jak w PR „P”: próba jest nieważna przy statusie `LlmCallLog` innym niż `OK` (np. `SCHEMA_ERROR` w `generate_questions` lub `refine_from_answers`; wtedy runda nie powstaje albo zostaje `AWAITING_ANSWERS`) i przy zmianie modelu lub promptu w trakcie; pusta paczka w próbie 1 (konkretne odpowiedzi) jest wynikiem do odnotowania, nie błędem.
+
+18. **PR 7g (2026-11-24): panel „Cykl poprawek”, doprecyzowania po implementacji.**
+   - **Miejsce i uprawnienia:** `RefinementPanel` jest renderowany po panelu oceny, wewnątrz przestrzeni roboczej wariantu (tylko EDITOR i wyżej, dla wyświetlanego wariantu; VIEWER panelu nie widzi). Dane z serwera: `listRoundsForVariant`, `listRoundProposalIds` (oba po `projectId` i `variantId`) oraz wersja wariantu najnowszej oceny (`latestEvaluationVersion`; tylko gdy najnowsza ocena jest czytelna).
+   - **Stan i propozycje:** propozycje rundy trafiają do przestrzeni roboczej płótna (`registerProposals`), więc płótno pokazuje je jako diff, a karty w rundzie to te same `ProposalCard` z „Zaakceptuj” / „Odrzuć” (rozstrzyganie pojedyncze po konflikcie). `submitAnswersAction` zwraca widoki propozycji z bazy (`listProposalsForRound` + `toProposalView` z lekkiego modułu `src/lib/proposals/view.ts`), `applyRoundAction` zwraca id przyjętych propozycji, a przestrzeń robocza ma nową metodę `applyBatch` (wersja, stan, status przyjętych, ponowne przejęcie stanu przez edytor). `acceptRoundBatch` zwraca `proposalIds`.
+   - **Logika prezentacji (`src/lib/refinement/presentation.ts`, testowana):** fazy rundy (`AWAITING_ANSWERS`, `EMPTY` = pusta paczka, `PENDING`, `RESOLVED`, `CANCELLED`) liczone ze statusów propozycji; dostępność „Rozpocznij rundę” (kolejność przyczyn: 3 rundy wykorzystane, aktywna runda, niezapisane zmiany, brak aktualnej oceny z odnośnikiem do panelu oceny), „Przygotuj poprawki” (co najmniej jedna niepusta odpowiedź, do 1000 znaków, niezapisane zmiany), „Zastosuj poprawki (n)”, baner „Zastosowano poprawki: oceń model ponownie” (ostatnia runda ma przyjęte propozycje, a najnowsza ocena nie dotyczy bieżącej wersji; bez automatycznego wywołania oceny).
+   - **Koszt rundy (punkt 17):** przy „Rozpocznij rundę” stały tekst „To będzie runda N z 3. Runda zużywa jedną z 3 prób, także gdy na podstawie odpowiedzi nie powstaną żadne propozycje.”, przy „Przygotuj poprawki” to samo dla bieżącej rundy. Pusta paczka: komunikat „Na podstawie odpowiedzi nie ma czego zmienić.”, faza „Bez poprawek”, brak „Zastosuj poprawki”.
+   - **„Zamknij rundę” (D16):** dwuetapowe („Zamknąć rundę N? Zamknięta runda liczy się do limitu 3 rund na wariant i nie można jej wznowić.” → „Potwierdź zamknięcie” / „Anuluj”), dostępne tylko dla rund aktywnych; po zamknięciu komunikat „Runda N zamknięta. Wykorzystano N z 3 rund.”. Propozycje zamkniętej rundy zostają do rozstrzygnięcia.
+   - **Podpowiedzi odpowiedzi:** przycisk z podpowiedzią wstawia jej tekst w pole odpowiedzi (które użytkownik może zmienić); podpowiedź jest zwykłym tekstem (punkt 16).
+   - **Niezmierzone:** zachowanie panelu na prawdziwym modelu to krok 0b (poniżej instrukcja); nie ma testów komponentów (konwencja repozytorium), a logika jest w funkcjach z testami.
+   - **Dane kroku 0b (Q0 dla prefiksu `P-7g-`, dwa projekty „Kawiarnia Ziarno” z modelem 19 wpisów):**
+     ```sql
+     \encoding UTF8
+     \set email 'TWÓJ_E-MAIL'
+     BEGIN;
+     WITH u AS (SELECT id FROM "User" WHERE email = :'email'),
+     spec AS (SELECT kod FROM (VALUES ('proba1'), ('proba2')) AS s(kod)),
+     nowe AS MATERIALIZED (
+       SELECT 'c' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 24) AS pid,
+              'c' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 24) AS vid,
+              'P-7g-' || spec.kod AS nazwa, u.id AS uid
+       FROM spec CROSS JOIN u
+       WHERE NOT EXISTS (
+         SELECT 1 FROM "Project" p JOIN "ProjectMember" m ON m."projectId" = p.id
+         WHERE m."userId" = u.id AND p.name = 'P-7g-' || spec.kod)
+     ),
+     p AS (
+       INSERT INTO "Project" (id, name, description, "updatedAt")
+       SELECT pid, nazwa, 'Kawiarnia w centrum miasta (dane przykładowe).', now() FROM nowe RETURNING id
+     ),
+     m AS (
+       INSERT INTO "ProjectMember" ("projectId", "userId", role) SELECT pid, uid, 'OWNER' FROM nowe RETURNING "projectId"
+     )
+     INSERT INTO "BmcVariant" (id, "projectId", name, "isMain", state, "updatedAt")
+     SELECT vid, pid, 'Wariant główny', true,
+       '{"customer_segments":["Studenci okolicznych uczelni","Pracownicy biurowi z centrum"],
+         "value_propositions":["Świeżo palona kawa speciality w cenie sieciówki","Szybkie zamówienie z odbiorem na miejscu"],
+         "channels":["Lokal stacjonarny","Strona zamówień online"],
+         "customer_relationships":["Karta lojalnościowa","Profil w mediach społecznościowych"],
+         "revenue_streams":["Sprzedaż napojów i wypieków","Sprzedaż kawy w ziarnach"],
+         "key_resources":["Ekspres ciśnieniowy i młynek","Wykwalifikowani bariści"],
+         "key_activities":["Przygotowanie kawy","Obsługa klientów w lokalu"],
+         "key_partnerships":["Lokalna palarnia","Piekarnia dostarczająca wypieki"],
+         "cost_structure":["Czynsz za lokal","Wynagrodzenia baristów","Zakup ziarna"]}'::jsonb,
+       now()
+     FROM nowe;
+
+     -- Kontrola: 2 wiersze (przy pierwszym uruchomieniu), warianty_glowne = 1, rola = OWNER, wpisow_w_modelu = 19.
+     SELECT p.name, p.id AS id_projektu, m.role AS rola,
+            (SELECT count(*) FROM "BmcVariant" v WHERE v."projectId" = p.id AND v."isMain") AS warianty_glowne,
+            (SELECT sum(jsonb_array_length(e.value)) FROM "BmcVariant" v, jsonb_each(v.state) e
+              WHERE v."projectId" = p.id AND v."isMain") AS wpisow_w_modelu
+     FROM "Project" p JOIN "ProjectMember" m ON m."projectId" = p.id
+     WHERE m."userId" = (SELECT id FROM "User" WHERE email = :'email') AND p.name LIKE 'P-7g-%'
+     ORDER BY p.name;
+
+     ROLLBACK;  -- po próbie zamień na COMMIT i uruchom całość ponownie
+     ```
+     Zapytanie jest przeniesionym i skróconym Q0 z `docs/plan-pr-p.md` (tylko dodaje wiersze, bez zmian i kasowania; bez konta o podanym e-mailu nie powstanie nic; ponowne uruchomienie nie dubluje projektów). Nie było uruchamiane przez Claude Code (brak połączenia z bazą): próba z `ROLLBACK` jest obowiązkowa, a błąd kolumny należy wkleić, nie poprawiać ręcznie.
+
+19. **PR 7g, krok 0b (2026-11-24): podpowiedzi odpowiedzi i strażnik podpowiedzi. Punkt ma pierwszeństwo przed regułami o podpowiedziach w punktach 15 i 16.**
+   - **Wynik kroku 0b (próby 1 do 3, `gemini-3.5-flash-lite`, limity domyślne, build przeszedł):** próba 1 (pełna runda): 3 pytania, jedna propozycja `REFINEMENT` (`refinementQuestionIndex = 2`) przyjęta, wersja wariantu 1 → 2, ocena „po” wykonana; próba 2 („Nie wiem” na wszystkie pytania): pusta paczka (`w_paczce = 0`), runda `PROPOSED` bez propozycji, runda 2 zamknięta z potwierdzeniem; odświeżanie panelu po akcjach działa samo; w logu 8 wywołań ze statusem `OK`. **Próba 3 (podpowiedzi) wykazała naruszenie reguły promptu:** model podał podpowiedzi w pierwszej osobie („Tak, mam alternatywne opcje”, „Nie, jestem zależny od obecnych partnerów”), a użytkownik kliknął jedną z nich i zapisała się jako jego odpowiedź (zapytanie 6 złapało tylko drugą, i tylko przez długość).
+   - **Decyzja: strażnik podpowiedzi (`sanitizeQuestions`, `src/lib/refinement/suggestions.ts`), druga linia obrony po prompcie.** W `generate_questions`, przed zapisem rundy, usuwa pojedyncze podpowiedzi (pytanie zostaje), które: zawierają cyfry, mają ponad 40 znaków (w znakach Unicode), zawierają wybrane formy czasowników w pierwszej osobie albo zaczynają się od „Tak” lub „Nie” z dalszym ciągiem po interpunkcji („Tak, ale częściowo”). Same „Tak”, „Nie”, „Nie dotyczy”, „Jeszcze nie wiem” i krótkie nazwy rodzaju opcji przechodzą. **Odstępstwo od zasady „bez cichego filtrowania” (obowiązującej dla paczki propozycji):** podpowiedzi to opcjonalne podpowiedzi interfejsu do kliknięcia, a nie dane, więc ich usunięcie nie kończy się błędem.
+   - **Wykrywanie pierwszej osoby to heurystyka na wybranych formach czasowników** (lista ok. 30 form: mam, jestem, planuję, robimy, posiadam, korzystam, współpracuję…, z rozpoznawaniem polskich liter i bez dopasowań wewnątrz wyrazów; „wiem” pominięte, bo „Nie wiem” jest dozwolone). **Nie łapie wszystkiego:** innych czasowników, zaimków dzierżawczych („nasz dostawca”), zdań bez czasownika, które są twierdzeniem o firmie. Jest drugą linią obrony po prompcie, a nie gwarancją; brak naruszeń w pomiarze nie dowodzi, że ich nie ma.
+   - **Liczniki strażnika w rundzie (Json, bez migracji):** `RefinementRound.questions` zawiera obok pytań pole `suggestionsGuard`: `generated` (ile podpowiedzi wygenerował model), `removed` (ile usunięto) i `reasons` (`digits`, `length`, `firstPerson`, `yesNoContinuation`; powody mogą się nakładać, więc ich suma bywa większa niż `removed`). Pole jest opcjonalne (rundy sprzed strażnika go nie mają), model nie może go ustawić (schemat odpowiedzi modelu jest `strictObject`). Cel: policzyć do pracy, jak często model łamał regułę promptu (udział usuniętych w wygenerowanych, powody). Kształt zapisany w bazie: `StoredQuestions`.
+   - **Prompt `questions-v1` (wersja bez zmiany, PR niezmergowany):** dozwolone wyłącznie same słowa „Tak”, „Nie”, „Jeszcze nie wiem”, „Nie dotyczy” bez dalszego ciągu oraz krótkie nazwy rodzaju opcji; zakazane zdania w pierwszej osobie i opisy firmy (z dwoma przykładami z próby 1); bez cyfr, najwyżej 4 podpowiedzi po 40 znaków; zwracanie się do użytkownika w liczbie pojedynczej (w próbie 2 pytania były w mnogiej). Opis pola `suggestedAnswers` w schemacie dla modelu mówi to samo.
+   - **Interfejs:** pod przyciskami podpowiedzi zdanie „Podpowiedź tylko wstawia tekst: zapisze się jako Twoja odpowiedź, więc popraw ją, jeśli nie jest prawdziwa.”.
+   - **Zapytanie 6 (kontrola podpowiedzi) rozszerzone:** 6a (podpowiedzi, które przeszły strażnika, a nadal mają cyfry lub ponad 40 znaków; oczekiwane 0 wierszy), 6b (liczniki strażnika na rundę; NULL = runda sprzed strażnika), 6c (suma wygenerowanych i usuniętych po rundach z licznikiem). Zapytania 1 do 5 bez zmian (punkt 17).
+   - **Weryfikacja poprawki:** jedno wywołanie w `P-7g-proba1` (runda 2 z aktualną oceną, bez odpowiadania na pytania), potem zapytania 1, 6a i 6b. Wynik trafia do „Stanu po kroku 7”.
+
+## Stan po kroku 7 (2026-11-24)
+
+PR-y kroku 7: 7a #42 (schemat załączników, magazyn, warstwa bazy), 7b #43 (zależności `unpdf` i `mammoth`, ekstraktor z ochroną przed bombą ZIP), 7c #44 (wgrywanie, lista i usuwanie załączników), 7d #45 (`read_attachment`, źródło propozycji, `chat-v6`), 7e #46 (schemat i warstwa bazy rund poprawek), 7f #47 (operacje `generate_questions` i `refine_from_answers`, akcje), 7g #48 (panel „Cykl poprawek”, strażnik podpowiedzi). PR 7g jest tu opisany w stanie przed merge'em; po merge'u kroku 7 nie zostaje żadne zadanie z kodem.
+
+**Liczba testów (`npm test`, wyłącznie mocki) po kolejnych PR-ach:** 1014 (7a), 1072 (7b), 1114 (7c), 1156 (7d), 1210 (7e), 1306 (7f), 1378 (7g).
+
+**Co działa:**
+- **Załączniki:** PDF z warstwą tekstową, DOCX i TXT (UTF-8) do 10 MB, najwyżej 10 na projekt; typ po zawartości; ochrona przed bombą ZIP (spis zawartości i faktyczne rozpakowanie z twardym limitem); skan PDF odrzucany; stałe numery `Z{n}` nieużywane ponownie po usunięciu; usuwanie tylko po dwuetapowym potwierdzeniu.
+- **Agent czyta załączniki:** `read_attachment` (etykieta `Z{n}`, stronicowanie `offset`, treść w bloku danych z escapowaniem), źródło propozycji (`CONVERSATION`, `ATTACHMENT`, `MODEL_KNOWLEDGE`) weryfikowane po stronie serwera (źródło `ATTACHMENT` tylko po udanym odczycie tej samej etykiety w rozmowie), źródło widoczne na karcie propozycji; `chat-v6`.
+- **Cykl poprawek:** ocena → `generate_questions` (3 do 5 pytań z najnowszej, aktualnej oceny) → odpowiedzi → `refine_from_answers` (0 do 8 propozycji ze źródłem `REFINEMENT`, runda i numer pytania) → „Zastosuj poprawki” (wszystkie albo żadna) → ocena „po”; najwyżej 3 rundy na wariant (zamknięte i puste też się liczą; limit także w SQL jako `CHECK`); dwuetapowe „Zamknij rundę”; pusta paczka jako poprawny wynik; blokada niezapisanych zmian; informacja o koszcie rundy.
+
+**Weryfikacja na prawdziwym modelu (`gemini-3.5-flash-lite`, wykonana przez właściciela repozytorium przez interfejs, nie przez Claude Code), wszystkie kroki przeszły, `LlmCallLog` bez statusów innych niż `OK`:**
+- **Załączniki (krok 0b po 7d):** A1 (odczyt, jedna propozycja `ATTACHMENT`, tekst: 3 kroki, 12 756 tokenów wejścia), A2 (odczyt, tekst: 2 kroki, 8 176), A3 i A3b (złośliwy plik: polecenia nie wykonane, prompt nie ujawniony, propozycja tylko z uczciwej części pliku; po poprawce `chat-v6` bez Markdown i z jednym zdaniem o poleceniach w pliku). Zapytanie o wycieki etykiet i identyfikatorów: 0 wierszy. Szczegóły w punktach 12 i 13 „Zmian po akceptacji”.
+- **Cykl poprawek (krok 0b po 7g, `P-7g-proba1` i `P-7g-proba2`):** próba 1 (pełna runda): 3 pytania, jedna propozycja `REFINEMENT` przyjęta, wersja wariantu 1 → 2, ocena „po”; próba 2 („Nie wiem” na wszystkie pytania): pusta paczka (`w_paczce = 0`), runda 2 zamknięta z potwierdzeniem („Wykorzystano 2 z 3 rund”); odświeżanie panelu po akcjach działa samo. Tokeny na wywołanie (wejście / wyjście): `evaluate_bmc` ok. 1,8 tys. / 0,3 do 0,4 tys., `generate_questions` ok. 2,1 tys. / 0,3 tys., `refine_from_answers` ok. 2,4 tys. / 0,01 do 0,1 tys.; czas pojedynczego wywołania 1 do 2 s.
+- **Podpowiedzi odpowiedzi (próba 3):** przed poprawką model podał w pierwszej osobie 2 z 28 wygenerowanych podpowiedzi („Tak, mam alternatywne opcje”, „Nie, jestem zależny od obecnych partnerów”), a jedną z nich użytkownik kliknął i zapisała się jako jego odpowiedź (liczenie ręczne na zapytaniu 1; rundy sprzed strażnika nie mają liczników). Po zaostrzeniu promptu i dodaniu strażnika (`sanitizeQuestions`, punkt 19): runda 2 w `P-7g-proba1`: 9 podpowiedzi, 0 usuniętych, wszystkie neutralne („Tak”, „Nie”, „Nie dotyczy”, „Jeszcze nie wiem”, nazwy rodzaju opcji), pytania w liczbie pojedynczej. **Zastrzeżenie:** jedna runda, 9 podpowiedzi, jeden model; wynik pokazuje, że poprawka działa, ale nie dowodzi, że model już nie łamie reguły, i nie sprawdza ścieżki usuwania na prawdziwym modelu (pokryta testami jednostkowymi). Zapytanie 6a nadal zwraca podpowiedź z rundy 1 (sprzed strażnika): dane historyczne, niczego nie zmieniano.
+- **Obserwacja o jakości pytań:** w rundzie 2 `P-7g-proba1` pytanie 3 zakłada „swoją przewagę cenową nad dużymi sieciami”, choć wpis w modelu mówi o kawie „w cenie sieciówki”: pytanie sugerujące fakt, którego model nie zawiera. Pojedynczy przypadek, do oceny w pomiarze B (B-M6).
+
+**Odstępstwa od planu (poza opisanymi w punktach „Zmian po akceptacji”):**
+- Pliki testowe PDF, ZIP i DOCX budowane w pamięci zamiast `__fixtures__` (7b).
+- Brak `listAttachmentsAction` (lista przez stronę serwerową i `router.refresh()`) i wymagany `Content-Length` przy wgrywaniu (7c).
+- `read_attachment` czyta tekst z bazy, nie z magazynu plików; wynik zawiera `label` i `name` (7d).
+- `toProposalView` przeniesione do `src/lib/proposals/view.ts`; plik `"use server"` może eksportować tylko funkcje asynchroniczne (błąd wykryty dopiero w `npm run build`, dodany test `use-server-exports.test.ts`) (7g).
+- Strażnik podpowiedzi usuwa pojedyncze podpowiedzi bez błędu (odstępstwo od „bez cichego filtrowania” dla paczki, uzasadnione w punkcie 19); liczniki w `RefinementRound.questions` (Json, bez migracji).
+- Krok 0b dla operacji cyklu poprawek przeniesiony z 7f na koniec 7g (przez panel).
+
+**Pomiar B (cykl poprawek, trzy serie scenariuszy B1 i B2, oceny „przed” i „po”): NIEWYKONANY.** Zrobione tylko trzy próby kroku 0b w dwóch projektach (jedna pełna runda i jedna pusta paczka), które sprawdzają działanie, a nie dają próby statystycznej: brak ocen „przed” i „po” w seriach, brak zmierzonej sensowności pytań i propozycji (B-M6), brak udziału odrzuceń i `SCHEMA_ERROR` w większej próbie. **Decyzję, czy go wykonać (budżet: ok. 45 wywołań i 120 do 150 tys. tokenów, trzy serie), podejmuje właściciel po zamknięciu kroku 7.** Zastrzeżenie dla pomiaru (punkt 3 „Zmian po akceptacji”): oceny „przed” i „po” wykonuje ten sam model, który generuje pytania i poprawki, więc różnica ocen może być zawyżona; niezależny sędzia to krok 10. Zapytanie o migawki dla sędziego jest w punkcie 3. Pomiar A (załączniki) wykonany tylko jako krok 0b i scenariusz A3 w dwóch próbach (A3 i A3b po poprawce promptu), a nie w trzech seriach zaplanowanych w punkcie 5: seria A3 niewykonana.
+
+**Otwarte (wpisy w `docs/zadania.md`):** seria kontrolna S1 do S5 na `chat-v6` w kroku 9 (ok. 17 wywołań, prefiks `P-v6-` albo nowszy), ochrona czasu ekstrakcji PDF (częściowa), `MAX_STEPS=3` (tura z odczytem i propozycją zużywa dokładnie 3 kroki), narastanie tokenów po odczycie załącznika (D9, niezmierzone), uwagi `npm audit` (`effect`/`prisma`, `minimatch`), heurystyka strażnika podpowiedzi, wspólny `onError`, osierocone wiadomości po przerwaniu tury, widoczność `SAVE_FAILED`, usuwanie projektu (w tym plików załączników w `.data/attachments`), ręczny indeks częściowy i `CHECK` (każda migracja sprawdzana pod kątem obu `DROP`), duplikaty wpisów w bloku, powiązanie wpisu z propozycją w raporcie (krok 9).
+
+**Następny krok:** krok 9 (rozszerzony raport ze źródłami i eksport; plan do zatwierdzenia przed implementacją), z uwzględnieniem zapisanych od 7a pól źródła (`sourceKind`, `sourceAttachmentName`, runda i numer pytania) oraz serii kontrolnej S1 do S5 na ostatecznej wersji promptu; wcześniej decyzja właściciela o pomiarze B.

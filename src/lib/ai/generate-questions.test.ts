@@ -147,6 +147,49 @@ describe("runGenerateQuestions: poprawny przebieg", () => {
     );
   });
 
+  it("strażnik podpowiedzi: usunięte podpowiedzi nie trafiają do rundy, a liczniki (ile i dlaczego) są zapisane obok pytań", async () => {
+    const withSuggestions = {
+      questions: [
+        { ...question, suggestedAnswers: ["Tak, mam alternatywne opcje", "Jeszcze nie wiem", "Wydarzenia tematyczne"] },
+        { ...question, blockKey: "channels", criterion: "risk_resilience", suggestedAnswers: ["Nie, jestem zależny od obecnych partnerów", "Sprzedaż za 5000 zł"] },
+        question,
+      ],
+    };
+    setModel(generateModel(JSON.stringify(withSuggestions)));
+
+    const result = await runGenerateQuestions(ctx);
+
+    expect(result).toMatchObject({ ok: true });
+    const stored = mocks.round.create.mock.calls[0][0].data.questions;
+    expect(stored.questions.map((q: { suggestedAnswers: string[] }) => q.suggestedAnswers)).toEqual([
+      ["Jeszcze nie wiem", "Wydarzenia tematyczne"],
+      [],
+      [],
+    ]);
+    expect(stored.suggestionsGuard).toEqual({
+      generated: 5,
+      removed: 3,
+      reasons: { digits: 1, length: 1, firstPerson: 2, yesNoContinuation: 2 },
+    });
+    // Widok rundy w wyniku operacji ma te same, zsanityzowane pytania.
+    expect((result as { round: { questions: Array<{ suggestedAnswers: string[] }> } }).round.questions[0].suggestedAnswers).toEqual([
+      "Jeszcze nie wiem",
+      "Wydarzenia tematyczne",
+    ]);
+  });
+
+  it("czyste podpowiedzi: liczniki zapisane z zerami (też wtedy da się policzyć udział naruszeń)", async () => {
+    setModel(generateModel(JSON.stringify({ questions: [{ ...question, suggestedAnswers: ["Tak", "Nie"] }, question, question] })));
+
+    await runGenerateQuestions(ctx);
+
+    expect(mocks.round.create.mock.calls[0][0].data.questions.suggestionsGuard).toEqual({
+      generated: 2,
+      removed: 0,
+      reasons: { digits: 0, length: 0, firstPerson: 0, yesNoContinuation: 0 },
+    });
+  });
+
   it("do modelu trafiają dane w blokach (projekt, stan, ocena), bez identyfikatorów z bazy", async () => {
     const model = setModel(generateModel(JSON.stringify(goodOutput)));
 

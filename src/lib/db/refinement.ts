@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db/client";
 import { BmcState } from "@/lib/schemas/bmc";
 import {
   MAX_REFINEMENT_ROUNDS,
-  QuestionsOutput,
+  StoredQuestions,
   RefinementAnswers,
   refineOutputSchema,
   sortRefineProposals,
@@ -87,7 +87,7 @@ export async function createRefinementRound(
     evaluationId: string;
     variantVersion: number;
     stateSnapshot: BmcState;
-    questions: QuestionsOutput;
+    questions: StoredQuestions;
     provider: string;
     model: string;
     questionsPromptVersion: string;
@@ -97,7 +97,7 @@ export async function createRefinementRound(
   maxRounds: number = MAX_REFINEMENT_ROUNDS,
 ): Promise<CreateRefinementRoundResult> {
   const { projectId, variantId } = args;
-  const questions = QuestionsOutput.parse(args.questions);
+  const questions = StoredQuestions.parse(args.questions);
   const stateSnapshot = BmcState.parse(args.stateSnapshot);
 
   try {
@@ -206,7 +206,7 @@ export async function saveAnswersAndProposals(
       if (round.status !== "AWAITING_ANSWERS") {
         return { ok: false, error: "WRONG_STATE" };
       }
-      const questions = QuestionsOutput.safeParse(round.questions);
+      const questions = StoredQuestions.safeParse(round.questions);
       if (!questions.success) {
         throw new Error(`Niepoprawne pytania w rundzie ${roundId}: ${z.prettifyError(questions.error)}`);
       }
@@ -350,7 +350,7 @@ type RoundRow = {
 };
 
 function toListItem(row: RoundRow): RefinementRoundListItem {
-  const questions = QuestionsOutput.safeParse(row.questions);
+  const questions = StoredQuestions.safeParse(row.questions);
   const answers = row.answers === null ? { success: true as const, data: null } : z.array(z.string()).safeParse(row.answers);
   if (!questions.success || !answers.success) {
     return { ok: false, id: row.id, roundNumber: row.roundNumber, error: "CORRUPT" };
@@ -414,7 +414,7 @@ export async function getRoundForRefine(projectId: string, variantId: string, ro
   if (!row) {
     return null;
   }
-  const questions = QuestionsOutput.safeParse(row.questions);
+  const questions = StoredQuestions.safeParse(row.questions);
   if (!questions.success) {
     throw new Error(`Niepoprawne pytania w rundzie ${row.id}: ${z.prettifyError(questions.error)}`);
   }
@@ -426,4 +426,23 @@ export async function getRoundForRefine(projectId: string, variantId: string, ro
     variantVersion: row.variantVersion,
     questions: questions.data.questions,
   };
+}
+
+/**
+ * Identyfikatory propozycji każdej rundy wariantu (w kolejności paczki). Status propozycji czyta interfejs z bieżącego stanu
+ * przestrzeni roboczej, więc tu tylko przynależność do rundy. Tylko z wariantu należącego do projektu.
+ */
+export async function listRoundProposalIds(projectId: string, variantId: string): Promise<Record<string, string[]>> {
+  const rows = await prisma.proposal.findMany({
+    where: { variantId, variant: { projectId }, refinementRoundId: { not: null } },
+    orderBy: [{ refinementQuestionIndex: "asc" }, { id: "asc" }],
+    select: { id: true, refinementRoundId: true },
+  });
+  const byRound: Record<string, string[]> = {};
+  for (const row of rows) {
+    if (row.refinementRoundId) {
+      (byRound[row.refinementRoundId] ??= []).push(row.id);
+    }
+  }
+  return byRound;
 }

@@ -4,6 +4,7 @@ import {
   MAX_REFINEMENT_ROUNDS,
   QuestionsOutput,
   RefinementAnswers,
+  StoredQuestions,
   RefineOutput,
   RefineProposal,
   refineOutputSchema,
@@ -52,6 +53,25 @@ describe("QuestionsOutput", () => {
 
     expect(QuestionsOutput.safeParse(three("   ")).success).toBe(false);
     expect(QuestionsOutput.safeParse(three("x".repeat(401))).success).toBe(false);
+  });
+});
+
+describe("StoredQuestions i liczniki strażnika", () => {
+  const guard = { generated: 5, removed: 2, reasons: { digits: 0, length: 0, firstPerson: 2, yesNoContinuation: 1 } };
+  const three = { questions: Array(3).fill(question) };
+
+  it("model nie może ustawić liczników: schemat odpowiedzi modelu (strictObject) odrzuca pole suggestionsGuard", () => {
+    expect(QuestionsOutput.safeParse({ ...three, suggestionsGuard: guard }).success).toBe(false);
+  });
+
+  it("zapisany kształt przyjmuje liczniki, a rundy sprzed strażnika (bez liczników) też", () => {
+    expect(StoredQuestions.safeParse({ ...three, suggestionsGuard: guard }).success).toBe(true);
+    expect(StoredQuestions.safeParse(three).success).toBe(true);
+  });
+
+  it("odrzuca ujemne liczniki i nieznane powody", () => {
+    expect(StoredQuestions.safeParse({ ...three, suggestionsGuard: { ...guard, removed: -1 } }).success).toBe(false);
+    expect(StoredQuestions.safeParse({ ...three, suggestionsGuard: { ...guard, reasons: { ...guard.reasons, inne: 1 } } }).success).toBe(false);
   });
 });
 

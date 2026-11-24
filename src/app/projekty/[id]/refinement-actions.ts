@@ -7,10 +7,12 @@ import { runRefineFromAnswers, type RefineFromAnswersErrorCode } from "@/lib/ai/
 import { requireProjectRole } from "@/lib/auth/permissions";
 import { APPLY_ERROR_MESSAGES } from "@/lib/bmc/proposals";
 import { VERSION_CONFLICT_MESSAGE } from "@/lib/bmc/messages";
-import { acceptRoundBatch, type BatchFailure } from "@/lib/db/proposals";
+import { acceptRoundBatch, listProposalsForRound, type BatchFailure } from "@/lib/db/proposals";
+import { toProposalView } from "@/lib/proposals/view";
 import { cancelRound } from "@/lib/db/refinement";
 import { getVariantProjectId } from "@/lib/db/variants";
 import { VariantId, type BmcState } from "@/lib/schemas/bmc";
+import type { ProposalView } from "@/lib/schemas/proposal";
 import {
   MAX_REFINEMENT_ROUNDS,
   RefinementRoundId,
@@ -28,7 +30,7 @@ const ROUND_NOT_FOUND_MESSAGE = "Nie znaleziono tej rundy poprawek.";
 const ALREADY_RESOLVED_MESSAGE = "Którąś z propozycji rozpatrzono w międzyczasie. Odśwież stronę.";
 const NOTHING_PENDING_MESSAGE = "W tej rundzie nie ma oczekujących propozycji.";
 const ALREADY_CANCELLED_MESSAGE = "Ta runda jest już zamknięta.";
-export const EMPTY_BATCH_MESSAGE = "Na podstawie odpowiedzi nie ma czego zmienić.";
+const EMPTY_BATCH_MESSAGE = "Na podstawie odpowiedzi nie ma czego zmienić.";
 
 const ExpectedVersion = z.number().int().min(1);
 
@@ -84,7 +86,7 @@ export async function startRefinementRoundAction(
 
 export type SubmitAnswersActionResult =
   // message tylko dla pustej paczki (odpowiedzi nie dały podstaw do zmian); runda jest wtedy PROPOSED i liczy się do limitu.
-  | { ok: true; roundId: string; proposalIds: string[]; message?: string }
+  | { ok: true; roundId: string; proposalIds: string[]; proposals: ProposalView[]; message?: string }
   | { ok: false; error: RefineFromAnswersErrorCode | "FORBIDDEN"; message: string; retryAfterSec?: number };
 
 /** „Przygotuj poprawki”: odpowiedzi użytkownika (dane, nie polecenia) → paczka propozycji rundy. */
@@ -118,8 +120,12 @@ export async function submitAnswersAction(
     return result;
   }
 
+  // Widoki propozycji z bazy (id i migawka nazwy źródła z serwera): klient dołącza je do przestrzeni roboczej płótna.
+  const records = result.proposalIds.length === 0 ? [] : await listProposalsForRound(access.projectId, checkedId, result.roundId);
+  const response = { ...result, proposals: records.map(toProposalView) };
+
   revalidatePath(`/projekty/${access.projectId}`);
-  return result.proposalIds.length === 0 ? { ...result, message: EMPTY_BATCH_MESSAGE } : result;
+  return result.proposalIds.length === 0 ? { ...response, message: EMPTY_BATCH_MESSAGE } : response;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -127,7 +133,7 @@ export async function submitAnswersAction(
 export type ApplyRoundFailure = BatchFailure & { message: string };
 
 export type ApplyRoundActionResult =
-  | { ok: true; version: number; state: BmcState; acceptedCount: number }
+  | { ok: true; version: number; state: BmcState; acceptedCount: number; acceptedProposalIds: string[] }
   | {
       ok: false;
       error: "FORBIDDEN" | "NOT_FOUND" | "VALIDATION" | "VERSION_CONFLICT" | "ALREADY_RESOLVED" | "NOTHING_PENDING" | "CONFLICTS";
@@ -187,7 +193,13 @@ export async function applyRoundAction(
   }
 
   revalidatePath(`/projekty/${access.projectId}`);
-  return { ok: true, version: result.version, state: result.state, acceptedCount: result.acceptedCount };
+  return {
+    ok: true,
+    version: result.version,
+    state: result.state,
+    acceptedCount: result.acceptedCount,
+    acceptedProposalIds: result.proposalIds,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

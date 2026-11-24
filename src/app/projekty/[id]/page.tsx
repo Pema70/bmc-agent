@@ -12,6 +12,7 @@ import { EvaluationPanel } from "@/components/evaluation/evaluation-panel";
 import { ImpactPanel } from "@/components/impact/impact-panel";
 import { ImpactProvider } from "@/components/impact/impact-provider";
 import { ProjectForm } from "@/components/projects/project-form";
+import { RefinementPanel } from "@/components/refinement/refinement-panel";
 import { StrategiesPanel } from "@/components/strategies/strategies-panel";
 import { ComparePicker } from "@/components/variants/compare-picker";
 import { VariantActions } from "@/components/variants/variant-actions";
@@ -25,6 +26,7 @@ import { listEvaluationsForVariant } from "@/lib/db/evaluations";
 import { listImpactAnalysesForVariant } from "@/lib/db/impact";
 import { countPendingProposals, listProposalsForVariant } from "@/lib/db/proposals";
 import { getProject } from "@/lib/db/projects";
+import { listRoundProposalIds, listRoundsForVariant } from "@/lib/db/refinement";
 import { listStrategyGenerationsForVariant } from "@/lib/db/strategies";
 import { getVariantDetails, listVariants } from "@/lib/db/variants";
 import { VariantId } from "@/lib/schemas/bmc";
@@ -121,6 +123,12 @@ export default async function ProjectPage({
   const strategyGenerations = variant
     ? await listStrategyGenerationsForVariant(access.projectId, variant.id, STRATEGIES_SHOWN)
     : [];
+  // Cykl poprawek (EDITOR i wyżej, dla wyświetlanego wariantu): rundy i przynależność propozycji do rund, oba zapytania po
+  // projectId I variantId. Wersja, której dotyczy najnowsza ocena, pozwala panelowi rozstrzygnąć, czy ocena jest aktualna.
+  const refinementRounds = variant && canEditCanvas ? await listRoundsForVariant(access.projectId, variant.id) : [];
+  const refinementProposalIds = variant && canEditCanvas ? await listRoundProposalIds(access.projectId, variant.id) : {};
+  const newestEvaluation = evaluations[0];
+  const latestEvaluationVersion = newestEvaluation?.ok ? newestEvaluation.evaluation.variantVersion : null;
   // Do potwierdzenia zmiany głównego (tylko właściciel, tylko na wariancie niegłównym): ile propozycji czeka na starym głównym.
   const pendingOnMain =
     isOwner && variant && !variant.isMain && mainListed
@@ -242,6 +250,13 @@ export default async function ProjectPage({
             canEvaluate={canEditCanvas}
             currentVersion={variant.version}
             initialItems={evaluations}
+          />
+        ) : null}
+        {variant && canEditCanvas ? (
+          <RefinementPanel
+            initialRounds={refinementRounds}
+            initialRoundProposalIds={refinementProposalIds}
+            latestEvaluationVersion={latestEvaluationVersion}
           />
         ) : null}
         {variant ? <ImpactPanel /> : null}

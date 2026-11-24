@@ -30,6 +30,8 @@ export type VariantWorkspaceValue = {
   registerProposals: (views: readonly ProposalView[]) => void;
   accept: (proposalId: string) => Promise<void>;
   reject: (proposalId: string) => Promise<void>;
+  // Paczka poprawek zastosowana na serwerze („Zastosuj poprawki”): nowy stan, wersja i status przyjętych propozycji.
+  applyBatch: (version: number, state: BmcState, acceptedIds: readonly string[]) => void;
 };
 
 const WorkspaceContext = createContext<VariantWorkspaceValue | null>(null);
@@ -106,6 +108,22 @@ export function VariantWorkspaceProvider({
 
   const setStatus = useCallback((id: string, status: ProposalStatus) => {
     setProposals((current) => (current[id] ? { ...current, [id]: { ...current[id], status } } : current));
+  }, []);
+
+  const applyBatch = useCallback((newVersion: number, state: BmcState, acceptedIds: readonly string[]) => {
+    versionRef.current = newVersion;
+    setVersion(newVersion);
+    setServerState(state);
+    setAdoptRevision((revision) => revision + 1);
+    setProposals((current) => {
+      const next = { ...current };
+      for (const id of acceptedIds) {
+        if (next[id]) {
+          next[id] = { ...next[id], status: "ACCEPTED" };
+        }
+      }
+      return next;
+    });
   }, []);
 
   const setFeedbackFor = useCallback((id: string, value: ProposalFeedback | null) => {
@@ -196,6 +214,7 @@ export function VariantWorkspaceProvider({
       registerProposals,
       accept,
       reject,
+      applyBatch,
     }),
     [
       projectId,
@@ -212,6 +231,7 @@ export function VariantWorkspaceProvider({
       registerProposals,
       accept,
       reject,
+      applyBatch,
     ],
   );
 

@@ -3,14 +3,14 @@ import { z } from "zod";
 import { hasSuccessfulRead } from "@/lib/ai/tools/read-attachment";
 import { checkProposable } from "@/lib/bmc/proposals";
 import { getAttachmentByOrdinal } from "@/lib/db/attachments";
-import { createProposal, type ProposalRecord } from "@/lib/db/proposals";
+import { createProposal } from "@/lib/db/proposals";
+import { toProposalView } from "@/lib/proposals/view";
 import type { BmcState } from "@/lib/schemas/bmc";
 import { attachmentLabel, parseAttachmentLabel } from "@/lib/schemas/attachment";
 import {
   ProposeBlockChangeInput,
   ProposeBlockChangeModelInput,
   type ProposalSource,
-  type ProposalView,
   type ProposeBlockChangeOutput,
 } from "@/lib/schemas/proposal";
 
@@ -24,18 +24,7 @@ export type ProposeToolContext = {
   maxPending: number;
 };
 
-export function toProposalView(record: ProposalRecord): ProposalView {
-  return {
-    id: record.id,
-    blockKey: record.blockKey,
-    operation: record.operation,
-    before: record.before,
-    after: record.after,
-    rationale: record.rationale,
-    sourceKind: record.sourceKind,
-    sourceAttachmentName: record.sourceAttachmentName,
-  };
-}
+export { toProposalView };
 
 /**
  * Narzędzie tylko PROPONUJE zmianę: tworzy rekord Proposal (PENDING) i nie dotyka stanu BMC.
