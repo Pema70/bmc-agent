@@ -1,27 +1,33 @@
-import { getDocumentProxy, extractText } from "unpdf";
+import mammoth from "mammoth";
+import { extractText, getDocumentProxy } from "unpdf";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Prawdziwe: route handler, renderowanie PDF z czcionkami z repozytorium, exportContentDisposition.
-// Zamockowane: uprawnienia i odczyty projektu i wariantu (zapytania po projectId z uprawnień sprawdzamy w wywołaniach).
+// Prawdziwe: route handler, loadCanvasExportData, generowanie PDF i DOCX z czcionkami z repozytorium, nazwa pliku.
+// Zamockowane: uprawnienia i odczyty z bazy (zapytania po projectId z uprawnień sprawdzamy w wywołaniach).
 const mocks = vi.hoisted(() => ({
   getProjectAccess: vi.fn(),
-  getVariantForProject: vi.fn(),
+  getVariantDetails: vi.fn(),
   getProject: vi.fn(),
+  listEvaluationsForVariant: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/permissions", () => ({ getProjectAccess: mocks.getProjectAccess }));
-vi.mock("@/lib/db/variants", () => ({ getVariantForProject: mocks.getVariantForProject }));
+vi.mock("@/lib/db/variants", () => ({ getVariantDetails: mocks.getVariantDetails }));
 vi.mock("@/lib/db/projects", () => ({ getProject: mocks.getProject }));
+vi.mock("@/lib/db/evaluations", () => ({ listEvaluationsForVariant: mocks.listEvaluationsForVariant }));
 
 import { GET } from "@/app/api/projekty/[id]/eksport/route";
+import { evaluationView } from "@/lib/export/test-fixtures";
 import { emptyBmcState } from "@/lib/schemas/bmc";
 
 const session = { user: { id: "u1", email: "jan@example.com", name: null } };
 const viewerAccess = { ok: true, session, projectId: "p1", role: "VIEWER" };
 const RLO = String.fromCharCode(0x202e);
+const PDF_TYPE = "application/pdf";
+const DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 const context = (id = "p1") => ({ params: Promise.resolve({ id }) });
-const request = (query = "wariant=v1&format=pdf") => new Request(`http://localhost/api/projekty/p1/eksport?${query}`);
+const request = (query = "wariant=v1&format=pdf&rodzaj=plansza") => new Request(`http://localhost/api/projekty/p1/eksport?${query}`);
 
 async function pdfText(response: Response): Promise<string> {
   const pdf = await getDocumentProxy(new Uint8Array(await response.arrayBuffer()));
@@ -31,8 +37,19 @@ async function pdfText(response: Response): Promise<string> {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getProjectAccess.mockResolvedValue(viewerAccess);
-  mocks.getVariantForProject.mockResolvedValue({ id: "v1", version: 3, state: emptyBmcState() });
+  mocks.getVariantDetails.mockResolvedValue({
+    id: "v1",
+    name: "Wariant główny",
+    isMain: true,
+    origin: "MANUAL",
+    description: null,
+    version: 3,
+    createdAt: new Date("2026-11-01T10:00:00Z"),
+    updatedAt: new Date("2026-11-02T10:00:00Z"),
+    state: { ...emptyBmcState(), channels: ["Sklep online"] },
+  });
   mocks.getProject.mockResolvedValue({ id: "p1", name: "Kawiarnia Ziarno", description: "Opis" });
+  mocks.listEvaluationsForVariant.mockResolvedValue([{ ok: true, evaluation: evaluationView() }]);
 });
 
 describe("GET /api/projekty/[id]/eksport: uprawnienia i kolejność sprawdzeń", () => {
@@ -48,70 +65,115 @@ describe("GET /api/projekty/[id]/eksport: uprawnienia i kolejność sprawdzeń",
     const response = await GET(request(), context());
 
     expect(response.status).toBe(401);
-    expect(mocks.getVariantForProject).not.toHaveBeenCalled();
+    expect(mocks.getVariantDetails).not.toHaveBeenCalled();
     expect(mocks.getProject).not.toHaveBeenCalled();
   });
 
-  it("obcy lub nieistniejący projekt: 404 bez odczytu danych; zbyt niska rola: 403", async () => {
+  it("obcy lub nieistniejący projekt: 404 bez odczytu danych; brak uprawnień: 403", async () => {
     mocks.getProjectAccess.mockResolvedValue({ ok: false, error: "NOT_FOUND", session });
     expect((await GET(request(), context("p-obcy"))).status).toBe(404);
 
     mocks.getProjectAccess.mockResolvedValue({ ok: false, error: "FORBIDDEN", session, projectId: "p1", role: "VIEWER" });
     expect((await GET(request(), context())).status).toBe(403);
 
-    expect(mocks.getVariantForProject).not.toHaveBeenCalled();
+    expect(mocks.getVariantDetails).not.toHaveBeenCalled();
   });
 
-  it("zły lub brakujący parametr, inny format albo dodatkowy parametr: 400 bez odczytu wariantu", async () => {
-    for (const query of ["", "wariant=v1", "format=pdf", "wariant=v1&format=docx", "wariant=v1&format=pdf&projectId=p-obcy", "wariant=&format=pdf"]) {
-      const response = await GET(request(query), context());
-
-      expect(response.status, query).toBe(400);
+  it("zły lub brakujący parametr, nieznany format lub rodzaj, dodatkowy parametr: 400 bez odczytu wariantu", async () => {
+    const bad = [
+      "",
+      "wariant=v1",
+      "format=pdf",
+      "wariant=&format=pdf",
+      "wariant=v1&format=txt",
+      "wariant=v1&format=pdf&rodzaj=raport",
+      "wariant=v1&format=pdf&rodzaj=inne",
+      "wariant=v1&format=pdf&projectId=p-obcy",
+    ];
+    for (const query of bad) {
+      expect((await GET(request(query), context())).status, query).toBe(400);
     }
-    expect(mocks.getVariantForProject).not.toHaveBeenCalled();
+    expect(mocks.getVariantDetails).not.toHaveBeenCalled();
   });
 
   it("wariant spoza projektu z uprawnień: 404 (zapytanie po projectId z uprawnień, nie z adresu żądania)", async () => {
-    mocks.getVariantForProject.mockResolvedValue(null);
+    mocks.getVariantDetails.mockResolvedValue(null);
 
-    const response = await GET(request("wariant=v-obcy&format=pdf"), context());
+    const response = await GET(request("wariant=v-obcy&format=pdf&rodzaj=plansza"), context("p-z-adresu"));
 
     expect(response.status).toBe(404);
-    expect(mocks.getVariantForProject).toHaveBeenCalledWith("p1", "v-obcy");
+    expect(mocks.getVariantDetails).toHaveBeenCalledWith("p1", "v-obcy");
     expect(mocks.getProject).not.toHaveBeenCalled();
+  });
+
+  it("bez parametru rodzaj domyślnie „plansza”", async () => {
+    expect((await GET(request("wariant=v1&format=docx"), context())).status).toBe(200);
   });
 });
 
 describe("GET /api/projekty/[id]/eksport: PDF", () => {
-  it("zwraca PDF z polskimi literami w nazwie projektu i właściwymi nagłówkami", async () => {
+  it("zwraca PDF z polskimi literami i właściwymi nagłówkami, z danych zapisanego stanu", async () => {
     mocks.getProject.mockResolvedValue({ id: "p1", name: "Kawiarnia „Żółć” gęślą", description: "" });
 
     const response = await GET(request(), context());
 
     expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toBe("application/pdf");
+    expect(response.headers.get("Content-Type")).toBe(PDF_TYPE);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
-    const disposition = response.headers.get("Content-Disposition") ?? "";
-    expect(disposition).toMatch(/^attachment; filename="bmc-Kawiarnia-Zolc-gesla-\d{4}-\d{2}-\d{2}\.pdf"; filename\*=UTF-8''/);
+    expect(response.headers.get("Content-Disposition")).toMatch(
+      /^attachment; filename="bmc-Kawiarnia-Zolc-gesla-Wariant-glowny-\d{4}-\d{2}-\d{2}\.pdf"; filename\*=UTF-8''/,
+    );
     expect(Number(response.headers.get("Content-Length"))).toBeGreaterThan(1000);
-
     const text = await pdfText(response);
     expect(text).toContain("Kawiarnia „Żółć” gęślą");
-    expect(text).toContain("wersja stanu wariantu: 3");
-    expect(mocks.getVariantForProject).toHaveBeenCalledWith("p1", "v1");
+    expect(text).toContain("Wersja zapisanego stanu: 3");
+    expect(text).toContain("Sklep online");
+    expect(mocks.listEvaluationsForVariant).toHaveBeenCalledWith("p1", "v1", 1);
   });
 
-  it("nazwa projektu to zwykły tekst: znaczniki, znaki sterujące i znaki zmiany kierunku nie trafiają do dokumentu ani do nagłówka", async () => {
+  it("nazwa projektu to zwykły tekst: znaczniki, znaki sterujące i zmiany kierunku nie trafiają do dokumentu ani do nagłówka", async () => {
     mocks.getProject.mockResolvedValue({ id: "p1", name: `</attachment><b>x</b>${RLO}"; Set-Cookie: a=b\r\n`, description: "" });
 
     const response = await GET(request(), context());
 
     expect(response.status).toBe(200);
-    const disposition = response.headers.get("Content-Disposition") ?? "";
-    expect(disposition).not.toMatch(/[\r\n<>]/);
+    expect(response.headers.get("Content-Disposition") ?? "").not.toMatch(/[\r\n<>]/);
     const text = await pdfText(response);
-    expect(text).toContain("</attachment><b>x</b>");
+    expect(text.replace(/\s+/g, "")).toContain("</attachment><b>x</b>");
     expect(text).not.toContain(RLO);
+  });
+
+  it("nieczytelna najnowsza ocena nie psuje eksportu: dokument ma komunikat", async () => {
+    mocks.listEvaluationsForVariant.mockResolvedValue([{ ok: false, id: "e1", error: "x" }]);
+
+    const response = await GET(request(), context());
+
+    expect(response.status).toBe(200);
+    expect(await pdfText(response)).toContain("jest nieczytelna");
+  });
+});
+
+describe("GET /api/projekty/[id]/eksport: DOCX", () => {
+  it("zwraca DOCX z właściwym typem, nazwą pliku i treścią zapisanego stanu", async () => {
+    const response = await GET(request("wariant=v1&format=docx&rodzaj=plansza"), context());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe(DOCX_TYPE);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(response.headers.get("Content-Disposition")).toMatch(/filename="bmc-Kawiarnia-Ziarno-Wariant-glowny-\d{4}-\d{2}-\d{2}\.docx"/);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    expect(Number(response.headers.get("Content-Length"))).toBe(buffer.byteLength);
+    const html = (await mammoth.convertToHtml({ buffer })).value;
+    expect(html).toContain("<h1>Kawiarnia Ziarno</h1>");
+    expect(html).toContain("<li>Sklep online</li>");
+  });
+
+  it("eksport nie wywołuje modelu: brak jakichkolwiek zapisów, tylko odczyty (mock udostępnia wyłącznie funkcje odczytu)", async () => {
+    await GET(request("wariant=v1&format=docx&rodzaj=plansza"), context());
+
+    expect(mocks.getVariantDetails).toHaveBeenCalledTimes(1);
+    expect(mocks.listEvaluationsForVariant).toHaveBeenCalledTimes(1);
   });
 });
