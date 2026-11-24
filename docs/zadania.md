@@ -55,6 +55,10 @@ Decyzje właściciela repozytorium, opisane w `docs/spec.md` (nagłówek, §1, �
 
 ## Dokumentacja i narzędzia
 
+- **Czcionki eksportu w produkcji (krok 9b).** `registerExportFonts()` czyta pliki z `process.cwd()` + `src/lib/export/fonts/`. Działa przy `next dev` i `next start` uruchamianych z katalogu projektu; przy wdrożeniu bezserwerowym lub trybie `standalone` pliki trzeba dołączyć do wyniku (`outputFileTracingIncludes`), inaczej eksport PDF zgłosi brak czcionki. Hosting jest otwarty (spec §15). Status: otwarte.
+- **Znaki spoza czcionki w PDF (krok 9b).** Noto Sans (2.015, Latin, Greek, Cyrillic) nie ma m.in. ≥, ≤, → ✓ ★, emoji ani CJK. Test potwierdza, że generowanie się nie wywraca, a polski tekst obok zostaje; **jak wyglądają brakujące znaki w przeglądarce PDF, sprawdza krok 0b** (niezmierzone). Status: otwarte.
+- **Czas generowania PDF i DOCX w głównym wątku (krok 9b).** Generowanie działa w procesie serwera (jak ekstrakcja tekstu z PDF w 7b: ochrona czasu częściowa); czcionki są parsowane przy każdym renderze (workaround błędu współdzielonego stanu, patrz plan 9, „Zmiany po akceptacji” pkt 6). Czasu nie zmierzono; zmierzyć w kroku 0b po 9d. Status: otwarte.
+
 - **Ujednolicenie końców linii (`.gitattributes`).** Na Windows Git zamienia LF na CRLF, przez co np. `prisma/migrations/migration_lock.toml` pokazuje się jako zmieniony mimo pustego `git diff`. Dodać `.gitattributes` (np. `* text=auto eol=lf`) i sprawdzić, że nie zmienia sum kontrolnych zastosowanych migracji.
 
 - **Brak Prettiera.** W projekcie nie ma Prettiera (ani w `package.json`, ani w `node_modules`), formatowanie pilnuje wyłącznie ESLint. Dodanie Prettiera to nowa zależność, więc wymaga zgody.
