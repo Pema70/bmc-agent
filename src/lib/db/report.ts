@@ -55,6 +55,7 @@ export type ReportProposal = {
   id: string;
   blockKey: BlockKey;
   operation: "add" | "edit" | "remove";
+  before: string | null;
   after: string | null;
   rationale: string;
   status: ProposalStatus;
@@ -77,6 +78,7 @@ export async function listProposalsForReport(projectId: string, variantId: strin
       id: true,
       blockKey: true,
       operation: true,
+      before: true,
       after: true,
       rationale: true,
       status: true,

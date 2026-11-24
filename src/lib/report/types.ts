@@ -6,7 +6,8 @@ import type { BlockDescription } from "@/lib/report/describe-blocks";
 import type { ResolvedOrigins } from "@/lib/report/provenance";
 import type { RoundEvaluationPair } from "@/lib/report/round-evaluations";
 import type { AttachmentView } from "@/lib/schemas/attachment";
-import type { BmcState } from "@/lib/schemas/bmc";
+import type { BlockKey, BmcState } from "@/lib/schemas/bmc";
+import type { ProposalStatus } from "@/lib/schemas/proposal";
 
 /** Limity raportu (decyzja D8 planu kroku 9). Nadmiar jest obcinany, a raport mówi o tym wprost. */
 export const REPORT_LIMITS = {
@@ -19,6 +20,17 @@ export const REPORT_LIMITS = {
 
 /** Lista obcięta do limitu; `truncated` oznacza, że w bazie są jeszcze starsze pozycje (pobieramy limit + 1). */
 export type Limited<T> = { items: T[]; truncated: boolean; limit: number };
+
+/** Propozycja z cyklu poprawek (dowolny status) do pokazania w sekcji rund; numer pytania liczony od 0 jak w bazie. */
+export type ReportRoundProposal = {
+  refinementRoundId: string;
+  questionIndex: number | null;
+  blockKey: BlockKey;
+  operation: "add" | "edit" | "remove";
+  before: string | null;
+  after: string | null;
+  status: ProposalStatus;
+};
 
 export type ReportAttachment = Omit<AttachmentView, "id"> & {
   /** Załącznik jest źródłem co najmniej jednego bieżącego wpisu albo zaakceptowanej propozycji wariantu. */
@@ -47,6 +59,8 @@ export type ReportData = {
   attachments: ReportAttachment[];
   evaluations: Limited<EvaluationListItem>;
   rounds: RoundEvaluationPair[];
+  /** Propozycje wszystkich rund poprawek wariantu (z listy propozycji; przy obciętej liście `proposalsTruncated`). */
+  roundProposals: ReportRoundProposal[];
   impacts: Limited<ImpactListItem>;
   comparisons: Limited<ComparisonListItem>;
   llmSummary: LlmCallSummaryRow[];

@@ -9,14 +9,18 @@ const mocks = vi.hoisted(() => ({
   getVariantDetails: vi.fn(),
   getProject: vi.fn(),
   listEvaluationsForVariant: vi.fn(),
+  loadReportData: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/permissions", () => ({ getProjectAccess: mocks.getProjectAccess }));
 vi.mock("@/lib/db/variants", () => ({ getVariantDetails: mocks.getVariantDetails }));
 vi.mock("@/lib/db/projects", () => ({ getProject: mocks.getProject }));
 vi.mock("@/lib/db/evaluations", () => ({ listEvaluationsForVariant: mocks.listEvaluationsForVariant }));
+// Składanie danych raportu ma własne testy (load-report-data.test.ts, z prawdziwymi funkcjami odczytu); tu sprawdzamy route.
+vi.mock("@/lib/report/load-report-data", () => ({ loadReportData: mocks.loadReportData }));
 
 import { GET } from "@/app/api/projekty/[id]/eksport/route";
+import { reportData } from "@/lib/export/report-fixtures";
 import { evaluationView } from "@/lib/export/test-fixtures";
 import { emptyBmcState } from "@/lib/schemas/bmc";
 
@@ -86,7 +90,6 @@ describe("GET /api/projekty/[id]/eksport: uprawnienia i kolejność sprawdzeń",
       "format=pdf",
       "wariant=&format=pdf",
       "wariant=v1&format=txt",
-      "wariant=v1&format=pdf&rodzaj=raport",
       "wariant=v1&format=pdf&rodzaj=inne",
       "wariant=v1&format=pdf&projectId=p-obcy",
     ];
@@ -175,5 +178,52 @@ describe("GET /api/projekty/[id]/eksport: DOCX", () => {
 
     expect(mocks.getVariantDetails).toHaveBeenCalledTimes(1);
     expect(mocks.listEvaluationsForVariant).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("GET /api/projekty/[id]/eksport: rodzaj „raport”", () => {
+  beforeEach(() => {
+    mocks.loadReportData.mockResolvedValue(reportData());
+  });
+
+  it("odczyt danych raportu po projekcie z uprawnień i wariancie z zapytania; bez odczytu danych płótna", async () => {
+    const response = await GET(request("wariant=v1&format=pdf&rodzaj=raport"), context("p-z-adresu"));
+
+    expect(response.status).toBe(200);
+    expect(mocks.loadReportData).toHaveBeenCalledWith("p1", "v1", expect.any(Date));
+    expect(mocks.getVariantDetails).not.toHaveBeenCalled();
+  });
+
+  it("PDF raportu: typ, nagłówki bezpieczeństwa i nazwa pliku z członem „raport”", async () => {
+    const response = await GET(request("wariant=v1&format=pdf&rodzaj=raport"), context());
+
+    expect(response.headers.get("Content-Type")).toBe(PDF_TYPE);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(response.headers.get("Content-Disposition")).toMatch(/filename="bmc-Kawiarnia-Ziarno-Wariant-glowny-raport-\d{4}-\d{2}-\d{2}\.pdf"/);
+    expect(await pdfText(response)).toContain("Raport wariantu modelu biznesowego");
+  });
+
+  it("DOCX raportu: typ i treść z kodami źródeł", async () => {
+    const response = await GET(request("wariant=v1&format=docx&rodzaj=raport"), context());
+
+    expect(response.headers.get("Content-Type")).toBe(DOCX_TYPE);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    expect((await mammoth.extractRawText({ buffer })).value).toContain("[W] Kawa ekologiczna");
+  });
+
+  it("wariant spoza projektu: 404", async () => {
+    mocks.loadReportData.mockResolvedValue(null);
+
+    expect((await GET(request("wariant=v-obcy&format=pdf&rodzaj=raport"), context())).status).toBe(404);
+  });
+
+  it("brak sesji i obcy projekt: bez odczytu danych raportu", async () => {
+    mocks.getProjectAccess.mockResolvedValue({ ok: false, error: "UNAUTHENTICATED" });
+    expect((await GET(request("wariant=v1&format=pdf&rodzaj=raport"), context())).status).toBe(401);
+    mocks.getProjectAccess.mockResolvedValue({ ok: false, error: "NOT_FOUND", session });
+    expect((await GET(request("wariant=v1&format=pdf&rodzaj=raport"), context())).status).toBe(404);
+
+    expect(mocks.loadReportData).not.toHaveBeenCalled();
   });
 });

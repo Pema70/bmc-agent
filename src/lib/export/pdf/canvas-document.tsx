@@ -9,7 +9,7 @@ import { CRITERION_LABELS, SCORE_MAX } from "@/lib/schemas/evaluation";
 const INK = "#000000";
 const MUTED = "#444444";
 
-const styles = StyleSheet.create({
+export const styles = StyleSheet.create({
   page: { fontFamily: EXPORT_FONT_FAMILY, fontSize: 8, color: INK, paddingTop: 24, paddingHorizontal: 24, paddingBottom: 52 },
   title: { fontSize: 16, fontWeight: 700 },
   subtitle: { fontSize: 10, marginTop: 2 },
@@ -55,7 +55,7 @@ const RADAR: RadarGeometry = { cx: 132, cy: 100, radius: 60, labelOffset: 12 };
 const RADAR_WIDTH = 264;
 const RADAR_HEIGHT = 200;
 
-function Radar({ scores }: { scores: Record<string, number> }) {
+export function Radar({ scores }: { scores: Record<string, number> }) {
   const axes = radarAxes(RADAR);
   const polygon = radarPoints(
     {
@@ -94,7 +94,7 @@ function Radar({ scores }: { scores: Record<string, number> }) {
   );
 }
 
-function Footer() {
+export function Footer() {
   return (
     <View style={styles.footer} fixed>
       <Text style={styles.footerNotice}>{AI_NOTICE}</Text>
@@ -103,31 +103,11 @@ function Footer() {
   );
 }
 
-/**
- * PDF z układem płótna BMC (A4 poziomo): klasyczny układ dziewięciu bloków, pod nim ocena z radarem (jeśli istnieje).
- * Wszystkie teksty to zwykłe węzły tekstowe (bez HTML i Markdown) po oczyszczeniu w `loadCanvasExportData`.
- */
-export function CanvasDocument({ data }: { data: CanvasExportData }) {
-  const block = (key: CanvasBlockData["blockKey"]) => data.blocks.find((item) => item.blockKey === key);
-  const evaluation = data.evaluation;
-  const stale = evaluation ? staleNote(evaluation, data.variantVersion) : null;
-
+/** Klasyczny układ dziewięciu bloków BMC (wpisy to gotowe teksty, np. z kodem źródła w raporcie). */
+export function CanvasGrid({ blocks }: { blocks: CanvasBlockData[] }) {
+  const block = (key: CanvasBlockData["blockKey"]) => blocks.find((item) => item.blockKey === key);
   return (
-    <Document
-      title={`${exportText(data.projectName, 100)} / ${exportText(data.variantName, 100)}`}
-      author="BMC Agent"
-      creator="BMC Agent"
-      producer="BMC Agent"
-      language="pl-PL"
-    >
-      <Page size="A4" orientation="landscape" style={styles.page}>
-        <Text style={styles.title}>{data.projectName}</Text>
-        <Text style={styles.subtitle}>{`Wariant: ${data.variantName}`}</Text>
-        <Text style={styles.meta}>
-          {`Wersja zapisanego stanu: ${data.variantVersion}. Wygenerowano: ${formatExportDateTime(data.generatedAt)}. Eksport dotyczy zapisanego stanu wariantu.`}
-        </Text>
-        <Text style={styles.notice}>{AI_NOTICE}</Text>
-
+    <>
         <View style={styles.topRow}>
           <View style={styles.column}>
             <Cell block={block("key_partnerships")} />
@@ -151,6 +131,35 @@ export function CanvasDocument({ data }: { data: CanvasExportData }) {
           <Cell block={block("cost_structure")} />
           <Cell block={block("revenue_streams")} />
         </View>
+    </>
+  );
+}
+
+/**
+ * PDF z układem płótna BMC (A4 poziomo): klasyczny układ dziewięciu bloków, pod nim ocena z radarem (jeśli istnieje).
+ * Wszystkie teksty to zwykłe węzły tekstowe (bez HTML i Markdown) po oczyszczeniu w `loadCanvasExportData`.
+ */
+export function CanvasDocument({ data }: { data: CanvasExportData }) {
+  const evaluation = data.evaluation;
+  const stale = evaluation ? staleNote(evaluation, data.variantVersion) : null;
+
+  return (
+    <Document
+      title={`${exportText(data.projectName, 100)} / ${exportText(data.variantName, 100)}`}
+      author="BMC Agent"
+      creator="BMC Agent"
+      producer="BMC Agent"
+      language="pl-PL"
+    >
+      <Page size="A4" orientation="landscape" style={styles.page}>
+        <Text style={styles.title}>{data.projectName}</Text>
+        <Text style={styles.subtitle}>{`Wariant: ${data.variantName}`}</Text>
+        <Text style={styles.meta}>
+          {`Wersja zapisanego stanu: ${data.variantVersion}. Wygenerowano: ${formatExportDateTime(data.generatedAt)}. Eksport dotyczy zapisanego stanu wariantu.`}
+        </Text>
+        <Text style={styles.notice}>{AI_NOTICE}</Text>
+
+        <CanvasGrid blocks={data.blocks} />
         <Footer />
       </Page>
 

@@ -8,7 +8,7 @@ import { getStrategyCandidate, getVariantForReport, listLlmCallSummary, listProp
 import { describeAllBlocks, type DescribedProposal } from "@/lib/report/describe-blocks";
 import { resolveEntryOrigins, type FallbackProposal } from "@/lib/report/provenance";
 import { pairRoundEvaluations } from "@/lib/report/round-evaluations";
-import { REPORT_LIMITS, type Limited, type ReportData } from "@/lib/report/types";
+import { REPORT_LIMITS, type Limited, type ReportData, type ReportRoundProposal } from "@/lib/report/types";
 
 function limited<T>(rows: readonly T[], limit: number): Limited<T> {
   return { items: rows.slice(0, limit), truncated: rows.length > limit, limit };
@@ -59,6 +59,26 @@ export async function loadReportData(projectId: string, variantId: string, now: 
 
   const origins = resolveEntryOrigins({ state: variant.state, storedOrigins: variant.entryOrigins, proposals: fallback, strategy: candidate });
 
+  // Lista jest od najnowszych; w rundzie porządkujemy po numerze pytania (stabilnie, a przy równych po kolejności powstania).
+  const roundProposals: ReportRoundProposal[] = [...proposals]
+    .reverse()
+    .flatMap((proposal) =>
+      proposal.refinementRoundId
+        ? [
+            {
+              refinementRoundId: proposal.refinementRoundId,
+              questionIndex: proposal.refinementQuestionIndex,
+              blockKey: proposal.blockKey,
+              operation: proposal.operation,
+              before: proposal.before,
+              after: proposal.after,
+              status: proposal.status,
+            },
+          ]
+        : [],
+    )
+    .sort((a, b) => (a.questionIndex ?? Number.MAX_SAFE_INTEGER) - (b.questionIndex ?? Number.MAX_SAFE_INTEGER));
+
   const usedNames = new Set<string>();
   for (const entry of origins.entries) {
     if (entry.origin?.attachmentName) {
@@ -102,6 +122,7 @@ export async function loadReportData(projectId: string, variantId: string, now: 
       evaluationRows,
       proposals.map((proposal) => ({ refinementRoundId: proposal.refinementRoundId, status: proposal.status, resolvedAt: proposal.resolvedAt })),
     ),
+    roundProposals,
     impacts: limited(impactRows, REPORT_LIMITS.impacts),
     comparisons: limited(comparisonRows, REPORT_LIMITS.comparisons),
     llmSummary,

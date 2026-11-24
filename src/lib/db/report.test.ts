@@ -76,6 +76,7 @@ describe("listProposalsForReport", () => {
         id: "pr1",
         blockKey: "channels",
         operation: "EDIT",
+        before: "Targi",
         after: "Sklep",
         rationale: "Bo tak.",
         status: "ACCEPTED",
@@ -89,9 +90,13 @@ describe("listProposalsForReport", () => {
 
     const rows = await listProposalsForReport("p1", "v1", 501);
 
-    expect(rows).toEqual([expect.objectContaining({ id: "pr1", operation: "edit", resolvedAt: new Date("2026-11-03T10:00:00Z") })]);
+    expect(rows).toEqual([expect.objectContaining({ id: "pr1", operation: "edit", before: "Targi", resolvedAt: new Date("2026-11-03T10:00:00Z") })]);
     expect(m.proposalFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { variantId: "v1", variant: { projectId: "p1" } }, take: 501 }),
+      expect.objectContaining({
+        where: { variantId: "v1", variant: { projectId: "p1" } },
+        take: 501,
+        select: expect.objectContaining({ before: true, after: true, refinementRoundId: true, refinementQuestionIndex: true }),
+      }),
     );
   });
 
