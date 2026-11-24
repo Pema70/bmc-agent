@@ -38,12 +38,38 @@ async function lockVariant(tx: Tx, projectId: string, variantId: string): Promis
   return locked.length > 0;
 }
 
+/**
+ * Stan limitów rund wariantu: liczba rund (także zamkniętych) i czy któraś jest niedokończona (AWAITING_ANSWERS albo
+ * PROPOSED z choć jedną propozycją PENDING). Wspólne dla startu rundy (w transakcji) i sprawdzenia przed wywołaniem modelu.
+ */
+async function readRoundGate(
+  client: Pick<Tx, "refinementRound" | "proposal">,
+  projectId: string,
+  variantId: string,
+): Promise<{ rounds: number; inProgress: boolean }> {
+  const rounds = await client.refinementRound.findMany({
+    where: { variantId, projectId },
+    select: { id: true, status: true },
+  });
+  const awaiting = rounds.some((round) => round.status === "AWAITING_ANSWERS");
+  const proposedIds = rounds.filter((round) => round.status === "PROPOSED").map((round) => round.id);
+  const pendingInProposed =
+    proposedIds.length > 0 &&
+    (await client.proposal.count({ where: { refinementRoundId: { in: proposedIds }, status: "PENDING" } })) > 0;
+  return { rounds: rounds.length, inProgress: awaiting || pendingInProposed };
+}
+
+/** Odczyt bez blokady (np. przed wywołaniem modelu); rozstrzygający jest zawsze odczyt w transakcji createRefinementRound. */
+export async function getRefinementGate(projectId: string, variantId: string): Promise<{ rounds: number; inProgress: boolean }> {
+  return readRoundGate(prisma, projectId, variantId);
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Start rundy
 // ---------------------------------------------------------------------------------------------------------------------
 
 export type CreateRefinementRoundResult =
-  | { ok: true; roundId: string; roundNumber: number }
+  | { ok: true; roundId: string; roundNumber: number; createdAt: Date }
   | { ok: false; error: "NOT_FOUND" | "LIMIT" | "ROUND_IN_PROGRESS" | "EVALUATION_NOT_FOUND" };
 
 /**
@@ -80,20 +106,11 @@ export async function createRefinementRound(
         return { ok: false, error: "NOT_FOUND" };
       }
 
-      const rounds = await tx.refinementRound.findMany({
-        where: { variantId, projectId },
-        select: { id: true, status: true },
-      });
-      if (rounds.length >= maxRounds) {
+      const gate = await readRoundGate(tx, projectId, variantId);
+      if (gate.rounds >= maxRounds) {
         return { ok: false, error: "LIMIT" };
       }
-
-      const awaiting = rounds.some((round) => round.status === "AWAITING_ANSWERS");
-      const proposedIds = rounds.filter((round) => round.status === "PROPOSED").map((round) => round.id);
-      const pendingInProposed =
-        proposedIds.length > 0 &&
-        (await tx.proposal.count({ where: { refinementRoundId: { in: proposedIds }, status: "PENDING" } })) > 0;
-      if (awaiting || pendingInProposed) {
+      if (gate.inProgress) {
         return { ok: false, error: "ROUND_IN_PROGRESS" };
       }
 
@@ -105,7 +122,7 @@ export async function createRefinementRound(
         return { ok: false, error: "EVALUATION_NOT_FOUND" };
       }
 
-      const roundNumber = rounds.length + 1;
+      const roundNumber = gate.rounds + 1;
       const created = await tx.refinementRound.create({
         data: {
           projectId,
@@ -121,9 +138,9 @@ export async function createRefinementRound(
           questionsLlmCallLogId: args.questionsLlmCallLogId,
           createdById: args.createdById,
         },
-        select: { id: true, roundNumber: true },
+        select: { id: true, roundNumber: true, createdAt: true },
       });
-      return { ok: true, roundId: created.id, roundNumber: created.roundNumber };
+      return { ok: true, roundId: created.id, roundNumber: created.roundNumber, createdAt: created.createdAt };
     });
   } catch (error) {
     if (isUniqueViolation(error)) {
@@ -377,4 +394,36 @@ export async function getRoundForVariant(
 /** Liczba rund wariantu (także zamkniętych), np. do sprawdzenia limitu przed wywołaniem modelu. */
 export async function countRoundsForVariant(projectId: string, variantId: string): Promise<number> {
   return prisma.refinementRound.count({ where: { variantId, projectId } });
+}
+
+export type RoundForRefine = {
+  id: string;
+  roundNumber: number;
+  status: RefinementStatus;
+  evaluationId: string;
+  variantVersion: number;
+  questions: RefinementQuestion[];
+};
+
+/** Runda potrzebna operacji „poprawki z odpowiedzi” (z filtrem po wariancie i projekcie). Uszkodzone pytania to błąd, nie null. */
+export async function getRoundForRefine(projectId: string, variantId: string, roundId: string): Promise<RoundForRefine | null> {
+  const row = await prisma.refinementRound.findFirst({
+    where: { id: roundId, variantId, projectId },
+    select: { id: true, roundNumber: true, status: true, evaluationId: true, variantVersion: true, questions: true },
+  });
+  if (!row) {
+    return null;
+  }
+  const questions = QuestionsOutput.safeParse(row.questions);
+  if (!questions.success) {
+    throw new Error(`Niepoprawne pytania w rundzie ${row.id}: ${z.prettifyError(questions.error)}`);
+  }
+  return {
+    id: row.id,
+    roundNumber: row.roundNumber,
+    status: row.status,
+    evaluationId: row.evaluationId,
+    variantVersion: row.variantVersion,
+    questions: questions.data.questions,
+  };
 }

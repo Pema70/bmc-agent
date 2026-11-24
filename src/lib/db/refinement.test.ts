@@ -70,7 +70,7 @@ describe("createRefinementRound", () => {
   it("pierwsza runda: numer 1, blokada wariantu przed odczytem rund, dane z serwera i stan zapisany jako migawka", async () => {
     const result = await createRefinementRound(createArgs);
 
-    expect(result).toEqual({ ok: true, roundId: "r-nowa", roundNumber: 1 });
+    expect(result).toMatchObject({ ok: true, roundId: "r-nowa", roundNumber: 1 });
     const [strings, ...values] = m.queryRaw.mock.calls[0] as [string[], ...unknown[]];
     expect(strings.join("?")).toContain('FROM "BmcVariant" WHERE "id" = ? AND "projectId" = ? FOR UPDATE');
     expect(values).toEqual(["v1", "p1"]);
