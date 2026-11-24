@@ -206,8 +206,9 @@ export default async function ProjectPage({
           wplyw: <ImpactPanel />,
           warianty: (
             <>
-              <VariantSwitcher projectId={access.projectId} variants={variantSummaries} currentId={variant.id} />
+              <VariantSwitcher key="przelacznik" projectId={access.projectId} variants={variantSummaries} currentId={variant.id} />
               <VariantActions
+                key="akcje"
                 projectId={access.projectId}
                 current={{ id: variant.id, name: variant.name, isMain: variant.isMain }}
                 mainVariantId={mainListed?.id ?? null}
@@ -216,6 +217,7 @@ export default async function ProjectPage({
                 pendingOnMain={pendingOnMain}
               />
               <StrategiesPanel
+                key="strategie"
                 // Bez key zależnego od listy: nowe generacje dołącza sam z props initialItems (bez remountu).
                 projectId={access.projectId}
                 variantId={variant.id}
