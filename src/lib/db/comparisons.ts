@@ -142,6 +142,32 @@ export async function listVariantComparisons(projectId: string, limit: number): 
   return rows.map((row) => toSummary(parseComparisonRow(row)));
 }
 
+/**
+ * Porównania projektu, w których brał udział wariant (na potrzeby raportu), od najnowszego, bez stanów wariantów.
+ * Identyfikatory wariantów są tylko w migawce `inputs` (brak kluczy obcych), więc filtr po wariancie robi Postgres
+ * operatorem zawierania JSONB (`@>`), a nie aplikacja po pobraniu wszystkich porównań. Zawsze też filtr po projectId.
+ */
+export async function listVariantComparisonsForVariant(
+  projectId: string,
+  variantId: string,
+  limit: number,
+): Promise<ComparisonListItem[]> {
+  const ids = await prisma.$queryRaw<Array<{ id: string }>>`
+    SELECT "id" FROM "VariantComparison"
+    WHERE "projectId" = ${projectId} AND "inputs" @> ${JSON.stringify([{ variantId }])}::jsonb
+    ORDER BY "createdAt" DESC, "id" DESC
+    LIMIT ${limit}`;
+  if (ids.length === 0) {
+    return [];
+  }
+  const rows = await prisma.variantComparison.findMany({
+    where: { projectId, id: { in: ids.map((row) => row.id) } },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: SELECT,
+  });
+  return rows.map((row) => toSummary(parseComparisonRow(row)));
+}
+
 /** Jedno porównanie po id (z migawkami stanów, do widoku obok siebie). Filtr po projectId; cudzy projekt lub brak: null. */
 export async function getVariantComparison(projectId: string, comparisonId: string): Promise<ComparisonItem | null> {
   const row = await prisma.variantComparison.findFirst({
