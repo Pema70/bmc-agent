@@ -1,143 +1,173 @@
 @import "tailwindcss";
 
 /*
- * Tokeny wyglądu (plan `docs/plan-design.md`): paleta A „błękit i bursztyn” (60% tło i powierzchnie, 30% tint i nagłówki,
- * 10% akcent). Komponenty używają wyłącznie tokenów semantycznych (klasy `bg-surface`, `text-muted`, `bg-head`…), więc zamiana
- * palety to zmiana tego bloku. Kontrasty par tekst/tło sprawdza `src/app/design-tokens.test.ts` (WCAG AA). Tryb ciemny
- * wynika z ustawienia systemu (bez przełącznika, decyzja D7).
+ * Tokeny wyglądu (plan `docs/plan-design.md`, paleta D „ciemny granat i koral”, wyłącznie tryb ciemny): 60% prawie czarne tło
+ * z poświatą granatu i korala, 30% ciemny granat (bloki, panele, czat, tabele: pełne, nieprzezroczyste tło; szkło tylko na
+ * pasku, nagłówkach i małych kartach), 10% koral (aktywny przycisk paska, plakietki, gradient tytułu); przyciski główne w
+ * jaśniejszym niebieskim. Komponenty używają wyłącznie tokenów semantycznych (`bg-surface`, `text-muted`, `bg-head`…).
+ * Kontrasty par tekst/tło sprawdza `src/app/design-tokens.test.ts` (WCAG AA). Raporty PDF i DOCX nie używają tych tokenów.
  */
 :root {
-  --bg-from: #F3F6FC;
-  --bg-to: #E6EDF9;
-  --surface: #FFFFFF;
-  --tint: #E8EEFA;
-  --text: #0F1B3D;
-  --muted: #4A5878;
-  --border: #C9D5EC;
-  --head-from: #1E3A8A;
-  --head-to: #2B55C4;
-  --on-head: #FFFFFF;
-  --accent-from: #B45309;
-  --accent-to: #92400E;
-  --on-accent: #FFFFFF;
-  --ring: #1E40AF;
-  --danger: #B91C1C;
-  --ai-bg: #F1EBFE;
-  --ai-fg: #5B21B6;
-  --ai-border: #C4B5FD;
-  --low-bg: #E3F6E9;
-  --low-fg: #166534;
-  --low-border: #86D3A0;
-  --medium-bg: #FEF3D6;
-  --medium-fg: #92400E;
-  --medium-border: #F2C14E;
-  --high-bg: #FDE6E6;
-  --high-fg: #991B1B;
-  --high-border: #F29B9B;
-  --main-bg: #E1E9FB;
-  --main-fg: #1E3A8A;
-  --main-border: #9DB4EC;
-  --grad-bg: linear-gradient(160deg, var(--bg-from), var(--bg-to));
+  color-scheme: dark;
+  --bg-from: #04060C;
+  --bg-to: #090E1D;
+  --surface: #101A36;
+  --tint: #17234A;
+  --text: #E9EDFB;
+  --muted: #B2BEE0;
+  --border: #3A4F9A;
+  --head-from: #28314A;
+  --head-to: #1C2540;
+  --on-head: #E9EDFB;
+  --primary-from: #7DB2FF;
+  --primary-to: #5B9BFF;
+  --on-primary: #06112B;
+  --accent-from: #FF9068;
+  --accent-to: #FF7345;
+  --on-accent: #1A0A06;
+  --ring: #7DB2FF;
+  --danger: #FF93AE;
+  --title-from: #7DB2FF;
+  --title-to: #FF9068;
+  --glow-navy-peak: #1D3690;
+  --glow-coral-peak: #7A393A;
+  --glow-navy: rgba(42, 79, 214, 0.62);
+  --glow-coral: rgba(255, 107, 91, 0.46);
+  --glass: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.22);
+  --ai-bg: #2E1650;
+  --ai-fg: #E3BDFF;
+  --ai-border: #8B5CC8;
+  --low-bg: #0F2E22;
+  --low-fg: #7EE2A4;
+  --low-border: #2F7A4C;
+  --medium-bg: #34270A;
+  --medium-fg: #FFD27A;
+  --medium-border: #8A6516;
+  --high-bg: #3A0F1C;
+  --high-fg: #FF93AE;
+  --high-border: #D14B6C;
+  --main-bg: #12285A;
+  --main-fg: #AFCBFF;
+  --main-border: #3F5FB5;
+  --grid: #5068BC;
   --grad-head: linear-gradient(135deg, var(--head-from), var(--head-to));
+  --grad-primary: linear-gradient(135deg, var(--primary-from), var(--primary-to));
   --grad-accent: linear-gradient(135deg, var(--accent-from), var(--accent-to));
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-from: #0B1226;
-    --bg-to: #111B38;
-    --surface: #16213F;
-    --tint: #1C2A52;
-    --text: #E8EDFA;
-    --muted: #A7B3D1;
-    --border: #2B3B66;
-    --head-from: #1E3A8A;
-    --head-to: #2B55C4;
-    --on-head: #FFFFFF;
-    --accent-from: #FBBF24;
-    --accent-to: #F59E0B;
-    --on-accent: #1A1203;
-    --ring: #FBBF24;
-    --danger: #FCA5A5;
-    --ai-bg: #2A1F52;
-    --ai-fg: #D8CCFF;
-    --ai-border: #5B47A8;
-    --low-bg: #123524;
-    --low-fg: #9BE2B5;
-    --low-border: #2F7A4C;
-    --medium-bg: #3A2A0A;
-    --medium-fg: #FCD679;
-    --medium-border: #8A6516;
-    --high-bg: #3F1616;
-    --high-fg: #FFB4B4;
-    --high-border: #8F3333;
-    --main-bg: #1B2C5E;
-    --main-fg: #C9D7FF;
-    --main-border: #3F5FB5;
-  }
+  --grad-title: linear-gradient(90deg, var(--title-from), var(--title-to));
 }
 
 @theme inline {
-  --color-bg-from: var(--bg-from);
-  --color-bg-to: var(--bg-to);
-  --color-surface: var(--surface);
-  --color-tint: var(--tint);
-  --color-text: var(--text);
-  --color-muted: var(--muted);
-  --color-border: var(--border);
-  --color-head-from: var(--head-from);
-  --color-head-to: var(--head-to);
-  --color-on-head: var(--on-head);
   --color-accent-from: var(--accent-from);
   --color-accent-to: var(--accent-to);
-  --color-on-accent: var(--on-accent);
-  --color-ring: var(--ring);
-  --color-danger: var(--danger);
   --color-ai-bg: var(--ai-bg);
-  --color-ai-fg: var(--ai-fg);
   --color-ai-border: var(--ai-border);
-  --color-low-bg: var(--low-bg);
-  --color-low-fg: var(--low-fg);
-  --color-low-border: var(--low-border);
-  --color-medium-bg: var(--medium-bg);
-  --color-medium-fg: var(--medium-fg);
-  --color-medium-border: var(--medium-border);
+  --color-ai-fg: var(--ai-fg);
+  --color-bg-from: var(--bg-from);
+  --color-bg-to: var(--bg-to);
+  --color-border: var(--border);
+  --color-danger: var(--danger);
+  --color-glass: var(--glass);
+  --color-glass-border: var(--glass-border);
+  --color-glow-coral: var(--glow-coral);
+  --color-glow-coral-peak: var(--glow-coral-peak);
+  --color-glow-navy: var(--glow-navy);
+  --color-glow-navy-peak: var(--glow-navy-peak);
+  --color-grid: var(--grid);
+  --color-head-from: var(--head-from);
+  --color-head-to: var(--head-to);
   --color-high-bg: var(--high-bg);
-  --color-high-fg: var(--high-fg);
   --color-high-border: var(--high-border);
+  --color-high-fg: var(--high-fg);
+  --color-low-bg: var(--low-bg);
+  --color-low-border: var(--low-border);
+  --color-low-fg: var(--low-fg);
   --color-main-bg: var(--main-bg);
-  --color-main-fg: var(--main-fg);
   --color-main-border: var(--main-border);
+  --color-main-fg: var(--main-fg);
+  --color-medium-bg: var(--medium-bg);
+  --color-medium-border: var(--medium-border);
+  --color-medium-fg: var(--medium-fg);
+  --color-muted: var(--muted);
+  --color-on-accent: var(--on-accent);
+  --color-on-head: var(--on-head);
+  --color-on-primary: var(--on-primary);
+  --color-primary-from: var(--primary-from);
+  --color-primary-to: var(--primary-to);
+  --color-ring: var(--ring);
+  --color-surface: var(--surface);
+  --color-text: var(--text);
+  --color-tint: var(--tint);
+  --color-title-from: var(--title-from);
+  --color-title-to: var(--title-to);
   --font-sans: var(--font-noto-sans), "Segoe UI", system-ui, sans-serif;
+  --font-display: var(--font-grotesk), var(--font-noto-sans), "Segoe UI", system-ui, sans-serif;
 }
 
-/* Gradienty wyłącznie na tłach, nagłówkach i przyciskach głównych; tekst treści leży na jednolitej powierzchni. */
-@utility bg-app {
-  background-color: var(--bg-from);
-  background-image: var(--grad-bg);
-}
-
+/* Gradienty tylko na tłach, nagłówkach i przyciskach; tekst treści leży na jednolitej powierzchni. */
 @utility bg-head {
   background-color: var(--head-from);
   background-image: var(--grad-head);
   color: var(--on-head);
 }
 
+/* Przycisk główny (jaśniejszy niebieski). */
 @utility bg-cta {
+  background-color: var(--primary-from);
+  background-image: var(--grad-primary);
+  color: var(--on-primary);
+}
+
+/* Wyróżnienie w kolorze akcentu (koral): aktywny przycisk paska, plakietki. */
+@utility bg-accent-grad {
   background-color: var(--accent-from);
   background-image: var(--grad-accent);
   color: var(--on-accent);
 }
 
+/* Tytuł projektu: gradient niebieski → koral (duży tekst). */
+@utility text-gradient-title {
+  background-image: var(--grad-title);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Szkło: tylko pasek, nagłówki i małe karty (pod tekstem jest zawsze ciemne tło strony). */
+@utility bg-glassy {
+  background-color: var(--glass);
+  border-color: var(--glass-border);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
 body {
   background-color: var(--bg-from);
-  background-image: var(--grad-bg);
+  background-image:
+    radial-gradient(72rem 50rem at 4% -8%, var(--glow-navy), transparent 72%),
+    radial-gradient(62rem 46rem at 98% 0%, var(--glow-coral), transparent 72%),
+    radial-gradient(74rem 50rem at 28% 112%, var(--glow-navy), transparent 72%),
+    radial-gradient(48rem 36rem at 90% 100%, var(--glow-coral), transparent 72%),
+    linear-gradient(180deg, var(--bg-from), var(--bg-to));
   background-attachment: fixed;
   color: var(--text);
   font-family: var(--font-sans);
 }
 
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }

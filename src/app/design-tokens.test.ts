@@ -2,10 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-// Kontrast tokenów wyglądu (plan `docs/plan-design.md`): pary tekst/tło w trybie jasnym i ciemnym muszą spełniać WCAG AA
-// (4,5:1 dla tekstu, 3:1 dla pierścienia fokusa). Test czyta prawdziwe pliki: `globals.css` (paleta A, obecnie w aplikacji)
-// oraz statyczny podgląd palety D (`docs/design-preview/d.html`, kandydat; wyłącznie tryb ciemny), w którym blok tokenów ma znacznik
-// `/* tokens:dark */`.
+// Kontrast tokenów wyglądu (plan `docs/plan-design.md`, paleta D, wyłącznie tryb ciemny): pary tekst/tło muszą spełniać WCAG AA
+// (4,5:1 dla tekstu, 3:1 dla pierścienia fokusa, siatki i linii wykresu). Test czyta prawdziwe pliki: `globals.css` (paleta w
+// aplikacji) oraz zatwierdzony statyczny podgląd `docs/design-preview/d.html` (blok tokenów ze znacznikiem `/* tokens:dark */`)
+// i sprawdza, że aplikacja używa dokładnie tych wartości, które właściciel zaakceptował w podglądzie.
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8").replace(/\r\n/g, "\n");
 
@@ -30,8 +30,7 @@ function blockAfter(source: string, marker: string): string {
 }
 
 const globals = read("src/app/globals.css");
-const globalsLight = declarations(blockAfter(globals, ":root {"));
-const globalsDark = { ...globalsLight, ...declarations(blockAfter(globals.slice(globals.indexOf("prefers-color-scheme: dark")), ":root {")) };
+const globalsDark = declarations(blockAfter(globals, ":root {"));
 
 const previewD = read("docs/design-preview/d.html");
 const dDark = declarations(blockAfter(previewD, "/* tokens:dark */"));
@@ -68,8 +67,8 @@ const STATES = ["ai", "low", "medium", "high", "main"] as const;
 const REQUIRED = ["bg-from", "bg-to", "surface", "tint", "text", "muted", "border", "head-from", "head-to", "on-head", "accent-from", "accent-to", "on-accent", "ring", "danger"];
 
 const PALETTES: Array<{ name: string; modes: Record<string, Tokens> }> = [
-  { name: "A (globals.css, w aplikacji)", modes: { jasny: globalsLight, ciemny: globalsDark } },
-  { name: "D (docs/design-preview/d.html, tylko tryb ciemny)", modes: { ciemny: dDark } },
+  { name: "D (globals.css, w aplikacji, tylko tryb ciemny)", modes: { ciemny: globalsDark } },
+  { name: "D (docs/design-preview/d.html, podgląd)", modes: { ciemny: dDark } },
 ];
 
 describe("tokeny wyglądu: kontrast WCAG AA", () => {
@@ -144,14 +143,14 @@ describe("tokeny wyglądu: kontrast WCAG AA", () => {
 
   describe("paleta D: odróżnialność kolorów i struktura", () => {
     it("koral akcentu jest wyraźnie inny niż czerwień stanu „wpływ wysoki” (odległość barwy ≥ 28°)", () => {
-      expect(hueDistance(dDark["accent-from"], dDark["high-fg"])).toBeGreaterThanOrEqual(28);
-      expect(hueDistance(dDark["accent-to"], dDark["high-border"])).toBeGreaterThanOrEqual(28);
+      expect(hueDistance(globalsDark["accent-from"], dDark["high-fg"])).toBeGreaterThanOrEqual(28);
+      expect(hueDistance(globalsDark["accent-to"], dDark["high-border"])).toBeGreaterThanOrEqual(28);
     });
 
     it("fiolet oznaczenia AI jest wyraźnie inny niż niebieski przycisków i stanu „Główny” (≥ 40°)", () => {
-      expect(hueDistance(dDark["ai-fg"], dDark["primary-from"])).toBeGreaterThanOrEqual(40);
-      expect(hueDistance(dDark["ai-fg"], dDark["main-fg"])).toBeGreaterThanOrEqual(40);
-      expect(hueDistance(dDark["ai-border"], dDark["main-border"])).toBeGreaterThanOrEqual(40);
+      expect(hueDistance(globalsDark["ai-fg"], dDark["primary-from"])).toBeGreaterThanOrEqual(40);
+      expect(hueDistance(globalsDark["ai-fg"], dDark["main-fg"])).toBeGreaterThanOrEqual(40);
+      expect(hueDistance(globalsDark["ai-border"], dDark["main-border"])).toBeGreaterThanOrEqual(40);
     });
 
     it("jest tylko tryb ciemny: brak bloku jasnego, przełącznika motywu i zależności od ustawienia systemu", () => {
@@ -204,15 +203,31 @@ describe("tokeny wyglądu: kontrast WCAG AA", () => {
     });
   });
 
-  it("gradienty są zdefiniowane na tokenach (tło, nagłówek, akcent), a font to Noto Sans z pliku lokalnego", () => {
-    expect(globals).toContain("--grad-bg: linear-gradient");
-    expect(globals).toContain("--grad-head: linear-gradient");
-    expect(globals).toContain("--grad-accent: linear-gradient");
+  it("aplikacja używa dokładnie tokenów zaakceptowanych w podglądzie (wszystkie kolory szesnastkowe zgodne)", () => {
+    for (const [name, value] of Object.entries(dDark)) {
+      expect(globalsDark[name], name).toBe(value);
+    }
+  });
+
+  it("globals.css: tylko tryb ciemny (bez prefers-color-scheme i bez tokenów jasnych), gradienty na tokenach, szkło tylko jako narzędzie", () => {
+    expect(globals).not.toContain("prefers-color-scheme");
+    expect(globals).toContain("color-scheme: dark;");
+    for (const gradient of ["--grad-head: linear-gradient", "--grad-primary: linear-gradient", "--grad-accent: linear-gradient", "--grad-title: linear-gradient"]) {
+      expect(globals, gradient).toContain(gradient);
+    }
+    expect(globals).toContain("@utility bg-glassy");
+    expect(globals).toContain("@utility bg-cta");
+    expect(globals).toContain("@utility text-gradient-title");
+  });
+
+  it("czcionki: Noto Sans (treść) i Space Grotesk (nagłówki) z plików lokalnych, bez sieci", () => {
     expect(globals).toContain("--font-noto-sans");
+    expect(globals).toContain("--font-grotesk");
     const layout = read("src/app/layout.tsx");
     expect(layout).toContain('from "next/font/local"');
     expect(layout).not.toContain("next/font/google");
     expect(layout).toContain("NotoSans-Regular.ttf");
     expect(layout).toContain("NotoSans-Bold.ttf");
+    expect(layout).toContain("SpaceGrotesk-Variable.ttf");
   });
 });

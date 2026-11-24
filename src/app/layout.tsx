@@ -14,6 +14,13 @@ const notoSans = localFont({
   ],
 });
 
+// Space Grotesk (SIL OFL 1.1, `src/app/fonts/`): tylko nagłówki i tytuł; krój zmienny, waga 300 do 700.
+const spaceGrotesk = localFont({
+  variable: "--font-grotesk",
+  display: "swap",
+  src: [{ path: "./fonts/SpaceGrotesk-Variable.ttf", weight: "300 700", style: "normal" }],
+});
+
 export const metadata: Metadata = {
   title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
   description: APP_DESCRIPTION,
@@ -23,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="pl"
-      className={`${notoSans.variable} h-full antialiased`}
+      className={`${notoSans.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <SiteHeader />

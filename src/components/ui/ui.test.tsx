@@ -48,6 +48,8 @@ describe("Button i buttonClass", () => {
     expect(buttonClass("primary")).toContain("bg-cta");
     expect(buttonClass("secondary")).toContain("bg-surface");
     expect(buttonClass("secondary")).not.toContain("bg-cta");
+    expect(buttonClass("primary", "sm")).toContain("min-h-9");
+    expect(buttonClass("primary")).toContain("min-h-10");
   });
 
   it("domyślnie type=button (nie wysyła formularza), disabled i dodatkowe klasy działają", () => {
