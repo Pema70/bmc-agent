@@ -4,6 +4,7 @@ const m = vi.hoisted(() => ({
   txProposal: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   txVariant: { findFirst: vi.fn(), updateMany: vi.fn() },
   txAttachment: { findFirst: vi.fn() },
+  txRound: { findFirst: vi.fn() },
   queryRaw: vi.fn(),
   prismaProposal: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), updateMany: vi.fn() },
   prismaVariant: { findFirst: vi.fn(), updateMany: vi.fn() },
@@ -27,7 +28,13 @@ import {
 } from "@/lib/db/proposals";
 import { emptyBmcState } from "@/lib/schemas/bmc";
 
-const tx = { proposal: m.txProposal, bmcVariant: m.txVariant, attachment: m.txAttachment, $queryRaw: m.queryRaw };
+const tx = {
+  proposal: m.txProposal,
+  bmcVariant: m.txVariant,
+  attachment: m.txAttachment,
+  refinementRound: m.txRound,
+  $queryRaw: m.queryRaw,
+};
 
 const state = { ...emptyBmcState(), channels: ["Sklep online"] };
 const row = {
@@ -41,6 +48,10 @@ const row = {
   status: "PENDING" as const,
   baseVersion: 3,
   createdAt: new Date("2026-11-11T10:00:00Z"),
+  sourceKind: "CONVERSATION" as const,
+  sourceAttachmentName: null,
+  refinementRoundId: null,
+  refinementQuestionIndex: null,
 };
 const args = { projectId: "p1", variantId: "v1", proposalId: "pr1", expectedVersion: 3, userId: "u1" };
 
@@ -243,13 +254,76 @@ describe("acceptProposal", () => {
     expect(m.transaction).toHaveBeenCalledTimes(1);
     expect(m.txVariant.updateMany).toHaveBeenCalledWith({
       where: { id: "v1", version: 3 },
-      data: { state: { ...state, channels: ["Sklep online", "Targi"] }, version: { increment: 1 } },
+      data: {
+        state: { ...state, channels: ["Sklep online", "Targi"] },
+        entryOrigins: [
+          { blockKey: "channels", text: "Targi", kind: "PROPOSAL", proposalId: "pr1", sourceKind: "CONVERSATION", recordedVersion: 4 },
+        ],
+        version: { increment: 1 },
+      },
     });
     expect(m.txProposal.updateMany).toHaveBeenCalledWith({
       where: { id: "pr1", variantId: "v1", status: "PENDING" },
       data: { status: "ACCEPTED", resolvedById: "u1", resolvedAt: expect.any(Date) },
     });
     expectNoWritesOutsideTransaction();
+  });
+
+  it("pochodzenie: edycja zastępuje pochodzenie starego tekstu nowym (propozycja), pozostałe wpisy zachowują swoje", async () => {
+    const kept = { blockKey: "revenue_streams", text: "Subskrypcja", kind: "MANUAL", recordedVersion: 2 };
+    const old = { blockKey: "channels", text: "Sklep online", kind: "MANUAL", recordedVersion: 1 };
+    m.txVariant.findFirst.mockResolvedValue({ version: 3, state: { ...state, revenue_streams: ["Subskrypcja"] }, entryOrigins: [kept, old] });
+    m.txProposal.findFirst.mockResolvedValue({ ...row, operation: "EDIT", before: "Sklep online", after: "Sklep internetowy" });
+
+    await acceptProposal(args);
+
+    expect(m.txVariant.updateMany.mock.calls[0][0].data.entryOrigins).toEqual([
+      kept,
+      { blockKey: "channels", text: "Sklep internetowy", kind: "PROPOSAL", proposalId: "pr1", sourceKind: "CONVERSATION", recordedVersion: 4 },
+    ]);
+  });
+
+  it("pochodzenie: usunięcie wpisu usuwa jego pochodzenie i niczego nie dodaje", async () => {
+    const old = { blockKey: "channels", text: "Sklep online", kind: "MANUAL", recordedVersion: 1 };
+    m.txVariant.findFirst.mockResolvedValue({ version: 3, state, entryOrigins: [old] });
+    m.txProposal.findFirst.mockResolvedValue({ ...row, operation: "REMOVE", before: "Sklep online", after: null });
+
+    await acceptProposal(args);
+
+    expect(m.txVariant.updateMany.mock.calls[0][0].data.entryOrigins).toEqual([]);
+  });
+
+  it("pochodzenie: propozycja z załącznika zapisuje migawkę nazwy pliku, a z wiedzy modelu rodzaj źródła", async () => {
+    m.txProposal.findFirst.mockResolvedValue({ ...row, sourceKind: "ATTACHMENT", sourceAttachmentName: "Opis kawiarni.pdf" });
+    await acceptProposal(args);
+    expect(m.txVariant.updateMany.mock.calls[0][0].data.entryOrigins).toEqual([
+      expect.objectContaining({ kind: "PROPOSAL", sourceKind: "ATTACHMENT", attachmentName: "Opis kawiarni.pdf" }),
+    ]);
+
+    m.txProposal.findFirst.mockResolvedValue({ ...row, sourceKind: "MODEL_KNOWLEDGE" });
+    await acceptProposal(args);
+    expect(m.txVariant.updateMany.mock.calls[1][0].data.entryOrigins).toEqual([
+      expect.objectContaining({ kind: "PROPOSAL", sourceKind: "MODEL_KNOWLEDGE" }),
+    ]);
+  });
+
+  it("pochodzenie: propozycja z cyklu poprawek zapisuje numer rundy (z bazy) i numer pytania", async () => {
+    m.txProposal.findFirst.mockResolvedValue({ ...row, sourceKind: "REFINEMENT", refinementRoundId: "r1", refinementQuestionIndex: 2 });
+    m.txRound.findFirst.mockResolvedValue({ roundNumber: 2 });
+
+    await acceptProposal(args);
+
+    expect(m.txRound.findFirst).toHaveBeenCalledWith({ where: { id: "r1" }, select: { roundNumber: true } });
+    expect(m.txVariant.updateMany.mock.calls[0][0].data.entryOrigins).toEqual([
+      expect.objectContaining({ kind: "PROPOSAL", sourceKind: "REFINEMENT", roundNumber: 2, questionIndex: 2 }),
+    ]);
+  });
+
+  it("pochodzenie: uszkodzony zapis w bazie nie wywraca akceptacji", async () => {
+    m.txVariant.findFirst.mockResolvedValue({ version: 3, state, entryOrigins: 42 });
+
+    expect(await acceptProposal(args)).toMatchObject({ ok: true });
+    expect(m.txVariant.updateMany.mock.calls[0][0].data.entryOrigins).toHaveLength(1);
   });
 
   it("propozycja spoza wariantu lub projektu: NOT_FOUND i brak zapisów", async () => {

@@ -122,12 +122,33 @@ describe("createVariant", () => {
           name: "Wariant główny (kopia)",
           isMain: false,
           state: stateWithEntries,
+          entryOrigins: [],
           origin: "MANUAL",
           createdById: "u1",
         },
       }),
     );
     expect(result).toMatchObject({ ok: true, variant: { id: "v-nowy", name: "Wariant główny (kopia)", isMain: false, version: 1, entryCount: 3 } });
+  });
+
+  it("kopia dziedziczy pochodzenie wpisów źródła (tylko dla wpisów, które są w stanie kopii)", async () => {
+    setup();
+    const inherited = { blockKey: "channels", text: "Sklep online", kind: "PROPOSAL", proposalId: "pr1", sourceKind: "ATTACHMENT", attachmentName: "Opis.pdf", recordedVersion: 2 };
+    const stale = { blockKey: "channels", text: "Nie ma w stanie", kind: "MANUAL", recordedVersion: 1 };
+    m.txFindFirst.mockResolvedValue({ id: "v1", name: "Wariant główny", state: stateWithEntries, entryOrigins: [inherited, stale] });
+
+    await createVariant(args);
+
+    expect(m.txFindFirst).toHaveBeenCalledWith(expect.objectContaining({ select: expect.objectContaining({ entryOrigins: true }) }));
+    expect(m.txCreate.mock.calls[0][0].data.entryOrigins).toEqual([inherited]);
+  });
+
+  it("uszkodzone pochodzenie źródła nie wywraca kopii: kopia dostaje pustą listę", async () => {
+    setup();
+    m.txFindFirst.mockResolvedValue({ id: "v1", name: "Wariant główny", state: stateWithEntries, entryOrigins: "zepsute" });
+
+    expect(await createVariant(args)).toMatchObject({ ok: true });
+    expect(m.txCreate.mock.calls[0][0].data.entryOrigins).toEqual([]);
   });
 
   it("numeruje kolejne kopie", async () => {

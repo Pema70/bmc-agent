@@ -3,6 +3,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import { applyProposal, type ApplyError } from "@/lib/bmc/proposals";
 import { prisma } from "@/lib/db/client";
 import { writeVariantStateIfVersion } from "@/lib/db/variants";
+import { originsAfterProposals, type AppliedProposal } from "@/lib/bmc/origins";
+import { parseStoredOrigins } from "@/lib/schemas/origin";
 import { BlockKey, BmcState } from "@/lib/schemas/bmc";
 import type {
   ProposalOperation,
@@ -31,6 +33,9 @@ export type ProposalRecord = {
   sourceKind: ProposalSourceKind;
   // Migawka nazwy pliku (niezaufany tekst), zostaje po usunięciu załącznika.
   sourceAttachmentName: string | null;
+  // Runda poprawek, z której pochodzi propozycja (sourceKind = REFINEMENT), i numer pytania.
+  refinementRoundId: string | null;
+  refinementQuestionIndex: number | null;
 };
 
 type ProposalRow = {
@@ -46,6 +51,8 @@ type ProposalRow = {
   createdAt: Date;
   sourceKind: ProposalSourceKind;
   sourceAttachmentName: string | null;
+  refinementRoundId: string | null;
+  refinementQuestionIndex: number | null;
 };
 
 const PROPOSAL_SELECT = {
@@ -61,6 +68,8 @@ const PROPOSAL_SELECT = {
   createdAt: true,
   sourceKind: true,
   sourceAttachmentName: true,
+  refinementRoundId: true,
+  refinementQuestionIndex: true,
 } as const;
 
 const OPERATION_TO_DB = { add: "ADD", edit: "EDIT", remove: "REMOVE" } as const;
@@ -99,6 +108,28 @@ async function resolveSourceData(
     return null;
   }
   return { sourceKind: "ATTACHMENT", sourceAttachmentId: attachment.id, sourceAttachmentName: attachment.fileName };
+}
+
+/** Numer rundy poprawek, z której pochodzi propozycja (null dla propozycji spoza cyklu poprawek). */
+async function roundNumberOf(client: Pick<Tx, "refinementRound">, roundId: string | null): Promise<number | null> {
+  if (!roundId) {
+    return null;
+  }
+  const round = await client.refinementRound.findFirst({ where: { id: roundId }, select: { roundNumber: true } });
+  return round?.roundNumber ?? null;
+}
+
+function toAppliedProposal(record: ProposalRecord, roundNumber: number | null): AppliedProposal {
+  return {
+    proposalId: record.id,
+    blockKey: record.blockKey,
+    operation: record.operation,
+    after: record.after,
+    sourceKind: record.sourceKind,
+    attachmentName: record.sourceAttachmentName,
+    roundNumber,
+    questionIndex: record.refinementQuestionIndex ?? null,
+  };
 }
 
 export type CreateProposalResult =
@@ -233,7 +264,7 @@ export async function acceptProposal(args: {
 
       const variant = await tx.bmcVariant.findFirst({
         where: { id: variantId, projectId },
-        select: { version: true, state: true },
+        select: { version: true, state: true, entryOrigins: true },
       });
       if (!variant) {
         return { ok: false, error: "NOT_FOUND" };
@@ -251,7 +282,14 @@ export async function acceptProposal(args: {
         return { ok: false, error: applied.error };
       }
 
-      if ((await writeVariantStateIfVersion(tx, variantId, expectedVersion, applied.state)) === 0) {
+      // Pochodzenie wpisów zapisujemy tym samym UPDATE, który zapisuje stan (nowy wpis z propozycji dostaje źródło propozycji).
+      const origins = originsAfterProposals(
+        parseStoredOrigins(variant.entryOrigins).origins,
+        applied.state,
+        [toAppliedProposal(proposal, await roundNumberOf(tx, proposal.refinementRoundId))],
+        expectedVersion + 1,
+      );
+      if ((await writeVariantStateIfVersion(tx, variantId, expectedVersion, applied.state, origins)) === 0) {
         throw new RollbackSignal("VERSION_CONFLICT");
       }
       const resolved = await tx.proposal.updateMany({
@@ -336,7 +374,7 @@ export async function acceptRoundBatch(args: {
 
   try {
     return await prisma.$transaction(async (tx): Promise<AcceptRoundBatchResult> => {
-      const round = await tx.refinementRound.findFirst({ where: { id: roundId, variantId, projectId }, select: { id: true } });
+      const round = await tx.refinementRound.findFirst({ where: { id: roundId, variantId, projectId }, select: { id: true, roundNumber: true } });
       if (!round) {
         return { ok: false, error: "NOT_FOUND" };
       }
@@ -353,7 +391,7 @@ export async function acceptRoundBatch(args: {
 
       const variant = await tx.bmcVariant.findFirst({
         where: { id: variantId, projectId },
-        select: { version: true, state: true },
+        select: { version: true, state: true, entryOrigins: true },
       });
       if (!variant) {
         return { ok: false, error: "NOT_FOUND" };
@@ -382,7 +420,13 @@ export async function acceptRoundBatch(args: {
         return { ok: false, error: "CONFLICTS", failures };
       }
 
-      if ((await writeVariantStateIfVersion(tx, variantId, expectedVersion, working)) === 0) {
+      const origins = originsAfterProposals(
+        parseStoredOrigins(variant.entryOrigins).origins,
+        working,
+        proposals.map((proposal) => toAppliedProposal(proposal, round.roundNumber)),
+        expectedVersion + 1,
+      );
+      if ((await writeVariantStateIfVersion(tx, variantId, expectedVersion, working, origins)) === 0) {
         throw new RollbackSignal("VERSION_CONFLICT");
       }
       const resolved = await tx.proposal.updateMany({

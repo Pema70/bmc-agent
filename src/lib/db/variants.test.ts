@@ -54,28 +54,122 @@ describe("getVariantProjectId", () => {
   });
 });
 
-describe("saveVariantState", () => {
-  it("zapisuje stan z warunkiem na wersję i podbija wersję", async () => {
+describe("saveVariantState: zapis stanu i pochodzenia wpisów (krok 9)", () => {
+  const oldState = { ...emptyBmcState(), channels: ["Sklep online", "Targi"], revenue_streams: ["Subskrypcja"] };
+  const proposalOrigin = {
+    blockKey: "channels",
+    text: "Targi",
+    kind: "PROPOSAL",
+    proposalId: "pr1",
+    sourceKind: "CONVERSATION",
+    recordedVersion: 2,
+  };
+
+  function current(overrides: Record<string, unknown> = {}) {
+    return { version: 3, state: oldState, entryOrigins: [proposalOrigin], ...overrides };
+  }
+
+  beforeEach(() => {
+    findFirst.mockResolvedValue(current());
     updateMany.mockResolvedValue({ count: 1 });
-    const state = { ...emptyBmcState(), channels: [" Sklep online "] };
+  });
+
+  it("zapisuje stan z warunkiem na wersję, podbija wersję i zapisuje pochodzenie tym samym UPDATE", async () => {
+    const state = { ...oldState, channels: ["Sklep online", "Targi", " Social media "] };
 
     expect(await saveVariantState("v1", 3, state)).toEqual({ ok: true, version: 4 });
+
+    expect(updateMany).toHaveBeenCalledTimes(1);
     expect(updateMany).toHaveBeenCalledWith({
       where: { id: "v1", version: 3 },
-      data: { state: { ...emptyBmcState(), channels: ["Sklep online"] }, version: { increment: 1 } },
+      data: {
+        state: { ...oldState, channels: ["Sklep online", "Targi", "Social media"] },
+        // „Targi” zachowuje pochodzenie z propozycji, „Social media” (nowy wpis) jest ręczne, „Sklep online” sprzed kroku 9 bez zapisu.
+        entryOrigins: [proposalOrigin, { blockKey: "channels", text: "Social media", kind: "MANUAL", recordedVersion: 4 }],
+        version: { increment: 1 },
+      },
     });
   });
 
-  it("zwraca VERSION_CONFLICT, gdy wersja w bazie jest inna", async () => {
-    updateMany.mockResolvedValue({ count: 0 });
+  it("odczytuje stary stan po id wariantu (z wersją i pochodzeniem) przed zapisem", async () => {
+    await saveVariantState("v1", 3, oldState);
 
-    expect(await saveVariantState("v1", 3, emptyBmcState())).toEqual({ ok: false, error: "VERSION_CONFLICT" });
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: "v1" },
+      select: { version: true, state: true, entryOrigins: true },
+    });
+    expect(findFirst.mock.invocationCallOrder[0]).toBeLessThan(updateMany.mock.invocationCallOrder[0]);
   });
 
-  it("nie zapisuje niepoprawnego stanu", async () => {
+  it("niezmienione wpisy sprzed kroku 9 nie dostają pochodzenia „ręczny” (zostają bez zapisu)", async () => {
+    findFirst.mockResolvedValue(current({ entryOrigins: [] }));
+
+    await saveVariantState("v1", 3, oldState);
+
+    expect(updateMany.mock.calls[0][0].data.entryOrigins).toEqual([]);
+  });
+
+  it("edycja tekstu wpisu z propozycji to nowy wpis „ręczny”, a pochodzenie starego tekstu znika", async () => {
+    const state = { ...oldState, channels: ["Sklep online", "Targi lokalne"] };
+
+    await saveVariantState("v1", 3, state);
+
+    expect(updateMany.mock.calls[0][0].data.entryOrigins).toEqual([
+      { blockKey: "channels", text: "Targi lokalne", kind: "MANUAL", recordedVersion: 4 },
+    ]);
+  });
+
+  it("usunięcie wpisu usuwa jego pochodzenie", async () => {
+    await saveVariantState("v1", 3, { ...oldState, channels: ["Sklep online"] });
+
+    expect(updateMany.mock.calls[0][0].data.entryOrigins).toEqual([]);
+  });
+
+  it("uszkodzone pochodzenie w bazie nie wywraca zapisu: jest zastępowane (tylko nowe wpisy ręczne)", async () => {
+    findFirst.mockResolvedValue(current({ entryOrigins: { to: "nie lista" } }));
+
+    expect(await saveVariantState("v1", 3, { ...oldState, key_resources: ["Ekspres"] })).toEqual({ ok: true, version: 4 });
+    expect(updateMany.mock.calls[0][0].data.entryOrigins).toEqual([
+      { blockKey: "key_resources", text: "Ekspres", kind: "MANUAL", recordedVersion: 4 },
+    ]);
+  });
+
+  it("nieczytelny stary stan: wszystkie wpisy zapisanego stanu są traktowane jako nowe (ręczne)", async () => {
+    findFirst.mockResolvedValue(current({ state: { channels: "nie lista" }, entryOrigins: [] }));
+
+    await saveVariantState("v1", 3, { ...emptyBmcState(), channels: ["Sklep online"] });
+
+    expect(updateMany.mock.calls[0][0].data.entryOrigins).toEqual([
+      { blockKey: "channels", text: "Sklep online", kind: "MANUAL", recordedVersion: 4 },
+    ]);
+  });
+
+  it("inna wersja w bazie przy odczycie: VERSION_CONFLICT bez zapisu", async () => {
+    findFirst.mockResolvedValue(current({ version: 5 }));
+
+    expect(await saveVariantState("v1", 3, oldState)).toEqual({ ok: false, error: "VERSION_CONFLICT" });
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it("wariant nie istnieje: VERSION_CONFLICT bez zapisu", async () => {
+    findFirst.mockResolvedValue(null);
+
+    expect(await saveVariantState("v1", 3, oldState)).toEqual({ ok: false, error: "VERSION_CONFLICT" });
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it("wyścig po odczycie (updateMany count 0): VERSION_CONFLICT, pochodzenie nie zostaje zapisane osobno", async () => {
+    updateMany.mockResolvedValue({ count: 0 });
+
+    expect(await saveVariantState("v1", 3, oldState)).toEqual({ ok: false, error: "VERSION_CONFLICT" });
+    expect(updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("nie zapisuje niepoprawnego stanu i nie czyta bazy", async () => {
     const result = await saveVariantState("v1", 3, { ...emptyBmcState(), channels: [""] });
 
     expect(result).toMatchObject({ ok: false, error: "VALIDATION" });
+    expect(findFirst).not.toHaveBeenCalled();
     expect(updateMany).not.toHaveBeenCalled();
   });
 });
