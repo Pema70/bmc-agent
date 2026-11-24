@@ -2,15 +2,18 @@ import { z } from "zod";
 import { getProjectAccess } from "@/lib/auth/permissions";
 import { loadCanvasExportData } from "@/lib/export/canvas-data";
 import { buildCanvasDocx } from "@/lib/export/docx/canvas-document";
-import { renderCanvasPdf } from "@/lib/export/pdf/render";
+import { buildReportDocx } from "@/lib/export/docx/report-document";
+import { renderCanvasPdf, renderReportPdf } from "@/lib/export/pdf/render";
+import { buildReportExport } from "@/lib/export/report-export";
 import { exportContentDisposition } from "@/lib/export/sanitize";
+import { loadReportData } from "@/lib/report/load-report-data";
 import { VariantId } from "@/lib/schemas/bmc";
 
-// 9d: rodzaj „plansza” (płótno BMC w PDF, wersja tekstowa w DOCX). Rodzaj „raport” dochodzi w 9e (ten sam adres).
+// Rodzaj „plansza” (9d): płótno BMC w PDF, wersja tekstowa w DOCX. Rodzaj „raport” (9e): rozszerzony raport ze źródłami.
 const ExportQuery = z.strictObject({
   wariant: VariantId,
   format: z.enum(["pdf", "docx"]),
-  rodzaj: z.literal("plansza"),
+  rodzaj: z.enum(["plansza", "raport"]),
 });
 
 const CONTENT_TYPES = {
@@ -50,19 +53,31 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
 
   // 3. Dane tylko z projektu z uprawnień (obcy lub nieistniejący wariant: 404 bez ujawniania). Zapisany stan, 0 wywołań modelu.
   const now = new Date();
-  const data = await loadCanvasExportData(access.projectId, parsed.data.wariant, now);
-  if (!data) {
-    return jsonError(404, "NOT_FOUND", "Nie znaleziono tego wariantu w projekcie.");
+  const { format, rodzaj } = parsed.data;
+  let body: Uint8Array;
+  let names: string[];
+  if (rodzaj === "raport") {
+    const report = await loadReportData(access.projectId, parsed.data.wariant, now);
+    if (!report) {
+      return jsonError(404, "NOT_FOUND", "Nie znaleziono tego wariantu w projekcie.");
+    }
+    const exportData = buildReportExport(report);
+    body = format === "pdf" ? await renderReportPdf(exportData) : await buildReportDocx(exportData);
+    names = [exportData.projectName, exportData.variantName, "raport"];
+  } else {
+    const data = await loadCanvasExportData(access.projectId, parsed.data.wariant, now);
+    if (!data) {
+      return jsonError(404, "NOT_FOUND", "Nie znaleziono tego wariantu w projekcie.");
+    }
+    body = format === "pdf" ? await renderCanvasPdf(data) : await buildCanvasDocx(data);
+    names = [data.projectName, data.variantName];
   }
-
-  const { format } = parsed.data;
-  const body = format === "pdf" ? await renderCanvasPdf(data) : await buildCanvasDocx(data);
 
   return new Response(body as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": CONTENT_TYPES[format],
-      "Content-Disposition": exportContentDisposition([data.projectName, data.variantName], now, format),
+      "Content-Disposition": exportContentDisposition(names, now, format),
       "Content-Length": String(body.byteLength),
       // Dokument zawiera dane projektu: bez buforowania w przeglądarce i pośrednikach.
       "Cache-Control": "no-store",

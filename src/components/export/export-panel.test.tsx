@@ -23,9 +23,17 @@ describe("ExportPanel", () => {
   it("ma dwa linki pobierania (PDF i DOCX) z atrybutem download", () => {
     expect(markup).toContain('href="/api/projekty/p1/eksport?wariant=v1&amp;format=pdf&amp;rodzaj=plansza"');
     expect(markup).toContain('href="/api/projekty/p1/eksport?wariant=v1&amp;format=docx&amp;rodzaj=plansza"');
-    expect((markup.match(/download/g) ?? []).length).toBe(2);
+    expect((markup.match(/download/g) ?? []).length).toBe(4);
     expect(markup).toContain("Pobierz PDF (płótno)");
     expect(markup).toContain("Pobierz DOCX (tekst)");
+  });
+
+  it("ma dwa linki do rozszerzonego raportu (PDF i DOCX) i mówi, że raport nie wywołuje modelu", () => {
+    expect(markup).toContain('href="/api/projekty/p1/eksport?wariant=v1&amp;format=pdf&amp;rodzaj=raport"');
+    expect(markup).toContain('href="/api/projekty/p1/eksport?wariant=v1&amp;format=docx&amp;rodzaj=raport"');
+    expect(markup).toContain("Pobierz raport PDF");
+    expect(markup).toContain("Pobierz raport DOCX");
+    expect(markup).toContain("nie wywołuje modelu");
   });
 
   it("mówi, że eksport dotyczy zapisanego stanu (wersja N) i że treści AI są oznaczone", () => {
