@@ -1,17 +1,22 @@
 import { z } from "zod";
 import { getProjectAccess } from "@/lib/auth/permissions";
-import { getProject } from "@/lib/db/projects";
-import { getVariantForProject } from "@/lib/db/variants";
+import { loadCanvasExportData } from "@/lib/export/canvas-data";
+import { buildCanvasDocx } from "@/lib/export/docx/canvas-document";
+import { renderCanvasPdf } from "@/lib/export/pdf/render";
 import { exportContentDisposition } from "@/lib/export/sanitize";
-import { renderSamplePdf } from "@/lib/export/pdf/render";
 import { VariantId } from "@/lib/schemas/bmc";
 
-// PR 9b: tylko próbny PDF (format=pdf), żeby sprawdzić zgodność z Next 16 i Turbopackiem oraz polskie litery. Format DOCX
-// i rodzaje „plansza” i „raport” dochodzą w 9d i 9e (ten sam adres, rozszerzony `ExportQuery`).
+// 9d: rodzaj „plansza” (płótno BMC w PDF, wersja tekstowa w DOCX). Rodzaj „raport” dochodzi w 9e (ten sam adres).
 const ExportQuery = z.strictObject({
   wariant: VariantId,
-  format: z.literal("pdf"),
+  format: z.enum(["pdf", "docx"]),
+  rodzaj: z.literal("plansza"),
 });
+
+const CONTENT_TYPES = {
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+} as const;
 
 function jsonError(status: number, error: string, message: string): Response {
   return Response.json({ error, message }, { status });
@@ -32,33 +37,33 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     return jsonError(404, "NOT_FOUND", "Nie znaleziono projektu.");
   }
 
-  // 2. Parametry zapytania (strict: nic innego nie trafia do dokumentu).
+  // 2. Parametry zapytania (strict: nic innego nie trafia do dokumentu). Bez `rodzaj` domyślnie „plansza”.
   const query = new URL(req.url).searchParams;
-  const parsed = ExportQuery.safeParse({ wariant: query.get("wariant") ?? undefined, format: query.get("format") ?? undefined });
-  if (!parsed.success || [...query.keys()].some((key) => key !== "wariant" && key !== "format")) {
+  const parsed = ExportQuery.safeParse({
+    wariant: query.get("wariant") ?? undefined,
+    format: query.get("format") ?? undefined,
+    rodzaj: query.get("rodzaj") ?? "plansza",
+  });
+  if (!parsed.success || [...query.keys()].some((key) => key !== "wariant" && key !== "format" && key !== "rodzaj")) {
     return jsonError(400, "VALIDATION", "Nieprawidłowe parametry eksportu.");
   }
 
-  // 3. Wariant i projekt tylko z projektu z uprawnień (obcy lub nieistniejący: 404 bez ujawniania).
-  const variant = await getVariantForProject(access.projectId, parsed.data.wariant);
-  const project = variant ? await getProject(access.projectId) : null;
-  if (!variant || !project) {
+  // 3. Dane tylko z projektu z uprawnień (obcy lub nieistniejący wariant: 404 bez ujawniania). Zapisany stan, 0 wywołań modelu.
+  const now = new Date();
+  const data = await loadCanvasExportData(access.projectId, parsed.data.wariant, now);
+  if (!data) {
     return jsonError(404, "NOT_FOUND", "Nie znaleziono tego wariantu w projekcie.");
   }
 
-  const now = new Date();
-  const pdf = await renderSamplePdf({
-    projectName: project.name,
-    variantVersion: variant.version,
-    generatedAt: new Intl.DateTimeFormat("pl-PL", { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Warsaw" }).format(now),
-  });
+  const { format } = parsed.data;
+  const body = format === "pdf" ? await renderCanvasPdf(data) : await buildCanvasDocx(data);
 
-  return new Response(pdf as BodyInit, {
+  return new Response(body as BodyInit, {
     status: 200,
     headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": exportContentDisposition([project.name], now, "pdf"),
-      "Content-Length": String(pdf.byteLength),
+      "Content-Type": CONTENT_TYPES[format],
+      "Content-Disposition": exportContentDisposition([data.projectName, data.variantName], now, format),
+      "Content-Length": String(body.byteLength),
       // Dokument zawiera dane projektu: bez buforowania w przeglądarce i pośrednikach.
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",

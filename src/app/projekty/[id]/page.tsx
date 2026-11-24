@@ -9,6 +9,7 @@ import { VariantWorkspaceProvider, type VariantWorkspaceProviderProps } from "@/
 import { AttachmentsPanel } from "@/components/attachments/attachments-panel";
 import { AgentChat } from "@/components/chat/agent-chat";
 import { EvaluationPanel } from "@/components/evaluation/evaluation-panel";
+import { ExportPanel } from "@/components/export/export-panel";
 import { ImpactPanel } from "@/components/impact/impact-panel";
 import { ImpactProvider } from "@/components/impact/impact-provider";
 import { ProjectForm } from "@/components/projects/project-form";
@@ -241,6 +242,7 @@ export default async function ProjectPage({
             </aside>
           ) : null}
         </div>
+        {variant ? <ExportPanel projectId={access.projectId} variantId={variant.id} variantVersion={variant.version} /> : null}
         {variant ? (
           <EvaluationPanel
             // Nowa ocena (np. z czatu, po router.refresh()) zmienia klucz, więc panel wczytuje świeżą listę.
