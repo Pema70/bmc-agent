@@ -324,7 +324,7 @@ Działa na zapisanym stanie wariantu, z załącznikiem albo bez niego, gdy model
    - PR README: instrukcja uruchomienia krok po kroku (`README.md`).
 7. Załączniki, `read_attachment` i cykl poprawek (ocena → pytania → poprawki, najwyżej 3 rundy na wariant, §7).
 8. ~~Współdzielenie projektów~~ **Usunięte z zakresu 2026-11-18** (projekty jednoosobowe, §8). Numer zostaje, żeby odwołania „krok 9” i „krok 10” w dokumentach były aktualne.
-9. Eksport PDF i DOCX oraz rozszerzony raport ze źródłami (§10).
+9. Eksport PDF i DOCX oraz rozszerzony raport ze źródłami (§10). **Zrobione.**
 10. Dane przykładowe, ręczna ocena referencyjna, niezależny agent oceniający (`judge_bmc`), skrypt ewaluacji, porównanie modeli.
 11. Wersja 2: dziewięciu agentów z orkiestracją (§16) i porównanie architektur. Zaczyna się dopiero po zamknięciu kroków 1 do 10.
 
