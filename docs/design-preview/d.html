@@ -3,8 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Podgląd palety D. Ciemny granat i koral</title>
-<style>/* tokens:dark */
+<title>Podgląd palety D (wersja 2)</title>
+<style>
+@font-face { font-family: "BMC Noto"; font-style: normal; font-weight: 400; src: url("../../src/lib/export/fonts/NotoSans-Regular.ttf") format("truetype"); }
+@font-face { font-family: "BMC Noto"; font-style: normal; font-weight: 700; src: url("../../src/lib/export/fonts/NotoSans-Bold.ttf") format("truetype"); }
+/* Space Grotesk (SIL OFL 1.1) tylko do nagłówków i tytułu; w podglądzie z pliku tymczasowego poza repozytorium (tylko na tym komputerze). */
+@font-face { font-family: "BMC Grotesk"; font-style: normal; font-weight: 300 700; src: url("file:///C:/Users/thepr/AppData/Local/Temp/claude/e2de8a3faef9131f/441d8e06-3958-47e1-ba85-670bab99eb33/scratchpad/sg-dl/SpaceGrotesk%5Bwght%5D.ttf") format("truetype"); }
+/* tokens:dark */
 :root {
   color-scheme: dark;
   --bg-from: #04060C;
@@ -12,8 +17,8 @@
   --surface: #101A36;
   --tint: #17234A;
   --text: #E9EDFB;
-  --muted: #A6B2D6;
-  --border: #25346A;
+  --muted: #B2BEE0;
+  --border: #3A4F9A;
   --head-from: #28314A;
   --head-to: #1C2540;
   --on-head: #E9EDFB;
@@ -25,14 +30,14 @@
   --on-accent: #1A0A06;
   --ring: #7DB2FF;
   --danger: #FF93AE;
-  --title-from: #8DBBFF;
+  --title-from: #7DB2FF;
   --title-to: #FF9068;
-  --glow-navy-peak: #172A6E;
-  --glow-coral-peak: #5D2E32;
-  --glow-navy: rgba(37, 70, 190, 0.5);
-  --glow-coral: rgba(255, 107, 91, 0.34);
-  --glass: rgba(255, 255, 255, 0.06);
-  --glass-border: rgba(255, 255, 255, 0.16);
+  --glow-navy-peak: #1D3690;
+  --glow-coral-peak: #7A393A;
+  --glow-navy: rgba(42, 79, 214, 0.62);
+  --glow-coral: rgba(255, 107, 91, 0.46);
+  --glass: rgba(255, 255, 255, 0.07);
+  --glass-border: rgba(255, 255, 255, 0.22);
   --ai-bg: #2E1650;
   --ai-fg: #E3BDFF;
   --ai-border: #8B5CC8;
@@ -57,7 +62,7 @@
   --surface: #FFFFFF;
   --tint: #EEF2FB;
   --text: #0E1630;
-  --muted: #4C5A80;
+  --muted: #3F4D75;
   --border: #CBD5EA;
   --head-from: #EAF0FC;
   --head-to: #F3F6FD;
@@ -70,14 +75,14 @@
   --on-accent: #FFFFFF;
   --ring: #2057D0;
   --danger: #B4233A;
-  --title-from: #2057D0;
-  --title-to: #A5300C;
-  --glow-navy-peak: #D6DFF7;
-  --glow-coral-peak: #F6E2E1;
-  --glow-navy: rgba(80, 120, 230, 0.18);
-  --glow-coral: rgba(255, 120, 90, 0.16);
+  --title-from: #1B45B0;
+  --title-to: #9A2B08;
+  --glow-navy-peak: #C3D0F5;
+  --glow-coral-peak: #F7D5D1;
+  --glow-navy: rgba(80, 120, 230, 0.3);
+  --glow-coral: rgba(255, 120, 90, 0.26);
   --glass: rgba(255, 255, 255, 0.66);
-  --glass-border: rgba(14, 22, 48, 0.14);
+  --glass-border: rgba(14, 22, 48, 0.16);
   --ai-bg: #F3E9FE;
   --ai-fg: #6B21A8;
   --ai-border: #D0A8F0;
@@ -94,123 +99,108 @@
   --main-fg: #1D3F94;
   --main-border: #9DB8EE;
 }
+
 * { box-sizing: border-box; }
-body { margin: 0; font-family: "BMC Noto", "Segoe UI", system-ui, sans-serif; font-style: normal; font-size: 16px; line-height: 1.5; color: var(--text); background: var(--bg-from); background-image: linear-gradient(180deg, var(--bg-from), var(--bg-to)); background-attachment: fixed; min-height: 100vh; }
-a, button { font: inherit; }
+html { scroll-behavior: smooth; }
+body { margin: 0; font-family: "BMC Noto", "Segoe UI", system-ui, sans-serif; font-style: normal; font-size: 16px; line-height: 1.55; color: var(--text); min-height: 100vh;
+  background-color: var(--bg-from);
+  background-image:
+    radial-gradient(72rem 50rem at 4% -8%, var(--glow-navy), transparent 72%),
+    radial-gradient(62rem 46rem at 98% 0%, var(--glow-coral), transparent 72%),
+    radial-gradient(74rem 50rem at 28% 112%, var(--glow-navy), transparent 72%),
+    radial-gradient(48rem 36rem at 90% 100%, var(--glow-coral), transparent 72%),
+    linear-gradient(180deg, var(--bg-from), var(--bg-to));
+  background-attachment: fixed; }
+h1, h2, h3, .display { font-family: "BMC Grotesk", "BMC Noto", "Segoe UI", sans-serif; letter-spacing: -0.01em; }
+a, button, input { font: inherit; }
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 24px; background: linear-gradient(135deg, var(--head-from), var(--head-to)); color: var(--on-head); }
-.top strong { font-size: 18px; }
-.top .grow { flex: 1; }
-.theme-btn { border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
-main { padding: 20px 24px 40px; }
-.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
-@media (min-width: 1200px) { .layout { grid-template-columns: minmax(0, 1fr) 24rem; } }
-h1 { font-size: 24px; margin: 0 0 4px; }
-.sub { color: var(--muted); margin: 0 0 14px; }
-.variantbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
-.variantbar .name { font-weight: 700; font-size: 18px; }
-.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid; border-radius: 999px; padding: 1px 10px; font-size: 13px; font-weight: 700; white-space: nowrap; }
-.chip svg { width: 12px; height: 12px; }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 32px; background: var(--glass); border-bottom: 1px solid var(--glass-border); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.top strong { font-family: "BMC Grotesk", "BMC Noto", sans-serif; font-size: 20px; }
+.top .grow { flex: 1; color: var(--muted); font-size: 14px; }
+.theme-btn { border: 1px solid var(--border); background: var(--tint); color: var(--text); border-radius: 10px; padding: 6px 12px; cursor: pointer; }
+main { padding: 32px; display: flex; flex-direction: column; gap: 28px; max-width: 120rem; margin: 0 auto; }
+h1.grad-title { margin: 0; font-size: clamp(2.25rem, 5vw, 3.75rem); line-height: 1.1; font-weight: 700; background: linear-gradient(90deg, var(--title-from), var(--title-to)); -webkit-background-clip: text; background-clip: text; color: transparent; display: inline-block; }
+.sub { color: var(--muted); margin: 6px 0 0; font-size: 17px; }
+.variantbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.variantbar .name { font-family: "BMC Grotesk", "BMC Noto", sans-serif; font-weight: 700; font-size: 20px; }
+.hint { font-size: 13px; color: var(--muted); }
+.chip { display: inline-flex; align-items: center; border: 1px solid; border-radius: 999px; padding: 1px 11px; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .chip-ai { background: var(--ai-bg); color: var(--ai-fg); border-color: var(--ai-border); }
 .chip-low { background: var(--low-bg); color: var(--low-fg); border-color: var(--low-border); }
 .chip-medium { background: var(--medium-bg); color: var(--medium-fg); border-color: var(--medium-border); }
 .chip-high { background: var(--high-bg); color: var(--high-fg); border-color: var(--high-border); }
 .chip-main { background: var(--main-bg); color: var(--main-fg); border-color: var(--main-border); }
-.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; padding: 8px; background: var(--tint); border: 1px solid var(--border); border-radius: 10px; }
-.tbtn { display: inline-flex; flex-wrap: wrap; max-width: 100%; align-items: center; gap: 8px; min-height: 40px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
-.tbtn:hover { border-color: var(--head-from); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; padding: 12px; background: var(--glass); border: 1px solid var(--glass-border); border-radius: 16px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28); }
+.tbtn { display: inline-flex; flex-wrap: wrap; max-width: 100%; align-items: center; gap: 8px; min-height: 44px; border: 1px solid var(--border); background: var(--tint); color: var(--text); border-radius: 12px; padding: 6px 14px; cursor: pointer; transition: box-shadow .15s, border-color .15s; }
+.tbtn:hover { border-color: var(--primary-from); box-shadow: 0 0 0 3px rgba(125, 178, 255, 0.16); }
 .tbtn[aria-expanded="true"] { background: linear-gradient(135deg, var(--accent-from), var(--accent-to)); color: var(--on-accent); border-color: transparent; font-weight: 700; }
-.pill { display: inline-block; min-width: 20px; text-align: center; border-radius: 999px; padding: 0 7px; font-size: 12px; font-weight: 700; background: var(--tint); color: var(--text); border: 1px solid var(--border); }
-.tbtn[aria-expanded="true"] .pill { background: var(--surface); color: var(--text); }
-.btn { display: inline-block; border: 1px solid transparent; border-radius: 8px; padding: 8px 16px; font-weight: 700; cursor: pointer; }
-.btn-primary { background: linear-gradient(135deg, var(--accent-from), var(--accent-to)); color: var(--on-accent); }
-.btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
-.canvas { display: grid; gap: 8px; grid-template-columns: 1fr; container-type: inline-size; }
+.pill { display: inline-block; min-width: 20px; text-align: center; border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 700; background: var(--accent-from); color: var(--on-accent); }
+.tbtn[aria-expanded="true"] .pill { background: var(--on-accent); color: var(--accent-from); }
+.btn { display: inline-block; border: 1px solid transparent; border-radius: 12px; padding: 9px 18px; font-weight: 700; cursor: pointer; transition: box-shadow .15s; }
+.btn-primary { background: linear-gradient(135deg, var(--primary-from), var(--primary-to)); color: var(--on-primary); }
+.btn-primary:hover { box-shadow: 0 0 22px rgba(125, 178, 255, 0.45); }
+.btn-secondary { background: var(--tint); color: var(--text); border-color: var(--border); }
+.btn-secondary:hover { border-color: var(--primary-from); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.32); }
+.card > header, .block > h3 { margin: 0; background: linear-gradient(135deg, var(--head-from), var(--head-to)); color: var(--on-head); border-bottom: 1px solid var(--glass-border); }
+.canvas { display: grid; gap: 14px; grid-template-columns: 1fr; }
 @media (min-width: 900px) {
-  .canvas { grid-template-columns: repeat(10, minmax(0, 1fr)); grid-template-rows: minmax(11rem, auto) minmax(11rem, auto) minmax(8rem, auto); }
+  .canvas { grid-template-columns: repeat(10, minmax(0, 1fr)); grid-template-rows: minmax(12rem, auto) minmax(12rem, auto) minmax(8.5rem, auto); }
   .b-kp { grid-column: 1 / span 2; grid-row: 1 / span 2; } .b-ka { grid-column: 3 / span 2; grid-row: 1; } .b-kr { grid-column: 3 / span 2; grid-row: 2; }
   .b-vp { grid-column: 5 / span 2; grid-row: 1 / span 2; } .b-rk { grid-column: 7 / span 2; grid-row: 1; } .b-ch { grid-column: 7 / span 2; grid-row: 2; }
   .b-sk { grid-column: 9 / span 2; grid-row: 1 / span 2; } .b-ks { grid-column: 1 / span 5; grid-row: 3; } .b-sp { grid-column: 6 / span 5; grid-row: 3; }
 }
-.block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
-.block > h3 { margin: 0; padding: 6px 12px; font-size: 14px; background: linear-gradient(135deg, var(--head-from), var(--head-to)); color: var(--on-head); }
-.block .body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.block { display: flex; flex-direction: column; min-width: 0; }
+.block > h3 { padding: 10px 16px; font-size: 15px; }
+.block .body { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
 .block .scroll { max-height: 17rem; overflow-y: auto; }
 .block ul { margin: 0; padding-left: 18px; font-size: 15px; overflow-wrap: anywhere; }
-.block li { margin-bottom: 4px; }
-.hint { font-size: 13px; color: var(--muted); }
-.block.impact { border-color: var(--high-border); box-shadow: 0 0 0 2px var(--high-border); }
-.proposal { background: var(--tint); border: 1px solid var(--border); border-radius: 8px; padding: 8px; font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
-.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.panel { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
-.panel > header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: linear-gradient(135deg, var(--head-from), var(--head-to)); color: var(--on-head); }
-.panel > header h2 { margin: 0; font-size: 19px; }
-.panel .content { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-table { border-collapse: collapse; width: 100%; font-size: 15px; }
-th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
-th { background: var(--tint); }
-.chat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; align-self: start; position: sticky; top: 12px; }
-.chat > header { padding: 10px 16px; background: linear-gradient(135deg, var(--head-from), var(--head-to)); color: var(--on-head); font-weight: 700; font-size: 18px; }
-.chat .msgs { padding: 12px; display: flex; flex-direction: column; gap: 10px; max-height: 34rem; overflow-y: auto; }
-.msg { border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; background: var(--surface); font-size: 15px; }
-.msg.user { background: var(--tint); }
+.block li { margin-bottom: 6px; }
+.block.impact { border-color: var(--high-border); box-shadow: 0 0 0 2px var(--high-border), 0 10px 30px rgba(0, 0, 0, 0.32); }
+.proposal { background: var(--tint); border: 1px solid var(--border); border-radius: 12px; padding: 10px; font-size: 14px; display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.dock > header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 20px; }
+.dock > header h2 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
+.dock .chatbody { display: flex; flex-direction: column; height: 26rem; }
+.dock .chatbody[hidden] { display: none; }
+.dock .msgs { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; }
+.msg { border: 1px solid var(--border); border-radius: 14px; padding: 10px 14px; background: var(--surface); font-size: 15px; max-width: 52rem; }
+.msg.user { background: var(--tint); align-self: flex-end; }
 .msg .who { font-size: 13px; color: var(--muted); font-weight: 700; margin: 0 0 2px; }
-.chat form { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border); background: var(--tint); }
-.chat input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--surface); color: var(--text); }
-.legend { margin-top: 20px; font-size: 14px; color: var(--muted); }
-.swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.sw { width: 130px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 12px; }
-.sw i { display: block; height: 36px; }
-.sw span { display: block; padding: 4px 6px; background: var(--surface); color: var(--text); }
-
-body { background-color: var(--bg-from); background-image:
-    radial-gradient(62rem 40rem at 10% -8%, var(--glow-navy), transparent 70%),
-    radial-gradient(52rem 36rem at 94% 4%, var(--glow-coral), transparent 70%),
-    radial-gradient(64rem 42rem at 40% 112%, var(--glow-navy), transparent 70%),
-    linear-gradient(180deg, var(--bg-from), var(--bg-to)); background-attachment: fixed; }
-.top { background: var(--glass); color: var(--text); border-bottom: 1px solid var(--glass-border); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-.theme-btn { background: var(--tint); color: var(--text); border-color: var(--border); }
-h1.grad-title { font-size: 30px; line-height: 1.2; background: linear-gradient(90deg, var(--title-from), var(--title-to)); -webkit-background-clip: text; background-clip: text; color: transparent; display: inline-block; }
-.toolbar { background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-.tbtn { background: var(--tint); border-color: var(--border); color: var(--text); }
-.tbtn:hover { border-color: var(--primary-from); }
-.tbtn[aria-expanded="true"] { background: linear-gradient(135deg, var(--accent-from), var(--accent-to)); color: var(--on-accent); border-color: transparent; }
-.pill { background: var(--accent-from); color: var(--on-accent); border-color: transparent; }
-.tbtn[aria-expanded="true"] .pill { background: var(--on-accent); color: var(--accent-from); }
-.btn-primary { background: linear-gradient(135deg, var(--primary-from), var(--primary-to)); color: var(--on-primary); }
-.btn-secondary { background: var(--tint); color: var(--text); border-color: var(--border); }
-.block { background: var(--surface); border-color: var(--border); }
-.block > h3 { background: linear-gradient(135deg, var(--head-from), var(--head-to)); color: var(--on-head); border-bottom: 1px solid var(--glass-border); }
-.panel { background: var(--surface); border-color: var(--border); }
-.panel > header, .chat > header { background: linear-gradient(135deg, var(--head-from), var(--head-to)); color: var(--on-head); border-bottom: 1px solid var(--glass-border); }
-.chat { background: var(--surface); border-color: var(--border); }
-.msg { background: var(--surface); }
-.msg.user { background: var(--tint); }
-.chat form { background: var(--tint); }
-.chat input { background: var(--surface); }
+.dock form { display: flex; gap: 10px; padding: 12px 20px; border-top: 1px solid var(--border); background: var(--tint); }
+.dock input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; background: var(--surface); color: var(--text); }
+.panel > header { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; }
+.panel > header h2 { margin: 0; font-size: 22px; }
+.panel .content { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
 th { background: var(--tint); }
-.block.impact { border-color: var(--high-border); box-shadow: 0 0 0 2px var(--high-border); }
-.small-card { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
-.coral-note { color: var(--text); }
+.small-card { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 14px; padding: 10px 16px; font-size: 14px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+.legend { font-size: 14px; color: var(--muted); }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.sw { width: 130px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; font-size: 12px; }
+.sw i { display: block; height: 36px; }
+.sw span { display: block; padding: 4px 8px; background: var(--surface); color: var(--text); }
+@media (max-width: 600px) { main { padding: 16px; } .top { padding: 10px 16px; } .dock .chatbody { height: 22rem; } }
 </style>
 </head>
 <body>
 <div class="top">
-  <strong>BMC Agent</strong><span class="grow">Podgląd palety: D. Ciemny granat i koral (statyczny, dane przykładowe)</span>
+  <strong>BMC Agent</strong><span class="grow">Podgląd palety D, wersja 2 (statyczny, dane przykładowe)</span>
   <button class="theme-btn" type="button" onclick="var r=document.documentElement;r.setAttribute('data-theme', r.getAttribute('data-theme')==='light'?'dark':'light')">Przełącz ciemny / jasny (domyślnie ciemny)</button>
 </div>
 <main>
-<div class="layout">
-<div>
-  <h1 class="grad-title">Kawiarnia Ziarno</h1>
-  <p class="sub">Palarnia i kawiarnia z Krakowa. Twoja rola: właściciel.</p>
+  <div>
+    <h1 class="grad-title">Kawiarnia Ziarno</h1>
+    <p class="sub">Palarnia i kawiarnia z Krakowa. Twoja rola: właściciel.</p>
+  </div>
   <div class="variantbar">
     <span class="name">Wariant główny</span><span class="chip chip-main">Główny</span>
     <span class="hint">wersja 7 · zapisany stan</span>
     <span class="chip chip-ai">Strategia AI</span><span class="hint">(przykład znacznika wariantu ze strategii)</span>
   </div>
   <div class="toolbar" role="toolbar" aria-label="Narzędzia modelu">
-    <button class="tbtn" type="button" aria-expanded="false">Czat <span class="pill">2 propozycje</span></button>
+    <button class="tbtn" id="tb-chat" type="button" aria-expanded="true" aria-controls="chatbody" onclick="toggleChat()">Czat <span class="pill">2 propozycje</span></button>
     <button class="tbtn" type="button" aria-expanded="true">Ocena <span class="pill">nieaktualna</span></button>
     <button class="tbtn" type="button" aria-expanded="false">Wpływ <span class="pill">aktywna analiza</span></button>
     <button class="tbtn" type="button" aria-expanded="false">Warianty i strategie <span class="pill">3</span></button>
@@ -220,22 +210,40 @@ th { background: var(--tint); }
     <button class="tbtn" type="button" aria-expanded="false">Eksport i raport <span class="pill">niezapisane zmiany</span></button>
   </div>
 
-  <div class="canvas" aria-label="Płótno modelu biznesowego">
-    <section class="block b-kp"><h3>Kluczowi partnerzy</h3><div class="body"><ul><li>Piekarnia lokalna</li><li>Plantacje w Etiopii</li></ul></div></section>
-    <section class="block b-ka"><h3>Kluczowe działania</h3><div class="body"><ul><li>Palenie ziarna</li><li>Obsługa kawiarni</li></ul></div></section>
-    <section class="block b-kr"><h3>Kluczowe zasoby</h3><div class="body"><ul><li>Palarnia własna</li></ul></div></section>
-    <section class="block b-vp"><h3>Propozycje wartości</h3><div class="body">
+  <div class="canvas" aria-label="Płótno modelu biznesowego (cała szerokość strony)">
+    <section class="card block b-kp"><h3>Kluczowi partnerzy</h3><div class="body"><ul><li>Piekarnia lokalna</li><li>Plantacje w Etiopii</li></ul></div></section>
+    <section class="card block b-ka"><h3>Kluczowe działania</h3><div class="body"><ul><li>Palenie ziarna</li><li>Obsługa kawiarni</li></ul></div></section>
+    <section class="card block b-kr"><h3>Kluczowe zasoby</h3><div class="body"><ul><li>Palarnia własna</li></ul></div></section>
+    <section class="card block b-vp"><h3>Propozycje wartości</h3><div class="body">
       <ul><li>Świeżo palona kawa</li><li>Zażółć gęślą jaźń: ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ</li></ul>
       <div class="proposal"><span><span class="chip chip-ai">Propozycja AI</span> Dodaj wpis: „Kawa ekologiczna”</span><span class="hint">Uzasadnienie agenta: klienci pytają o kawę ekologiczną.</span><span class="row"><button class="btn btn-primary" type="button">Zaakceptuj</button><button class="btn btn-secondary" type="button">Odrzuć</button></span></div>
     </div></section>
-    <section class="block b-rk"><h3>Relacje z klientami</h3><div class="body"><ul><li>Karta lojalnościowa</li></ul></div></section>
-    <section class="block b-ch impact"><h3>Kanały</h3><div class="body"><span class="chip chip-high">Wpływ wysoki</span><ul><li>Sklep stacjonarny</li><li>Sprzedaż w sklepie internetowym</li></ul></div></section>
-    <section class="block b-sk"><h3>Segmenty klientów</h3><div class="body"><p class="hint" style="margin:0">Przewiń: 8 wpisów w bloku</p><div class="scroll" tabindex="0" aria-label="Wpisy bloku Segmenty klientów"><ul><li>Studenci krakowskich uczelni</li><li>Pracownicy biurowi</li><li>Turyści</li><li>Firmy z biurami w centrum</li><li>Miłośnicy kawy specialty</li><li>Rodziny z dziećmi</li><li>Kawa_bez_spacji_o_bardzo_dlugiej_nazwie_pracownicy_biurowca_przy_ulicy_dlugiej</li><li>Seniorzy</li></ul></div></div></section>
-    <section class="block b-ks"><h3>Struktura kosztów</h3><div class="body"><ul><li>Zakup ziarna</li><li>Wynajem lokalu</li></ul></div></section>
-    <section class="block b-sp"><h3>Strumienie przychodów</h3><div class="body"><ul><li>Sprzedaż kawy w kawiarni</li><li>Subskrypcja miesięczna</li></ul></div></section>
+    <section class="card block b-rk"><h3>Relacje z klientami</h3><div class="body"><ul><li>Karta lojalnościowa</li></ul></div></section>
+    <section class="card block b-ch impact"><h3>Kanały</h3><div class="body"><span><span class="chip chip-high">Wpływ wysoki</span></span><ul><li>Sklep stacjonarny</li><li>Sprzedaż w sklepie internetowym</li></ul></div></section>
+    <section class="card block b-sk"><h3>Segmenty klientów</h3><div class="body"><p class="hint" style="margin:0">Przewiń: 8 wpisów w bloku</p><div class="scroll" tabindex="0" aria-label="Wpisy bloku Segmenty klientów"><ul><li>Studenci krakowskich uczelni</li><li>Pracownicy biurowi</li><li>Turyści</li><li>Firmy z biurami w centrum</li><li>Miłośnicy kawy specialty</li><li>Rodziny z dziećmi</li><li>Kawa_bez_spacji_o_bardzo_dlugiej_nazwie_pracownicy_biurowca_przy_ulicy_dlugiej</li><li>Seniorzy</li></ul></div></div></section>
+    <section class="card block b-ks"><h3>Struktura kosztów</h3><div class="body"><ul><li>Zakup ziarna</li><li>Wynajem lokalu</li></ul></div></section>
+    <section class="card block b-sp"><h3>Strumienie przychodów</h3><div class="body"><ul><li>Sprzedaż kawy w kawiarni</li><li>Subskrypcja miesięczna</li></ul></div></section>
   </div>
 
-  <section class="panel" aria-labelledby="p-ocena">
+  <section class="card dock" aria-labelledby="chat-h">
+    <header>
+      <h2 id="chat-h">Czat z agentem <span class="chip chip-ai">AI</span></h2>
+      <button class="btn btn-secondary" id="chat-toggle" type="button" aria-expanded="true" aria-controls="chatbody" onclick="toggleChat()">Zwiń czat</button>
+    </header>
+    <div class="chatbody" id="chatbody">
+      <div class="msgs" tabindex="0" aria-label="Rozmowa (przewijana, stała wysokość)">
+        <div class="msg user"><p class="who">Ty</p>Dodaj do kanałów sprzedaż w sklepie internetowym.</div>
+        <div class="msg"><p class="who">Agent</p>Proponuję dodać wpis „Sprzedaż w sklepie internetowym” do bloku Kanały. <div class="proposal" style="margin-top:8px"><span><span class="chip chip-ai">Propozycja AI</span> Dodaj wpis w bloku Kanały</span><span class="row"><button class="btn btn-primary" type="button">Zaakceptuj</button><button class="btn btn-secondary" type="button">Odrzuć</button></span></div></div>
+        <div class="msg user"><p class="who">Ty</p>Oceń model.</div>
+        <div class="msg"><p class="who">Agent</p>Ocena gotowa: spójność 8/10, ryzyko 4/10. To opinia modelu, a nie weryfikacja biznesowa.</div>
+        <div class="msg user"><p class="who">Ty</p>Które bloki mają największy wpływ na ryzyko?</div>
+        <div class="msg"><p class="who">Agent</p>Największy wpływ mają Kluczowi partnerzy (zależność od jednego dostawcy ziarna) oraz Struktura kosztów. To ogólna ocena modelu językowego, nie weryfikacja danych.</div>
+      </div>
+      <form onsubmit="return false"><input aria-label="Wiadomość" placeholder="Napisz do agenta…"><button class="btn btn-primary" type="submit">Wyślij</button></form>
+    </div>
+  </section>
+
+  <section class="card panel" aria-labelledby="p-ocena">
     <header><h2 id="p-ocena">Ocena modelu</h2><span class="chip chip-ai">AI</span></header>
     <div class="content">
       <p class="hint" style="margin:0">Ocena AI: google / gemini-3.5-flash-lite · prompt evaluate-v1 · dotyczy wersji 5 (bieżąca: 7), ocena może być nieaktualna.</p>
@@ -252,22 +260,15 @@ th { background: var(--tint); }
       <span class="chip chip-low">Wpływ niski</span><span class="chip chip-medium">Wpływ średni</span><span class="chip chip-high">Wpływ wysoki</span></span>
     </div>
   </section>
-</div>
 
-<aside class="chat" aria-label="Czat z agentem">
-  <header>Czat z agentem</header>
-  <div class="msgs">
-    <div class="msg user"><p class="who">Ty</p>Dodaj do kanałów sprzedaż w sklepie internetowym.</div>
-    <div class="msg"><p class="who">Agent</p>Proponuję dodać wpis „Sprzedaż w sklepie internetowym” do bloku Kanały. <div class="proposal" style="margin-top:6px"><span><span class="chip chip-ai">Propozycja AI</span> Dodaj wpis w bloku Kanały</span><span class="row"><button class="btn btn-primary" type="button">Zaakceptuj</button><button class="btn btn-secondary" type="button">Odrzuć</button></span></div></div>
-    <div class="msg user"><p class="who">Ty</p>Oceń model.</div>
-    <div class="msg"><p class="who">Agent</p>Ocena gotowa: spójność 8/10, ryzyko 4/10. To opinia modelu, a nie weryfikacja biznesowa.</div>
-  </div>
-  <form onsubmit="return false"><input aria-label="Wiadomość" placeholder="Napisz do agenta…"><button class="btn btn-primary" type="submit">Wyślij</button></form>
-</aside>
-</div>
-
-<div class="small-card" style="margin-top:20px">Mała szklana karta: półprzezroczysta z cienką jasną ramką (tylko pasek, nagłówki i małe karty). Bloki, czat i tabele mają pełne, nieprzezroczyste tło.</div><div class="legend">Paleta: 60% czarne tło z poświatą (granat i koral), 30% ciemny granat (bloki, panele, czat, przyciski drugorzędne; szklane tylko pasek, nagłówki i małe karty), 10% koral (aktywny przycisk paska, plakietki, gradient tytułu); przyciski główne w jaśniejszym niebieskim.
-  <div class="swatches"><div class="sw"><i style="background:var(--bg-from)"></i><span>tło (60%)</span></div><div class="sw"><i style="background:var(--surface)"></i><span>powierzchnia</span></div><div class="sw"><i style="background:var(--tint)"></i><span>granat (30%)</span></div><div class="sw"><i style="background:var(--primary-from)"></i><span>przycisk główny</span></div><div class="sw"><i style="background:var(--accent-from)"></i><span>koral (10%)</span></div><div class="sw"><i style="background:var(--ai-fg)"></i><span>AI</span></div><div class="sw"><i style="background:var(--high-fg)"></i><span>wpływ wysoki</span></div></div></div>
+  <div class="small-card">Mała szklana karta: półprzezroczysta z cienką jasną ramką (pasek, nagłówki i małe karty). Bloki, czat i tabele mają pełne, nieprzezroczyste tło. Układ: płótno na całą szerokość, pod nim zwijany czat (stała wysokość, pole wiadomości zawsze na dole), pod czatem jeden otwarty panel.</div>
+  <div class="legend">Paleta D: 60% czarne tło z poświatą (granat i koral), 30% ciemny granat, 10% koral; przyciski główne w jaśniejszym niebieskim. Nagłówki i tytuł: Space Grotesk (z pliku tymczasowego); wpisy, czat i tabele: Noto Sans.
+    <div class="swatches"><div class="sw"><i style="background:var(--bg-from)"></i><span>tło (60%)</span></div><div class="sw"><i style="background:var(--surface)"></i><span>powierzchnia</span></div><div class="sw"><i style="background:var(--tint)"></i><span>granat (30%)</span></div><div class="sw"><i style="background:var(--primary-from)"></i><span>przycisk główny</span></div><div class="sw"><i style="background:var(--accent-from)"></i><span>koral (10%)</span></div><div class="sw"><i style="background:var(--ai-fg)"></i><span>AI</span></div><div class="sw"><i style="background:var(--high-fg)"></i><span>wpływ wysoki</span></div></div></div>
 </main>
+<script>
+function toggleChat(){var b=document.getElementById('chatbody'),t=document.getElementById('chat-toggle'),tb=document.getElementById('tb-chat');var open=b.hasAttribute('hidden');if(open){b.removeAttribute('hidden')}else{b.setAttribute('hidden','')}t.setAttribute('aria-expanded',open?'true':'false');tb.setAttribute('aria-expanded',open?'true':'false');t.textContent=open?'Zwiń czat':'Rozwiń czat';if(open){scrollChat();}}
+function scrollChat(){var m=document.querySelector('.msgs');m.scrollTop=m.scrollHeight;}
+window.addEventListener('load',scrollChat);
+</script>
 </body>
 </html>

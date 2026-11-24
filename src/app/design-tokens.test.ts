@@ -114,13 +114,13 @@ describe("tokeny wyglądu: kontrast WCAG AA", () => {
             }
           });
 
-          it("gradient tytułu (jeśli jest) na tle strony i szczytach poświaty ≥ 4,5:1", () => {
+          it("gradient tytułu (jeśli jest; duży pogrubiony tekst, WCAG AA 3:1) na tle strony i szczytach poświaty", () => {
             if (!tokens["title-from"]) {
               return;
             }
             for (const end of ["title-from", "title-to"]) {
               for (const background of ["bg-from", "bg-to", "glow-navy-peak", "glow-coral-peak"]) {
-                expect(contrast(tokens[end], tokens[background]), `${end} na ${background}`).toBeGreaterThanOrEqual(4.5);
+                expect(contrast(tokens[end], tokens[background]), `${end} na ${background}`).toBeGreaterThanOrEqual(3);
               }
             }
           });
