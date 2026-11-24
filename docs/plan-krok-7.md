@@ -526,3 +526,65 @@ Plan zaakceptowany 2026-11-22 z poniższymi poprawkami. **Tabela decyzji (D1 do 
    - **Prompty:** `questions-v1` (3 do 5 pytań z jednego bloku i jednego kryterium, celowane w najniższe oceny; pytania tylko o rzeczy znane użytkownikowi, bez prośby o dane, które model użyłby potem jako faktów bez źródła; `suggestedAnswers` wymagane, może być puste) i `refine-v1` (paczka 1 do 8 propozycji, tylko z odpowiedzi użytkownika, pytania bez odpowiedzi pomijane, dokładne `before`, kolejność stosowania). Dane (projekt, stan, ocena z uzasadnieniami, pytania, odpowiedzi) wyłącznie w blokach `dataBlock` z escapowaniem, prompty mówią wprost, że to dane, nie polecenia; w promptach nie ma identyfikatorów z bazy (tylko numery pytań).
    - **Akcje (`refinement-actions.ts`):** `startRefinementRoundAction`, `submitAnswersAction`, `applyRoundAction`, `cancelRoundAction`. Kolejność w każdej: rola EDITOR, wariant należy do projektu, Zod, operacja, `revalidatePath` tylko po sukcesie. `applyRoundAction` przy `CONFLICTS` zwraca listę propozycji z powodami (żadna zmiana nie została zapisana). `cancelRoundAction` zwraca komunikat „Runda N zamknięta. Wykorzystano N z 3 rund.” (dwuetapowe potwierdzenie w interfejsie to zadanie 7g).
    - **Zmiany w warstwie bazy z 7e (potrzebne operacjom):** wspólny odczyt `readRoundGate` (używany w transakcji startu rundy i przez `getRefinementGate`), `createRefinementRound` zwraca także `createdAt`, nowe `getRoundForRefine` (runda z pytaniami; uszkodzone pytania to błąd, nie `null`).
+
+16. **PR 7f, przegląd promptów przed merge'em (2026-11-24; wersje zostają `questions-v1` i `refine-v1`, bo PR nie jest zmergowany). Punkt ma pierwszeństwo przed punktem 15.**
+   - **Pusta paczka jest poprawnym wynikiem (`refine-v1`).** `RefineOutput` to 0 do 8 propozycji. Gdy odpowiedzi nie dają podstaw do zmian (np. „nie wiem”, „bez zmian”, odpowiedź nie na temat), model zwraca `proposals: []` i niczego nie wymyśla. Skutek: `findRefineViolation` bez zmian w kodzie (pusta paczka nie narusza reguł); `saveAnswersAndProposals` zapisuje odpowiedzi, `result = { proposals: [] }` i status `PROPOSED` bez propozycji; akcja `submitAnswersAction` zwraca `ok: true` z `proposalIds: []` i komunikatem „Na podstawie odpowiedzi nie ma czego zmienić.”. **Bez zmian w bazie** (`result` jest `Json?`, status `PROPOSED` istnieje). Runda `PROPOSED` bez propozycji nie blokuje startu następnej (brak oczekujących), **ale liczy się do limitu 3 rund** (model był wywołany dwa razy); w 7g interfejs pokazuje komunikat i nie oferuje „Zastosuj poprawki”.
+   - **Decyzja o pochodzeniu danych: podpowiedzi odpowiedzi (`questions-v1`).** Kliknięta podpowiedź zapisuje się jako odpowiedź użytkownika (`RefinementRound.answers`), więc w raporcie wyglądałaby jak fakt od właściciela. Dlatego `suggestedAnswers` mogą być wyłącznie neutralnymi formami odpowiedzi („Tak”, „Nie”, „Jeszcze nie wiem”) albo ogólnymi kategoriami bez twierdzeń o konkretnej firmie („Osoby prywatne”, „Firmy”); nie mogą być gotowym opisem firmy ani zawierać liczb, kwot i faktów. Opis pola w schemacie dla modelu (`RefinementQuestion.suggestedAnswers`) mówi to samo. To zasada promptowa, niewymuszana kodem (do sprawdzenia w kroku 0b i w pomiarze B); interfejs (7g) pokazuje podpowiedź jako zwykły tekst do wstawienia w pole odpowiedzi, które użytkownik może poprawić.
+   - **Konkurencja i rynek (`questions-v1`):** zamiast zakazu pytań o rynek i konkurencję: bez pytań o ogólne dane rynkowe (wielkość rynku, średnie ceny, statystyki branży), ale można pytać o to, co użytkownik sam wie lub obserwuje (np. kto jest jego najbliższą konkurencją w okolicy, na co skarżą się klienci).
+   - **Liczby (`questions-v1`):** pytać o liczby wolno, jeśli zna je tylko użytkownik, ale nie wolno zakładać ich za niego: ani w treści pytania, ani w podpowiedziach nie podajemy liczb, kwot ani faktów o firmie (zastępuje niejasne zdanie „użytkownik sam je poda w odpowiedzi”).
+   - **Kolejność w `refine-v1`:** zdanie o kolejności stosowania i zmianach wcześniejszych propozycji zastąpione przez „Każdy wpis zmieniaj najwyżej raz w całej paczce.”. Kod nadal stosuje paczkę w kolejności numerów pytań (sortowanie bez zmian); reguła „najwyżej raz” jest tylko promptowa, `findRefineViolation` jej nie egzekwuje (dwie propozycje do jednego wpisu przechodzą, jeśli stosują się po kolei).
+
+17. **Wymagania dla 7g i instrukcja kroku 0b na końcu 7g (2026-11-24, decyzja właściciela).**
+   - **Informacja o limicie prób w panelu (7g):** przy „Rozpocznij rundę” i przy „Przygotuj poprawki” interfejs pokazuje, że **runda zużywa jedną z 3 prób, także gdy nie powstaną żadne propozycje** (np. „To jest runda N z 3. Runda zużywa jedną z 3 prób nawet wtedy, gdy na podstawie odpowiedzi nie powstaną żadne poprawki.”). Przy pustej paczce panel pokazuje komunikat z akcji („Na podstawie odpowiedzi nie ma czego zmienić.”) i nie oferuje „Zastosuj poprawki”.
+   - **Krok 0b na końcu 7g: trzy próby** (jeden projekt z przykładowymi danymi, `gemini-3.5-flash-lite`, każda w osobnym projekcie z prefiksem `P-7g-…`, ponieważ wariant ma limit 3 rund; limity aplikacji domyślne wystarczą: każda próba to 2 wywołania modelu plus ocena początkowa):
+     1. **Pełna runda z konkretnymi odpowiedziami i „Zastosuj poprawki”:** ocena początkowa (przycisk „Oceń model”) → „Rozpocznij rundę” → odpowiedzi na pytania (konkretne opisy firmy, bez pomijania) → „Przygotuj poprawki” → „Zastosuj poprawki” → „Oceń model” (ocena „po”). Oczekiwane: 3 do 5 pytań, paczka 1 do 8 propozycji z numerami pytań, status rundy `PROPOSED`, wszystkie propozycje `ACCEPTED`, wersja wariantu +1.
+     2. **Runda, w której na wszystkie pytania odpowiadam „Nie wiem”:** oczekiwana **pusta paczka** (`result = { "proposals": [] }`, 0 propozycji, status `PROPOSED`, komunikat „Na podstawie odpowiedzi nie ma czego zmienić.”, brak przycisku „Zastosuj poprawki”).
+     3. **Kontrola podpowiedzi odpowiedzi:** czy `suggestedAnswers` są neutralne („Tak”, „Nie”, „Jeszcze nie wiem”, ogólne kategorie), czy zawierają twierdzenia o firmie albo liczby (reguła z punktu 16 jest tylko promptowa). Kontrola na pytaniach z prób 1 i 2 zapytaniem „kontrola podpowiedzi” poniżej; w razie naruszeń: kolejne PR (kod odrzucający podpowiedzi z cyframi lub zbyt długie albo doprecyzowanie promptu), bez zmiany w tym kroku.
+   - **Zapytania SQL tylko do odczytu** (uruchamia właściciel w `psql`; przed nimi `\encoding UTF8`, `\pset pager off`, `\x off`, `\set prefiks 'P-7g-'`). Wszystkie filtrują po nazwie projektu z prefiksem:
+     ```sql
+     -- Pytania i podpowiedzi
+     SELECT p.name AS projekt, r."roundNumber" AS runda, q.ord - 1 AS nr, q.value->>'blockKey' AS blok,
+            q.value->>'criterion' AS kryterium, q.value->>'question' AS pytanie, q.value->'suggestedAnswers' AS podpowiedzi
+     FROM "RefinementRound" r JOIN "Project" p ON p.id = r."projectId",
+          jsonb_array_elements(r.questions->'questions') WITH ORDINALITY AS q(value, ord)
+     WHERE p.name LIKE :'prefiks' || '%' ORDER BY p.name, r."roundNumber", q.ord;
+
+     -- Odpowiedzi użytkownika (nr = numer pytania; pusty tekst = pominięte)
+     SELECT p.name AS projekt, r."roundNumber" AS runda, a.ord - 1 AS nr, a.value AS odpowiedz
+     FROM "RefinementRound" r JOIN "Project" p ON p.id = r."projectId",
+          jsonb_array_elements_text(r.answers) WITH ORDINALITY AS a(value, ord)
+     WHERE p.name LIKE :'prefiks' || '%' ORDER BY p.name, r."roundNumber", a.ord;
+
+     -- Paczka zapisana w rundzie (liczba propozycji; 0 = pusta paczka) i propozycje z bazy
+     SELECT p.name AS projekt, r."roundNumber" AS runda, r.status, jsonb_array_length(r.result->'proposals') AS w_paczce,
+            pr."refinementQuestionIndex" AS nr, pr."blockKey", pr.operation, pr.before, pr.after, pr.rationale,
+            pr.status AS status_propozycji, pr."sourceKind"
+     FROM "RefinementRound" r JOIN "Project" p ON p.id = r."projectId"
+     LEFT JOIN "Proposal" pr ON pr."refinementRoundId" = r.id
+     WHERE p.name LIKE :'prefiks' || '%' ORDER BY p.name, r."roundNumber", pr."refinementQuestionIndex", pr.id;
+
+     -- Statusy rund, wersja wariantu i liczniki propozycji
+     SELECT p.name AS projekt, r."roundNumber" AS runda, r.status, r."variantVersion" AS wersja_start, v.version AS wersja_teraz,
+            count(pr.id) AS propozycji, count(pr.id) FILTER (WHERE pr.status = 'ACCEPTED') AS przyjete,
+            count(pr.id) FILTER (WHERE pr.status = 'PENDING') AS oczekujace, count(pr.id) FILTER (WHERE pr.status = 'REJECTED') AS odrzucone
+     FROM "RefinementRound" r JOIN "Project" p ON p.id = r."projectId" JOIN "BmcVariant" v ON v.id = r."variantId"
+     LEFT JOIN "Proposal" pr ON pr."refinementRoundId" = r.id
+     WHERE p.name LIKE :'prefiks' || '%' GROUP BY p.name, r.id, r."roundNumber", r.status, r."variantVersion", v.version
+     ORDER BY p.name, r."roundNumber";
+
+     -- Log wywołań (oczekiwane: status OK, errorCode puste, promptVersion questions-v1 i refine-v1)
+     SELECT p.name AS projekt, l."createdAt", l.operation, l."promptVersion", l.status, l."errorCode",
+            l."inputTokens", l."outputTokens", l."durationMs"
+     FROM "LlmCallLog" l JOIN "Project" p ON p.id = l."projectId"
+     WHERE p.name LIKE :'prefiks' || '%' AND l.operation IN ('generate_questions', 'refine_from_answers', 'evaluate_bmc')
+     ORDER BY p.name, l."createdAt";
+
+     -- Kontrola podpowiedzi: podpowiedzi z cyframi lub dłuższe niż 40 znaków (oczekiwane: 0 wierszy lub same uzasadnione)
+     SELECT p.name AS projekt, r."roundNumber" AS runda, q.ord - 1 AS nr, s.value AS podpowiedz
+     FROM "RefinementRound" r JOIN "Project" p ON p.id = r."projectId",
+          jsonb_array_elements(r.questions->'questions') WITH ORDINALITY AS q(value, ord),
+          jsonb_array_elements_text(q.value->'suggestedAnswers') AS s(value)
+     WHERE p.name LIKE :'prefiks' || '%' AND (s.value ~ '[0-9]' OR length(s.value) > 40)
+     ORDER BY p.name, r."roundNumber", q.ord;
+     ```
+   - Reguły ważności jak w PR „P”: próba jest nieważna przy statusie `LlmCallLog` innym niż `OK` (np. `SCHEMA_ERROR` w `generate_questions` lub `refine_from_answers`; wtedy runda nie powstaje albo zostaje `AWAITING_ANSWERS`) i przy zmianie modelu lub promptu w trakcie; pusta paczka w próbie 1 (konkretne odpowiedzi) jest wynikiem do odnotowania, nie błędem.
