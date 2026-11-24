@@ -135,6 +135,26 @@ describe("submitAnswersAction", () => {
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/projekty/p1");
   });
 
+  it("pusta paczka: ok z komunikatem „Na podstawie odpowiedzi nie ma czego zmienić.” i odświeżeniem strony", async () => {
+    mocks.runRefineFromAnswers.mockResolvedValue({ ok: true, roundId: "r1", proposalIds: [] });
+
+    expect(await submitAnswersAction("p1", "v1", { roundId: "r1", expectedVersion: 3, answers: ["nie wiem"] })).toEqual({
+      ok: true,
+      roundId: "r1",
+      proposalIds: [],
+      message: "Na podstawie odpowiedzi nie ma czego zmienić.",
+    });
+    expect(mocks.revalidatePath).toHaveBeenCalledWith("/projekty/p1");
+  });
+
+  it("niepusta paczka nie ma komunikatu o braku zmian", async () => {
+    mocks.runRefineFromAnswers.mockResolvedValue({ ok: true, roundId: "r1", proposalIds: ["pr1"] });
+
+    const result = await submitAnswersAction("p1", "v1", { roundId: "r1", expectedVersion: 3, answers: ["Tak"] });
+
+    expect(result).toEqual({ ok: true, roundId: "r1", proposalIds: ["pr1"] });
+  });
+
   it("błąd operacji (np. limit użytkownika z retryAfterSec) przechodzi bez zmian", async () => {
     mocks.runRefineFromAnswers.mockResolvedValue({ ok: false, error: "LIMIT", message: "Limit.", retryAfterSec: 90 });
 

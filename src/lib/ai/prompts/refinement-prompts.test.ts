@@ -47,13 +47,33 @@ describe("questions-v1", () => {
   it("zawiera reguły: pytania z oceny, tylko o rzeczy znane użytkownikowi, brak wymyślania liczb, zwykły tekst, wytyczne bloków", () => {
     expect(system).toContain("3 do 5 pytań");
     expect(system).toContain("najniższymi punktami");
-    expect(system).toContain("Pytaj o rzeczy, które zna wyłącznie użytkownik");
-    expect(system).toContain("nie proś o dane, które miałbyś później użyć jako faktów bez źródła");
+    expect(system).toContain("Pytaj o rzeczy, które wie lub obserwuje użytkownik");
     expect(system).toContain("Nie wymyślaj danych liczbowych");
     expect(system).toContain("bez formatowania Markdown");
     for (const key of BLOCK_KEYS) {
       expect(system).toContain(`- ${key} (`);
     }
+  });
+
+  it("pytania o konkurencję i rynek: nie o ogólne dane rynkowe, ale o to, co użytkownik sam wie lub obserwuje", () => {
+    expect(system).toContain("kto jest jego najbliższą konkurencją w okolicy");
+    expect(system).toContain("Nie pytaj o ogólne dane rynkowe (wielkość rynku, średnie ceny, statystyki branży)");
+    expect(system).not.toContain("Nie zadawaj pytań o ogólną wiedzę");
+  });
+
+  it("liczby: wolno o nie pytać, jeśli zna je tylko użytkownik, ale nie zakładać ich w pytaniu ani w podpowiedziach", () => {
+    expect(system).toContain("Wolno pytać o liczby");
+    expect(system).toContain("jeśli zna je tylko użytkownik, ale nie zakładaj ich za niego");
+    expect(system).toContain("ani w treści pytania, ani w podpowiedziach nie podawaj liczb, kwot ani faktów o firmie");
+    expect(system).not.toContain("użytkownik sam je poda w odpowiedzi");
+  });
+
+  it("podpowiedzi odpowiedzi: tylko neutralne formy lub ogólne kategorie, bo kliknięta podpowiedź jest odpowiedzią użytkownika", () => {
+    expect(system).toContain("Kliknięta podpowiedź zostaje zapisana jako odpowiedź użytkownika");
+    expect(system).toContain("nie może być gotowym opisem jego firmy ani twierdzeniem o niej");
+    expect(system).toContain("neutralne formy odpowiedzi (np. „Tak”, „Nie”, „Jeszcze nie wiem”)");
+    expect(system).toContain("ogólne kategorie bez twierdzeń o konkretnej firmie");
+    expect(system).toContain("podaj pustą tablicę");
   });
 
   it("dane są w blokach po instrukcjach: projekt, stan, ocena (klucz, etykieta, punkty, uzasadnienie)", () => {
@@ -105,13 +125,20 @@ describe("refine-v1", () => {
   });
 
   it("zawiera reguły paczki: questionIndex, pytania bez odpowiedzi pomijane, tylko fakty od użytkownika, dokładne before, kolejność stosowania", () => {
-    expect(system).toContain("od 1 do 8 propozycji");
+    expect(system).toContain("od 0 do 8 propozycji");
     expect(system).toContain("questionIndex");
     expect(system).toContain("answer równe null");
     expect(system).toContain("Opieraj się wyłącznie na odpowiedziach użytkownika");
     expect(system).toContain("DOKŁADNYM tekstem istniejącego wpisu");
-    expect(system).toContain("w kolejności rosnących numerów pytań");
+    expect(system).toContain("Każdy wpis zmieniaj najwyżej raz w całej paczce.");
+    expect(system).not.toContain("chyba że jest to celowe");
     expect(system).toContain("bez formatowania Markdown");
+  });
+
+  it("pusta paczka: gdy odpowiedzi nie dają podstaw do zmian, model zwraca proposals: [] i niczego nie wymyśla", () => {
+    expect(system).toContain("Jeśli odpowiedzi nie dają podstaw do zmian");
+    expect(system).toContain("„nie wiem”, „bez zmian”, odpowiedź nie na temat");
+    expect(system).toContain("zwróć pustą paczkę (proposals: []) i niczego nie wymyślaj");
   });
 
   it("pytania mają numery, a odpowiedzi to tekst albo null dla pominiętych (przycięte białe znaki)", () => {

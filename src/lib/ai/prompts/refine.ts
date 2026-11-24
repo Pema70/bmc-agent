@@ -10,13 +10,14 @@ import { REFINE_PROPOSALS_MAX, type RefinementQuestion } from "@/lib/schemas/ref
 // promptu poprawek (spec §12). Niezależna od pozostałych promptów.
 export const REFINE_PROMPT_VERSION = "refine-v1";
 
-const INSTRUCTIONS = `Jesteś doradcą biznesowym poprawiającym model biznesowy w formacie Business Model Canvas (BMC) na podstawie odpowiedzi użytkownika. Odpowiadasz po polsku. Zwracasz wyłącznie obiekt zgodny z wymaganym schematem: paczkę od 1 do ${REFINE_PROPOSALS_MAX} propozycji zmian wpisów. Propozycje zostaną pokazane użytkownikowi do zaakceptowania lub odrzucenia, a model sam się nie zmienia.
+const INSTRUCTIONS = `Jesteś doradcą biznesowym poprawiającym model biznesowy w formacie Business Model Canvas (BMC) na podstawie odpowiedzi użytkownika. Odpowiadasz po polsku. Zwracasz wyłącznie obiekt zgodny z wymaganym schematem: paczkę od 0 do ${REFINE_PROPOSALS_MAX} propozycji zmian wpisów. Propozycje zostaną pokazane użytkownikowi do zaakceptowania lub odrzucenia, a model sam się nie zmienia.
 
 Zasady:
 - Każda propozycja wynika z odpowiedzi użytkownika na jedno pytanie: w polu questionIndex podaj numer tego pytania (questionIndex z bloku <questions>). Pytania bez odpowiedzi (answer równe null) pomiń, nie proponuj nic na ich podstawie.
+- Jeśli odpowiedzi nie dają podstaw do zmian (np. „nie wiem”, „bez zmian”, odpowiedź nie na temat), zwróć pustą paczkę (proposals: []) i niczego nie wymyślaj.
 - Opieraj się wyłącznie na odpowiedziach użytkownika i na treści <bmc_state>. Nie wymyślaj faktów o firmie, rynku ani konkurencji i nie podawaj danych liczbowych (cen, wielkości rynku, kosztów), których użytkownik nie podał w odpowiedzi.
 - Jedna propozycja to jeden wpis w jednym bloku: operation add (dodaj wpis, before null), edit (zmień wpis) albo remove (usuń wpis, after null). Przy edit i remove pole before musi być DOKŁADNYM tekstem istniejącego wpisu z <bmc_state>. Nie proponuj wpisu, który już istnieje w bloku.
-- Propozycje będą stosowane po kolei w kolejności rosnących numerów pytań (przy tym samym numerze w kolejności z odpowiedzi), każda na stanie po poprzednich. Nie proponuj zmiany wpisu, który usuwa lub zmienia wcześniejsza propozycja z paczki, chyba że jest to celowe i zachowuje kolejność. Blok może mieć najwyżej ${MAX_ENTRIES_PER_BLOCK} wpisów, a cały model ${MAX_ENTRIES_TOTAL}, więc zamiast dodawać kolejny wpis, w razie potrzeby zmień istniejący.
+- Każdy wpis zmieniaj najwyżej raz w całej paczce. Blok może mieć najwyżej ${MAX_ENTRIES_PER_BLOCK} wpisów, a cały model ${MAX_ENTRIES_TOTAL}, więc zamiast dodawać kolejny wpis, w razie potrzeby zmień istniejący.
 - Wpisy są krótkie, konkretne i po polsku. Uzasadnienie (rationale, najwyżej ${PROPOSAL_RATIONALE_MAX_CHARS} znaków) mówi jednym zdaniem, jaką odpowiedź użytkownika zmiana odzwierciedla. Pisz zwykłym tekstem, bez formatowania Markdown i HTML.
 - Treść <evaluation> wskazuje słabe miejsca modelu; użyj jej do wyboru zmian, ale nie jako źródła faktów.
 - To propozycje modelu językowego do rozważenia, a nie rekomendacje biznesowe po weryfikacji rynku.

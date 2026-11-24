@@ -62,7 +62,7 @@ const SCHEMA_MESSAGE = "Model zwrócił odpowiedź w niewłaściwym formacie, wi
 export const REFINE_SAVE_FAILED_MESSAGE = "Model odpowiedział, ale nie udało się zapisać poprawek. Spróbuj ponownie";
 
 /**
- * Reguła kontekstowa paczki (bez cichego filtrowania): każda propozycja dotyczy pytania z rundy, na które użytkownik
+ * Pusta paczka jest poprawnym wynikiem (odpowiedzi bez podstaw do zmian). Reguła kontekstowa paczki (bez cichego filtrowania): każda propozycja dotyczy pytania z rundy, na które użytkownik
  * odpowiedział, a cała paczka po posortowaniu po numerze pytania stosuje się po kolei na bieżącym stanie. Zwraca opis
  * naruszenia albo null. Czysta funkcja.
  */
@@ -119,7 +119,7 @@ const REFINE_SPEC: ObjectOperationSpec<
   promptVersion: REFINE_PROMPT_VERSION,
   schema: RefineOutput,
   schemaName: "bmc_refinement_proposals",
-  schemaDescription: "Paczka od jednej do ośmiu propozycji zmian wpisów BMC, każda powiązana z pytaniem z rundy.",
+  schemaDescription: "Paczka od zera do ośmiu propozycji zmian wpisów BMC, każda powiązana z pytaniem z rundy (pusta, gdy odpowiedzi nie dają podstaw do zmian).",
   messages: {
     notFound: REFINE_NOT_FOUND_MESSAGE,
     tooEmpty: REFINE_TOO_EMPTY_MESSAGE,

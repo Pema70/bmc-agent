@@ -227,6 +227,31 @@ describe("saveAnswersAndProposals", () => {
     expect(created.map((data) => data.operation)).toEqual(["ADD", "EDIT"]);
   });
 
+  it("pusta paczka: odpowiedzi zapisane, status PROPOSED, wynik { proposals: [] }, żadnej propozycji i bez kolumn ani zmian w schemacie", async () => {
+    const result = await saveAnswersAndProposals(args({ refine: { proposals: [] } }), 20);
+
+    expect(result).toEqual({ ok: true, proposalIds: [] });
+    expect(m.txProposal.create).not.toHaveBeenCalled();
+    expect(m.txRound.updateMany).toHaveBeenCalledWith({
+      where: { id: "r1", variantId: "v1", projectId: "p1", status: "AWAITING_ANSWERS" },
+      data: expect.objectContaining({ answers: ["Pracownicy biur", ""], result: { proposals: [] }, status: "PROPOSED" }),
+    });
+  });
+
+  it("pusta paczka mieści się w limicie oczekujących nawet przy pełnym limicie (nic nie dochodzi)", async () => {
+    m.txProposal.count.mockResolvedValue(20);
+
+    expect(await saveAnswersAndProposals(args({ refine: { proposals: [] } }), 20)).toEqual({ ok: true, proposalIds: [] });
+  });
+
+  it("runda PROPOSED bez propozycji nie blokuje startu następnej (brak oczekujących)", async () => {
+    m.txRound.findMany.mockResolvedValue([{ id: "r1", status: "PROPOSED" }]);
+    m.txProposal.count.mockResolvedValue(0);
+    m.txRound.create.mockResolvedValue({ id: "r2", roundNumber: 2, createdAt: new Date() });
+
+    expect(await createRefinementRound(createArgs)).toMatchObject({ ok: true, roundNumber: 2 });
+  });
+
   it("cudza lub nieistniejąca runda: NOT_FOUND (zapytanie po id, variantId i projectId), bez zapisu", async () => {
     m.txRound.findFirst.mockResolvedValue(null);
 
