@@ -427,3 +427,22 @@ export async function getRoundForRefine(projectId: string, variantId: string, ro
     questions: questions.data.questions,
   };
 }
+
+/**
+ * Identyfikatory propozycji każdej rundy wariantu (w kolejności paczki). Status propozycji czyta interfejs z bieżącego stanu
+ * przestrzeni roboczej, więc tu tylko przynależność do rundy. Tylko z wariantu należącego do projektu.
+ */
+export async function listRoundProposalIds(projectId: string, variantId: string): Promise<Record<string, string[]>> {
+  const rows = await prisma.proposal.findMany({
+    where: { variantId, variant: { projectId }, refinementRoundId: { not: null } },
+    orderBy: [{ refinementQuestionIndex: "asc" }, { id: "asc" }],
+    select: { id: true, refinementRoundId: true },
+  });
+  const byRound: Record<string, string[]> = {};
+  for (const row of rows) {
+    if (row.refinementRoundId) {
+      (byRound[row.refinementRoundId] ??= []).push(row.id);
+    }
+  }
+  return byRound;
+}

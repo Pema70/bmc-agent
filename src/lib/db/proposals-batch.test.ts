@@ -60,7 +60,7 @@ describe("acceptRoundBatch", () => {
 
     const result = await acceptRoundBatch(args);
 
-    expect(result).toMatchObject({ ok: true, version: 4, acceptedCount: 3 });
+    expect(result).toMatchObject({ ok: true, version: 4, acceptedCount: 3, proposalIds: ["pr1", "pr2", "pr3"] });
     expect(m.transaction).toHaveBeenCalledTimes(1);
     const next = (result as { state: typeof state }).state;
     expect(next.customer_segments).toEqual(["Studenci", "Pracownicy pobliskich biur"]);
