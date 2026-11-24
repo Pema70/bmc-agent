@@ -46,3 +46,7 @@ next-env.d.ts
 
 # magazyn plików załączników na dev (ATTACHMENTS_DIR)
 /.data/
+
+# opisy PR i pomocnicze diffy w katalogu glownym (nowe opisy zapisujemy poza repozytorium)
+/pr-*-body.md
+/schema-diff.txt
