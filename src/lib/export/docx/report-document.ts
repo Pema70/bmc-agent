@@ -182,6 +182,15 @@ export async function buildReportDocx(data: ReportExportData): Promise<Uint8Arra
       children.push(p(`Blok: ${question.blockTitle}; kryterium: ${question.criterion}`, { small: true }));
       children.push(p(`Odpowiedź użytkownika: ${question.answer}`));
     }
+    if (round.proposals.length > 0) {
+      children.push(h("H3", "Propozycje poprawek (AI)"));
+      children.push(
+        table(
+          [{ title: "Pytanie", width: 8 }, { title: "Blok", width: 16 }, { title: "Operacja", width: 14 }, { title: "Tekst przed", width: 24 }, { title: "Tekst po", width: 24 }, { title: "Status", width: 14 }],
+          round.proposals.map((item) => [item.question, item.blockTitle, item.operation, item.before, item.after, item.status]),
+        ),
+      );
+    }
     if (round.before) {
       children.push(p(`Ocena przed rundą: ${round.before}`, { small: true }));
     }

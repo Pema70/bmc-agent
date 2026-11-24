@@ -111,6 +111,18 @@ describe("PDF rozszerzonego raportu", () => {
     expect(flat).toContain("Odpowiedź użytkownika: Tak, od roku");
   });
 
+  it("propozycje rundy: tabela z pytaniem, blokiem, operacją, tekstem przed i po, statusem i oznaczeniem AI", async () => {
+    const { flat } = await read();
+
+    expect(flat).toContain("Propozycje poprawek (AI)");
+    for (const header of ["Pytanie", "Operacja", "Tekst przed", "Tekst po", "Status"]) {
+      expect(flat, header).toContain(header);
+    }
+    for (const value of ["Dodanie wpisu", "Zmiana wpisu", "Usunięcie wpisu", "przyjęta", "odrzucona", "oczekująca", "Turyści", "Palarnia własna"]) {
+      expect(flat, value).toContain(value);
+    }
+  });
+
   it("runda poprawek: ocena przed i po, modele i prompty, załączniki", async () => {
     const { flat } = await read();
 

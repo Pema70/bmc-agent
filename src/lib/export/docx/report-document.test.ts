@@ -136,6 +136,17 @@ describe("DOCX rozszerzonego raportu", () => {
     }
   });
 
+  it("propozycje rundy: nagłówek AI i tabela z pytaniem, blokiem, operacją, tekstem przed i po oraz statusem", async () => {
+    const bytes = await build();
+    const result = await html(bytes);
+    const content = await text(bytes);
+
+    expect(result).toContain("<h3>Propozycje poprawek (AI)</h3>");
+    for (const value of ["Pytanie", "Operacja", "Tekst przed", "Tekst po", "Dodanie wpisu", "Zmiana wpisu", "Usunięcie wpisu", "przyjęta", "odrzucona", "oczekująca", "Turyści", "Sprzedaż w sklepie internetowym"]) {
+      expect(content, value).toContain(value);
+    }
+  });
+
   it("nazwa załącznika ze znacznikami i znaki sterujące nie psują dokumentu (zwykły tekst, poprawny XML)", async () => {
     const bytes = await build(reportData({ project: { name: "Kaw\u0000iarnia", description: "x\u0007y" } }));
     const xml = zipPart(bytes, "word/document.xml");

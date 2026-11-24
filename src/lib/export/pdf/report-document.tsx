@@ -222,6 +222,17 @@ export function ReportDocument({ data }: { data: ReportExportData }) {
                   <Text>{`Odpowiedź użytkownika: ${question.answer}`}</Text>
                 </View>
               ))}
+              {round.proposals.length > 0 ? (
+                <View>
+                  <Text style={styles.h3} minPresenceAhead={30}>
+                    Propozycje poprawek (AI)
+                  </Text>
+                  <Table
+                    columns={[{ header: "Pytanie", width: 45 }, { header: "Blok", width: 110 }, { header: "Operacja", width: 85 }, { header: "Tekst przed", width: 200 }, { header: "Tekst po" }, { header: "Status", width: 70 }]}
+                    rows={round.proposals.map((item) => [item.question, item.blockTitle, item.operation, item.before, item.after, item.status])}
+                  />
+                </View>
+              ) : null}
               {round.before ? <Text style={styles.small}>{`Ocena przed rundą: ${round.before}`}</Text> : null}
               {round.after ? <Text style={styles.small}>{`Ocena po rundzie: ${round.after}`}</Text> : null}
             </View>

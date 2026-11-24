@@ -43,10 +43,21 @@ export type ReportScoreRow = { label: string; score: number | null };
 
 export type ReportEvaluationHistoryRow = { date: string; source: string; version: number; scores: string };
 
+export type ReportRoundProposalRow = {
+  /** Numer pytania liczony od 1 albo „?”, gdy zapis go nie ma. */
+  question: string;
+  blockTitle: string;
+  operation: string;
+  before: string;
+  after: string;
+  status: string;
+};
+
 export type ReportRound = {
   heading: string;
   status: string;
   questions: Array<{ number: number; blockTitle: string; criterion: string; question: string; answer: string }>;
+  proposals: ReportRoundProposalRow[];
   before: string;
   after: string;
 };
@@ -113,6 +124,9 @@ function formatSize(bytes: number): string {
 function scoreLine(rows: Array<{ label: string; score: number }>): string {
   return rows.map((row) => `${row.label}: ${row.score}`).join("; ");
 }
+
+const PROPOSAL_STATUS_TEXT = { ACCEPTED: "przyjęta", REJECTED: "odrzucona", PENDING: "oczekująca" } as const;
+const NO_VALUE = "(brak)";
 
 const OPERATION_LABELS = { add: "Dodanie wpisu", edit: "Zmiana wpisu", remove: "Usunięcie wpisu" } as const;
 
@@ -188,7 +202,7 @@ export function buildReportExport(data: ReportData): ReportExportData {
 
   const rounds: ReportRound[] = data.rounds.map((pair) => {
     if (!pair.ok) {
-      return { heading: `Runda ${pair.roundNumber}`, status: "Zapis rundy jest nieczytelny (niezgodny ze schematem).", questions: [], before: "", after: "" };
+      return { heading: `Runda ${pair.roundNumber}`, status: "Zapis rundy jest nieczytelny (niezgodny ze schematem).", questions: [], proposals: [], before: "", after: "" };
     }
     const round = pair.round;
     const before = pair.before ? evaluationLine(toEvaluationExport(pair.before, data.variant.version)) : "brak (ocena niedostępna)";
@@ -208,6 +222,16 @@ export function buildReportExport(data: ReportData): ReportExportData {
         question: clean(question.question),
         answer: round.answers ? clean(round.answers[index]) || "(brak odpowiedzi)" : "(brak odpowiedzi)",
       })),
+      proposals: data.roundProposals
+        .filter((proposal) => proposal.refinementRoundId === round.id)
+        .map((proposal) => ({
+          question: proposal.questionIndex === null ? "?" : String(proposal.questionIndex + 1),
+          blockTitle: blockTitle(proposal.blockKey),
+          operation: OPERATION_LABELS[proposal.operation],
+          before: clean(proposal.before) || NO_VALUE,
+          after: clean(proposal.after) || NO_VALUE,
+          status: PROPOSAL_STATUS_TEXT[proposal.status],
+        })),
       before,
       after: afterText[pair.afterStatus],
     };

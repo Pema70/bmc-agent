@@ -124,6 +124,11 @@ export function reportData(overrides: Partial<ReportData> = {}): ReportData {
     ],
     evaluations: { items: evaluationRows, truncated: false, limit: 20 },
     rounds: pairRoundEvaluations(roundItems, evaluationRows, [{ refinementRoundId: "r1", status: "ACCEPTED", resolvedAt: new Date("2026-11-20T12:00:00Z") }]),
+    roundProposals: [
+      { refinementRoundId: "r1", questionIndex: 0, blockKey: "key_resources", operation: "add", before: null, after: "Palarnia własna", status: "ACCEPTED" },
+      { refinementRoundId: "r1", questionIndex: 1, blockKey: "channels", operation: "edit", before: "Sklep", after: "Sprzedaż w sklepie internetowym", status: "REJECTED" },
+      { refinementRoundId: "r1", questionIndex: 2, blockKey: "customer_segments", operation: "remove", before: "Turyści", after: null, status: "PENDING" },
+    ],
     impacts: {
       items: [
         {

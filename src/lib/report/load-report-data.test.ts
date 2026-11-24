@@ -271,10 +271,32 @@ describe("loadReportData: oceny, rundy, analizy, porównania, załączniki, mode
     expect(pair?.ok && [pair.before?.id, pair.after?.id]).toEqual(["e1", "e2"]);
   });
 
+  it("propozycje rund: tylko z rund, z tekstem przed i po, statusem i numerem pytania, posortowane po pytaniu (odczyt po projekcie i wariancie)", async () => {
+    m.roundFindMany.mockResolvedValue([roundRow()]);
+    // Odczyt zwraca od najnowszych; pytanie 2 powstało później niż pytanie 0.
+    m.proposalFindMany.mockResolvedValue([
+      proposalRow({ id: "pr3", refinementRoundId: "r1", refinementQuestionIndex: 2, sourceKind: "REFINEMENT", operation: "REMOVE", before: "Turyści", after: null, status: "PENDING" }),
+      proposalRow({ id: "pr2", refinementRoundId: "r1", refinementQuestionIndex: 1, sourceKind: "REFINEMENT", operation: "EDIT", before: "Sklep", after: "Sklep online", status: "REJECTED" }),
+      proposalRow({ id: "pr1", refinementRoundId: "r1", refinementQuestionIndex: 0, sourceKind: "REFINEMENT", operation: "ADD", before: null, after: "Palarnia", status: "ACCEPTED" }),
+      proposalRow({ id: "pr0", refinementRoundId: null }),
+    ]);
+
+    const data = await loadReportData("p1", "v1", NOW);
+
+    expect(m.proposalFindMany).toHaveBeenCalledWith(expect.objectContaining({ where: { variantId: "v1", variant: { projectId: "p1" } } }));
+    expect(data?.roundProposals).toEqual([
+      { refinementRoundId: "r1", questionIndex: 0, blockKey: "channels", operation: "add", before: null, after: "Palarnia", status: "ACCEPTED" },
+      { refinementRoundId: "r1", questionIndex: 1, blockKey: "channels", operation: "edit", before: "Sklep", after: "Sklep online", status: "REJECTED" },
+      { refinementRoundId: "r1", questionIndex: 2, blockKey: "channels", operation: "remove", before: "Turyści", after: null, status: "PENDING" },
+    ]);
+    expect(JSON.stringify(data?.roundProposals)).not.toContain("pr1");
+  });
+
   it("wariant bez oceny i bez rund: puste listy", async () => {
     const data = await loadReportData("p1", "v1", NOW);
 
     expect(data?.rounds).toEqual([]);
+    expect(data?.roundProposals).toEqual([]);
     expect(data?.evaluations.items).toEqual([]);
     expect(data?.impacts.items).toEqual([]);
     expect(data?.comparisons.items).toEqual([]);
