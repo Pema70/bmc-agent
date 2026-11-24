@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Podgląd palety B. Morski i koral</title>
+<style>
+@font-face { font-family: "Noto Sans"; font-weight: 400; src: local("Noto Sans"), url("../../src/lib/export/fonts/NotoSans-Regular.ttf") format("truetype"); }
+@font-face { font-family: "Noto Sans"; font-weight: 700; src: local("Noto Sans Bold"), url("../../src/lib/export/fonts/NotoSans-Bold.ttf") format("truetype"); }
+:root {
+  --bg-from: #F1FAF8;
+  --bg-to: #E1F3EF;
+  --surface: #FFFFFF;
+  --tint: #E3F3F0;
+  --text: #0B2B2A;
+  --muted: #42605E;
+  --border: #BFDDD8;
+  --head-from: #0F5F5A;
+  --head-to: #0F766E;
+  --on-head: #FFFFFF;
+  --accent-from: #C2410C;
+  --accent-to: #9A3412;
+  --on-accent: #FFFFFF;
+  --ring: #0F5F5A;
+  --danger: #B91C1C;
+  --ai-bg: #F1EBFE;
+  --ai-fg: #5B21B6;
+  --ai-border: #C4B5FD;
+  --low-bg: #E3F6E9;
+  --low-fg: #166534;
+  --low-border: #86D3A0;
+  --medium-bg: #FEF3D6;
+  --medium-fg: #92400E;
+  --medium-border: #F2C14E;
+  --high-bg: #FDE6E6;
+  --high-fg: #991B1B;
+  --high-border: #F29B9B;
+  --main-bg: #DDF1EE;
+  --main-fg: #0F5F5A;
+  --main-border: #8CCBC3;
+  --grad-bg: linear-gradient(160deg, var(--bg-from), var(--bg-to));
+  --grad-head: linear-gradient(135deg, var(--head-from), var(--head-to));
+  --grad-accent: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+}
+:root[data-theme="dark"] {
+  --bg-from: #07191A;
+  --bg-to: #0C2627;
+  --surface: #10302F;
+  --tint: #143B39;
+  --text: #E3F5F2;
+  --muted: #9CC2BE;
+  --border: #1F514D;
+  --head-from: #0F5F5A;
+  --head-to: #13807A;
+  --on-head: #FFFFFF;
+  --accent-from: #FB923C;
+  --accent-to: #F97316;
+  --on-accent: #1C0A02;
+  --ring: #FB923C;
+  --danger: #FCA5A5;
+  --ai-bg: #2A1F52;
+  --ai-fg: #D8CCFF;
+  --ai-border: #5B47A8;
+  --low-bg: #123524;
+  --low-fg: #9BE2B5;
+  --low-border: #2F7A4C;
+  --medium-bg: #3A2A0A;
+  --medium-fg: #FCD679;
+  --medium-border: #8A6516;
+  --high-bg: #3F1616;
+  --high-fg: #FFB4B4;
+  --high-border: #8F3333;
+  --main-bg: #12403D;
+  --main-fg: #BDEFE8;
+  --main-border: #2E7F78;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg-from: #07191A;
+    --bg-to: #0C2627;
+    --surface: #10302F;
+    --tint: #143B39;
+    --text: #E3F5F2;
+    --muted: #9CC2BE;
+    --border: #1F514D;
+    --head-from: #0F5F5A;
+    --head-to: #13807A;
+    --on-head: #FFFFFF;
+    --accent-from: #FB923C;
+    --accent-to: #F97316;
+    --on-accent: #1C0A02;
+    --ring: #FB923C;
+    --danger: #FCA5A5;
+    --ai-bg: #2A1F52;
+    --ai-fg: #D8CCFF;
+    --ai-border: #5B47A8;
+    --low-bg: #123524;
+    --low-fg: #9BE2B5;
+    --low-border: #2F7A4C;
+    --medium-bg: #3A2A0A;
+    --medium-fg: #FCD679;
+    --medium-border: #8A6516;
+    --high-bg: #3F1616;
+    --high-fg: #FFB4B4;
+    --high-border: #8F3333;
+    --main-bg: #12403D;
+    --main-fg: #BDEFE8;
+    --main-border: #2E7F78;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: "Noto Sans", "Segoe UI", system-ui, sans-serif; font-size: 16px; line-height: 1.5; color: var(--text); background: var(--bg-from); background-image: var(--grad-bg); background-attachment: fixed; min-height: 100vh; }
+a, button { font: inherit; }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 24px; background: var(--grad-head); color: var(--on-head); }
+.top strong { font-size: 18px; }
+.top .grow { flex: 1; }
+.theme-btn { border: 1px solid currentColor; background: transparent; color: inherit; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+main { padding: 20px 24px 40px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+@media (min-width: 1200px) { .layout { grid-template-columns: minmax(0, 1fr) 24rem; } }
+h1 { font-size: 24px; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 14px; }
+.variantbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.variantbar .name { font-weight: 700; font-size: 18px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid; border-radius: 999px; padding: 1px 10px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.chip svg { width: 12px; height: 12px; }
+.chip-ai { background: var(--ai-bg); color: var(--ai-fg); border-color: var(--ai-border); }
+.chip-low { background: var(--low-bg); color: var(--low-fg); border-color: var(--low-border); }
+.chip-medium { background: var(--medium-bg); color: var(--medium-fg); border-color: var(--medium-border); }
+.chip-high { background: var(--high-bg); color: var(--high-fg); border-color: var(--high-border); }
+.chip-main { background: var(--main-bg); color: var(--main-fg); border-color: var(--main-border); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; padding: 8px; background: var(--tint); border: 1px solid var(--border); border-radius: 10px; }
+.tbtn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.tbtn:hover { border-color: var(--head-from); }
+.tbtn[aria-expanded="true"] { background: var(--grad-accent); color: var(--on-accent); border-color: transparent; font-weight: 700; }
+.pill { display: inline-block; min-width: 20px; text-align: center; border-radius: 999px; padding: 0 7px; font-size: 12px; font-weight: 700; background: var(--tint); color: var(--text); border: 1px solid var(--border); }
+.tbtn[aria-expanded="true"] .pill { background: var(--surface); color: var(--text); }
+.btn { display: inline-block; border: 1px solid transparent; border-radius: 8px; padding: 8px 16px; font-weight: 700; cursor: pointer; }
+.btn-primary { background: var(--grad-accent); color: var(--on-accent); }
+.btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+.canvas { display: grid; gap: 8px; grid-template-columns: 1fr; container-type: inline-size; }
+@media (min-width: 900px) {
+  .canvas { grid-template-columns: repeat(10, minmax(0, 1fr)); grid-template-rows: minmax(11rem, auto) minmax(11rem, auto) minmax(8rem, auto); }
+  .b-kp { grid-column: 1 / span 2; grid-row: 1 / span 2; } .b-ka { grid-column: 3 / span 2; grid-row: 1; } .b-kr { grid-column: 3 / span 2; grid-row: 2; }
+  .b-vp { grid-column: 5 / span 2; grid-row: 1 / span 2; } .b-rk { grid-column: 7 / span 2; grid-row: 1; } .b-ch { grid-column: 7 / span 2; grid-row: 2; }
+  .b-sk { grid-column: 9 / span 2; grid-row: 1 / span 2; } .b-ks { grid-column: 1 / span 5; grid-row: 3; } .b-sp { grid-column: 6 / span 5; grid-row: 3; }
+}
+.block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.block > h3 { margin: 0; padding: 6px 12px; font-size: 14px; background: var(--grad-head); color: var(--on-head); }
+.block .body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.block .scroll { max-height: 17rem; overflow-y: auto; }
+.block ul { margin: 0; padding-left: 18px; font-size: 15px; overflow-wrap: anywhere; }
+.block li { margin-bottom: 4px; }
+.hint { font-size: 13px; color: var(--muted); }
+.block.impact { border-color: var(--high-border); box-shadow: 0 0 0 2px var(--high-border); }
+.proposal { background: var(--tint); border: 1px solid var(--border); border-radius: 8px; padding: 8px; font-size: 14px; display: flex; flex-direction: column; gap: 6px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.panel { margin-top: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.panel > header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: var(--grad-head); color: var(--on-head); }
+.panel > header h2 { margin: 0; font-size: 19px; }
+.panel .content { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+table { border-collapse: collapse; width: 100%; font-size: 15px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { background: var(--tint); }
+.chat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; align-self: start; position: sticky; top: 12px; }
+.chat > header { padding: 10px 16px; background: var(--grad-head); color: var(--on-head); font-weight: 700; font-size: 18px; }
+.chat .msgs { padding: 12px; display: flex; flex-direction: column; gap: 10px; max-height: 34rem; overflow-y: auto; }
+.msg { border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; background: var(--surface); font-size: 15px; }
+.msg.user { background: var(--tint); }
+.msg .who { font-size: 13px; color: var(--muted); font-weight: 700; margin: 0 0 2px; }
+.chat form { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border); background: var(--tint); }
+.chat input { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--surface); color: var(--text); }
+.legend { margin-top: 20px; font-size: 14px; color: var(--muted); }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.sw { width: 130px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 12px; }
+.sw i { display: block; height: 36px; }
+.sw span { display: block; padding: 4px 6px; background: var(--surface); color: var(--text); }
+</style>
+</head>
+<body>
+<div class="top">
+  <strong>BMC Agent</strong><span class="grow">Podgląd palety: B. Morski i koral (statyczny, dane przykładowe)</span>
+  <button class="theme-btn" type="button" onclick="var r=document.documentElement;r.setAttribute('data-theme', r.getAttribute('data-theme')==='dark'?'light':'dark')">Przełącz jasny / ciemny</button>
+</div>
+<main>
+<div class="layout">
+<div>
+  <h1>Kawiarnia Ziarno</h1>
+  <p class="sub">Palarnia i kawiarnia z Krakowa. Twoja rola: właściciel.</p>
+  <div class="variantbar">
+    <span class="name">Wariant główny</span><span class="chip chip-main">Główny</span>
+    <span class="hint">wersja 7 · zapisany stan</span>
+    <span class="chip chip-ai">Strategia AI</span><span class="hint">(przykład znacznika wariantu ze strategii)</span>
+  </div>
+  <div class="toolbar" role="toolbar" aria-label="Narzędzia modelu">
+    <button class="tbtn" type="button" aria-expanded="false">Czat <span class="pill">2 propozycje</span></button>
+    <button class="tbtn" type="button" aria-expanded="true">Ocena <span class="pill">nieaktualna</span></button>
+    <button class="tbtn" type="button" aria-expanded="false">Wpływ <span class="pill">aktywna analiza</span></button>
+    <button class="tbtn" type="button" aria-expanded="false">Warianty i strategie <span class="pill">3</span></button>
+    <button class="tbtn" type="button" aria-expanded="false">Porównanie</button>
+    <button class="tbtn" type="button" aria-expanded="false">Cykl poprawek <span class="pill">runda 1 z 3</span></button>
+    <button class="tbtn" type="button" aria-expanded="false">Załączniki <span class="pill">3/10</span></button>
+    <button class="tbtn" type="button" aria-expanded="false">Eksport i raport <span class="pill">niezapisane zmiany</span></button>
+  </div>
+
+  <div class="canvas" aria-label="Płótno modelu biznesowego">
+    <section class="block b-kp"><h3>Kluczowi partnerzy</h3><div class="body"><ul><li>Piekarnia lokalna</li><li>Plantacje w Etiopii</li></ul></div></section>
+    <section class="block b-ka"><h3>Kluczowe działania</h3><div class="body"><ul><li>Palenie ziarna</li><li>Obsługa kawiarni</li></ul></div></section>
+    <section class="block b-kr"><h3>Kluczowe zasoby</h3><div class="body"><ul><li>Palarnia własna</li></ul></div></section>
+    <section class="block b-vp"><h3>Propozycje wartości</h3><div class="body">
+      <ul><li>Świeżo palona kawa</li><li>Zażółć gęślą jaźń: ąćęłńóśźż ĄĆĘŁŃÓŚŹŻ</li></ul>
+      <div class="proposal"><span><span class="chip chip-ai">Propozycja AI</span> Dodaj wpis: „Kawa ekologiczna”</span><span class="hint">Uzasadnienie agenta: klienci pytają o kawę ekologiczną.</span><span class="row"><button class="btn btn-primary" type="button">Zaakceptuj</button><button class="btn btn-secondary" type="button">Odrzuć</button></span></div>
+    </div></section>
+    <section class="block b-rk"><h3>Relacje z klientami</h3><div class="body"><ul><li>Karta lojalnościowa</li></ul></div></section>
+    <section class="block b-ch impact"><h3>Kanały</h3><div class="body"><span class="chip chip-high">Wpływ wysoki</span><ul><li>Sklep stacjonarny</li><li>Sprzedaż w sklepie internetowym</li></ul></div></section>
+    <section class="block b-sk"><h3>Segmenty klientów</h3><div class="body"><p class="hint" style="margin:0">Przewiń: 8 wpisów w bloku</p><div class="scroll" tabindex="0" aria-label="Wpisy bloku Segmenty klientów"><ul><li>Studenci krakowskich uczelni</li><li>Pracownicy biurowi</li><li>Turyści</li><li>Firmy z biurami w centrum</li><li>Miłośnicy kawy specialty</li><li>Rodziny z dziećmi</li><li>Kawa_bez_spacji_o_bardzo_dlugiej_nazwie_pracownicy_biurowca_przy_ulicy_dlugiej</li><li>Seniorzy</li></ul></div></div></section>
+    <section class="block b-ks"><h3>Struktura kosztów</h3><div class="body"><ul><li>Zakup ziarna</li><li>Wynajem lokalu</li></ul></div></section>
+    <section class="block b-sp"><h3>Strumienie przychodów</h3><div class="body"><ul><li>Sprzedaż kawy w kawiarni</li><li>Subskrypcja miesięczna</li></ul></div></section>
+  </div>
+
+  <section class="panel" aria-labelledby="p-ocena">
+    <header><h2 id="p-ocena">Ocena modelu</h2><span class="chip chip-ai">AI</span></header>
+    <div class="content">
+      <p class="hint" style="margin:0">Ocena AI: google / gemini-3.5-flash-lite · prompt evaluate-v1 · dotyczy wersji 5 (bieżąca: 7), ocena może być nieaktualna.</p>
+      <table>
+        <thead><tr><th>Kryterium</th><th>Ocena</th><th>Uzasadnienie (AI)</th></tr></thead>
+        <tbody>
+          <tr><td>Spójność</td><td>8/10</td><td>Segmenty i kanały pasują do propozycji wartości.</td></tr>
+          <tr><td>Ryzyko (10 = niskie)</td><td>4/10</td><td>Zależność od jednego dostawcy ziarna.</td></tr>
+          <tr><td>Realność</td><td>7/10</td><td>Zasoby są dostępne: palarnia i lokal.</td></tr>
+          <tr><td>Innowacyjność</td><td>5/10</td><td>Subskrypcja jest znana na rynku.</td></tr>
+        </tbody>
+      </table>
+      <span class="row"><button class="btn btn-primary" type="button">Oceń model</button><button class="btn btn-secondary" type="button">Dodaj ocenę ręczną</button>
+      <span class="chip chip-low">Wpływ niski</span><span class="chip chip-medium">Wpływ średni</span><span class="chip chip-high">Wpływ wysoki</span></span>
+    </div>
+  </section>
+</div>
+
+<aside class="chat" aria-label="Czat z agentem">
+  <header>Czat z agentem</header>
+  <div class="msgs">
+    <div class="msg user"><p class="who">Ty</p>Dodaj do kanałów sprzedaż w sklepie internetowym.</div>
+    <div class="msg"><p class="who">Agent</p>Proponuję dodać wpis „Sprzedaż w sklepie internetowym” do bloku Kanały. <div class="proposal" style="margin-top:6px"><span><span class="chip chip-ai">Propozycja AI</span> Dodaj wpis w bloku Kanały</span><span class="row"><button class="btn btn-primary" type="button">Zaakceptuj</button><button class="btn btn-secondary" type="button">Odrzuć</button></span></div></div>
+    <div class="msg user"><p class="who">Ty</p>Oceń model.</div>
+    <div class="msg"><p class="who">Agent</p>Ocena gotowa: spójność 8/10, ryzyko 4/10. To opinia modelu, a nie weryfikacja biznesowa.</div>
+  </div>
+  <form onsubmit="return false"><input aria-label="Wiadomość" placeholder="Napisz do agenta…"><button class="btn btn-primary" type="submit">Wyślij</button></form>
+</aside>
+</div>
+
+<div class="legend">Paleta: 60% tła i powierzchnie, 30% tint i nagłówki (gradient), 10% akcent (gradient na przyciskach głównych i aktywnym przycisku paska).
+  <div class="swatches"><div class="sw"><i style="background:var(--bg-from)"></i><span>tło</span></div><div class="sw"><i style="background:var(--tint)"></i><span>tint (30%)</span></div><div class="sw"><i style="background:var(--head-from)"></i><span>nagłówek od</span></div><div class="sw"><i style="background:var(--head-to)"></i><span>nagłówek do</span></div><div class="sw"><i style="background:var(--accent-from)"></i><span>akcent od</span></div><div class="sw"><i style="background:var(--accent-to)"></i><span>akcent do</span></div></div></div>
+</main>
+</body>
+</html>
