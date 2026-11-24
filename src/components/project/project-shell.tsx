@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useCallback, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from "react";
 import { useOptionalVariantWorkspace } from "@/components/bmc/variant-workspace";
 import { useOptionalImpact } from "@/components/impact/impact-provider";
 import { PanelControlContext } from "@/components/project/panel-context";
@@ -211,7 +211,7 @@ export function ProjectShell({
       </nav>
 
       <main className="mx-auto flex w-full max-w-[120rem] flex-1 flex-col gap-7 px-4 py-8 sm:px-6 lg:px-8">
-        {header}
+        <Fragment key="header">{header}</Fragment>
 
         {variant ? (
           <div className="flex flex-wrap items-center gap-3">
@@ -278,7 +278,7 @@ export function ProjectShell({
           ))}
         </div>
 
-        {footer}
+        <Fragment key="footer">{footer}</Fragment>
       </main>
     </PanelControlContext.Provider>
   );
