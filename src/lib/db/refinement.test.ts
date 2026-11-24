@@ -89,6 +89,23 @@ describe("createRefinementRound", () => {
     });
   });
 
+  it("zapisuje liczniki strażnika podpowiedzi obok pytań (Json bez migracji) i przyjmuje starszy kształt bez liczników", async () => {
+    const guard = { generated: 5, removed: 2, reasons: { digits: 0, length: 0, firstPerson: 2, yesNoContinuation: 1 } };
+
+    await createRefinementRound({ ...createArgs, questions: { ...questions, suggestionsGuard: guard } });
+    await createRefinementRound(createArgs);
+
+    expect(m.txRound.create.mock.calls[0][0].data.questions).toEqual({ ...questions, suggestionsGuard: guard });
+    expect(m.txRound.create.mock.calls[1][0].data.questions).toEqual(questions);
+  });
+
+  it("niepoprawne liczniki (ujemne, dodatkowe pole) odrzuca walidacja przed zapytaniem", async () => {
+    const bad = { ...questions, suggestionsGuard: { generated: -1, removed: 0, reasons: { digits: 0, length: 0, firstPerson: 0, yesNoContinuation: 0 } } };
+
+    await expect(createRefinementRound({ ...createArgs, questions: bad })).rejects.toThrow();
+    expect(m.transaction).not.toHaveBeenCalled();
+  });
+
   it("kolejna runda dostaje numer liczba rund + 1", async () => {
     m.txRound.findMany.mockResolvedValue([{ id: "r1", status: "CANCELLED" }]);
 

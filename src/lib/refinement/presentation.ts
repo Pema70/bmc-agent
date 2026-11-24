@@ -14,6 +14,8 @@ export const NO_ANSWERS_MESSAGE = "Odpowiedz na co najmniej jedno pytanie.";
 export const ANSWER_TOO_LONG_MESSAGE = `Odpowiedź może mieć najwyżej ${ANSWER_MAX_CHARS} znaków.`;
 export const NO_PENDING_MESSAGE = "Wszystkie propozycje tej rundy są już rozstrzygnięte.";
 export const REEVALUATE_MESSAGE = "Zastosowano poprawki: oceń model ponownie, żeby zobaczyć, czy się poprawił.";
+export const SUGGESTION_NOTICE =
+  "Podpowiedź tylko wstawia tekst: zapisze się jako Twoja odpowiedź, więc popraw ją, jeśli nie jest prawdziwa.";
 export const EMPTY_BATCH_NOTE = "Na podstawie odpowiedzi nie ma czego zmienić.";
 
 // Wspólny koszt rundy (punkt 17 planu): zużywa próbę także wtedy, gdy nie powstaną propozycje.

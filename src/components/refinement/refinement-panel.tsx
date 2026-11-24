@@ -18,6 +18,7 @@ import {
   REEVALUATE_MESSAGE,
   REFINEMENT_LABEL,
   REFINEMENT_NOTICE,
+  SUGGESTION_NOTICE,
   applyAvailability,
   cancelPrompt,
   describeAppliedCount,
@@ -312,6 +313,7 @@ export function RefinementPanel({ initialRounds, initialRoundProposalIds, latest
                               className="rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 text-sm dark:border-zinc-700"
                             />
                             {question.suggestedAnswers.length > 0 ? (
+                              <div className="flex flex-col gap-1">
                               <div className="flex flex-wrap gap-2" role="group" aria-label="Podpowiedzi odpowiedzi">
                                 {question.suggestedAnswers.map((suggestion) => (
                                   <button
@@ -324,6 +326,8 @@ export function RefinementPanel({ initialRounds, initialRoundProposalIds, latest
                                     {suggestion}
                                   </button>
                                 ))}
+                              </div>
+                              <p className="text-xs text-zinc-600 dark:text-zinc-400">{SUGGESTION_NOTICE}</p>
                               </div>
                             ) : null}
                           </li>

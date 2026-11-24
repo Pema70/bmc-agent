@@ -9,6 +9,7 @@ import {
   ROUNDS_EXHAUSTED_MESSAGE,
   ROUND_ACTIVE_MESSAGE,
   ROUND_COST_NOTICE,
+  SUGGESTION_NOTICE,
   applyAvailability,
   cancelPrompt,
   describeAppliedCount,
@@ -146,6 +147,12 @@ describe("odmiana", () => {
     [8, "8 propozycji"],
   ])("pluralProposals(%i)", (count, expected) => {
     expect(pluralProposals(count)).toBe(expected);
+  });
+
+  it("zdanie pod podpowiedziami: wstawia tekst, który zapisze się jako odpowiedź użytkownika", () => {
+    expect(SUGGESTION_NOTICE).toBe(
+      "Podpowiedź tylko wstawia tekst: zapisze się jako Twoja odpowiedź, więc popraw ją, jeśli nie jest prawdziwa.",
+    );
   });
 
   it("komunikat o pustej paczce", () => {

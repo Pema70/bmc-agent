@@ -68,12 +68,21 @@ describe("questions-v1", () => {
     expect(system).not.toContain("użytkownik sam je poda w odpowiedzi");
   });
 
-  it("podpowiedzi odpowiedzi: tylko neutralne formy lub ogólne kategorie, bo kliknięta podpowiedź jest odpowiedzią użytkownika", () => {
+  it("podpowiedzi odpowiedzi: same słowa lub nazwy rodzaju opcji, bez pierwszej osoby i twierdzeń o firmie (kliknięcie to odpowiedź użytkownika)", () => {
     expect(system).toContain("Kliknięta podpowiedź zostaje zapisana jako odpowiedź użytkownika");
-    expect(system).toContain("nie może być gotowym opisem jego firmy ani twierdzeniem o niej");
-    expect(system).toContain("neutralne formy odpowiedzi (np. „Tak”, „Nie”, „Jeszcze nie wiem”)");
-    expect(system).toContain("ogólne kategorie bez twierdzeń o konkretnej firmie");
+    expect(system).toContain("podpowiedź nie może być twierdzeniem o jego firmie");
+    expect(system).toContain("same słowa „Tak”, „Nie”, „Jeszcze nie wiem” albo „Nie dotyczy”, bez dalszego ciągu zdania");
+    expect(system).toContain("krótkie nazwy rodzaju opcji");
+    expect(system).toContain("Zabronione są zdania w pierwszej osobie i opisy firmy");
+    // Dokładnie te dwa przykłady z kroku 0b (próba 1) są podane jako zakazane.
+    expect(system).toContain("„Tak, mam alternatywne opcje”");
+    expect(system).toContain("„Nie, jestem zależny od obecnych partnerów”");
+    expect(system).toContain("Podpowiedzi nie zawierają cyfr; jest ich najwyżej 4, a każda ma najwyżej 40 znaków");
     expect(system).toContain("podaj pustą tablicę");
+  });
+
+  it("zwracanie się do użytkownika w liczbie pojedynczej", () => {
+    expect(system).toContain("Zwracaj się do użytkownika w liczbie pojedynczej (na „ty”)");
   });
 
   it("dane są w blokach po instrukcjach: projekt, stan, ocena (klucz, etykieta, punkty, uzasadnienie)", () => {

@@ -9,6 +9,7 @@ import { runObjectOperation, type ObjectOperationSpec } from "@/lib/ai/run-objec
 import { listEvaluationsForVariant } from "@/lib/db/evaluations";
 import { getProject } from "@/lib/db/projects";
 import { createRefinementRound, getRefinementGate } from "@/lib/db/refinement";
+import { sanitizeQuestions } from "@/lib/refinement/suggestions";
 import { getVariantForProject } from "@/lib/db/variants";
 import type { EvaluationView } from "@/lib/schemas/evaluation";
 import {
@@ -124,13 +125,15 @@ const QUESTIONS_SPEC: ObjectOperationSpec<
     prompt: buildQuestionsPrompt(project, variant.state, evaluation.result),
   }),
   save: async ({ ctx, loaded, prepared, output, resolved, llmCallLogId }) => {
+    // Druga linia obrony po prompcie: usuwa niedozwolone podpowiedzi (heurystyka) i zapisuje liczniki w rundzie.
+    const sanitized = sanitizeQuestions(output);
     const created = await createRefinementRound({
       projectId: ctx.projectId,
       variantId: loaded.variant.id,
       evaluationId: prepared.evaluation.id,
       variantVersion: loaded.variant.version,
       stateSnapshot: loaded.variant.state,
-      questions: output,
+      questions: { ...sanitized.questions, suggestionsGuard: sanitized.guard },
       provider: resolved.provider,
       model: resolved.modelId,
       questionsPromptVersion: QUESTIONS_PROMPT_VERSION,
@@ -159,7 +162,7 @@ const QUESTIONS_SPEC: ObjectOperationSpec<
         status: "AWAITING_ANSWERS",
         evaluationId: prepared.evaluation.id,
         variantVersion: loaded.variant.version,
-        questions: output.questions,
+        questions: sanitized.questions.questions,
         answers: null,
         createdAt: created.createdAt,
       },
