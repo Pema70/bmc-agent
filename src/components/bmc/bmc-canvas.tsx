@@ -1,6 +1,15 @@
 "use client";
 
-import { BLOCK_CARD_BASE, BLOCK_PLACEMENT, CANVAS_GRID } from "@/components/bmc/layout";
+import {
+  BLOCK_BODY,
+  BLOCK_CARD_BASE,
+  BLOCK_HEADER,
+  BLOCK_PLACEMENT,
+  CANVAS_CONTAINER,
+  CANVAS_GRID,
+  ENTRY_LIST_SCROLL,
+  SCROLL_HINT_FROM,
+} from "@/components/bmc/layout";
 import { ImpactCanvasBanner } from "@/components/impact/canvas-banner";
 import {
   ImpactBadge,
@@ -14,7 +23,7 @@ import { BLOCK_INFO, BLOCK_KEYS, type BlockKey, type BmcState } from "@/lib/sche
 // showImpact=false: podgląd cudzego stanu (np. kandydata strategii) bez wyróżnień aktywnej analizy wpływu bieżącego wariantu.
 export function BmcCanvas({ state, showImpact = true }: { state: BmcState; showImpact?: boolean }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className={`${CANVAS_CONTAINER} flex flex-col gap-2`}>
       {showImpact ? <ImpactCanvasBanner /> : null}
       <div className={CANVAS_GRID}>
         {BLOCK_KEYS.map((key) => (
@@ -33,23 +42,32 @@ function ReadOnlyBlock({ blockKey, entries, showImpact }: { blockKey: BlockKey; 
       aria-labelledby={`block-${blockKey}`}
       className={`${BLOCK_CARD_BASE} ${impactBorderClass(impact)} ${BLOCK_PLACEMENT[blockKey]}`}
     >
-      <header className="flex flex-col gap-0.5">
-        <h3 id={`block-${blockKey}`} className="text-sm font-semibold">
+      <header className={BLOCK_HEADER}>
+        <h3 id={`block-${blockKey}`} className="text-sm font-bold">
           {BLOCK_INFO[blockKey].label}
         </h3>
         <ImpactBadge state={impact} />
-        <p className="text-xs text-zinc-500">{BLOCK_INFO[blockKey].description}</p>
+        <p className="text-xs text-muted">{BLOCK_INFO[blockKey].description}</p>
       </header>
+      <div className={BLOCK_BODY}>
       <ImpactDetails state={impact} />
       {entries.length === 0 ? (
-        <p className="text-sm text-zinc-400 italic">Brak wpisów.</p>
+        <p className="text-sm text-muted italic">Brak wpisów.</p>
       ) : (
-        <ul className="flex list-disc flex-col gap-1 pl-4 text-sm break-words">
+        <>
+        {entries.length >= SCROLL_HINT_FROM ? <p className="text-xs text-muted">Przewiń: wpisów w bloku {entries.length}</p> : null}
+        <ul
+          tabIndex={entries.length >= SCROLL_HINT_FROM ? 0 : undefined}
+          aria-label={entries.length >= SCROLL_HINT_FROM ? `Wpisy: ${BLOCK_INFO[blockKey].label}` : undefined}
+          className={`flex list-disc flex-col gap-1.5 pl-5 text-[0.9375rem] leading-normal break-words ${ENTRY_LIST_SCROLL}`}
+        >
           {entries.map((entry, index) => (
             <li key={index}>{entry}</li>
           ))}
         </ul>
+        </>
       )}
+      </div>
     </section>
   );
 }

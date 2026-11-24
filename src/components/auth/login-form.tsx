@@ -36,7 +36,7 @@ export function LoginForm() {
       <FormField label="Hasło" name="password" type="password" autoComplete="current-password" required />
 
       {error ? (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       ) : null}
@@ -44,12 +44,12 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-zinc-900 px-4 py-2 font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+        className="rounded-lg bg-cta px-4 py-2 font-bold disabled:opacity-60"
       >
         {pending ? "Logowanie…" : "Zaloguj się"}
       </button>
 
-      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+      <p className="text-sm text-muted">
         Nie masz konta?{" "}
         <Link href="/rejestracja" className="font-medium underline">
           Zarejestruj się

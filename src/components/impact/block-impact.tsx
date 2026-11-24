@@ -6,23 +6,23 @@ import type { BlockKey } from "@/lib/schemas/bmc";
 import type { ImpactLevel } from "@/lib/schemas/impact";
 
 // Obramowanie niesie stopień także bez koloru: niski = cienkie przerywane, średni = grube przerywane,
-// wysoki = grube ciągłe. Blok zmieniany: podwójna ramka. Kolory dobrane tak, by nie mylić się z czerwienią/zielenią
-// diffu propozycji ani z bursztynem propozycji; w trybie ciemnym jaśniejsze odcienie.
+// wysoki = grube ciągłe. Blok zmieniany: podwójna ramka. Kolory to tokeny stanów (zielony, bursztynowy, czerwony); ponieważ
+// diff propozycji też używa czerwieni i zieleni, a oznaczenie AI fioletu, stopień zawsze rozróżnia kształt ramki i etykieta.
 const LEVEL_BORDER: Record<ImpactLevel, string> = {
-  low: "border border-dashed border-sky-600 dark:border-sky-400",
-  medium: "border-2 border-dashed border-blue-700 dark:border-blue-400",
-  high: "border-2 border-solid border-indigo-800 dark:border-indigo-300",
+  low: "border border-dashed border-low-border",
+  medium: "border-2 border-dashed border-medium-border",
+  high: "border-2 border-solid border-high-border",
 };
-const CHANGED_BORDER = "border-4 border-double border-teal-700 dark:border-teal-300";
-const DEFAULT_BORDER = "border border-zinc-300 dark:border-zinc-700";
+const CHANGED_BORDER = "border-4 border-double border-main-border";
+const DEFAULT_BORDER = "border border-border";
 
 const LEVEL_BADGE: Record<ImpactLevel, string> = {
-  low: "bg-sky-100 text-sky-900 ring-1 ring-sky-600 dark:bg-sky-950 dark:text-sky-100 dark:ring-sky-400",
-  medium: "bg-blue-100 text-blue-900 ring-1 ring-blue-700 dark:bg-blue-950 dark:text-blue-100 dark:ring-blue-400",
-  high: "bg-indigo-100 text-indigo-950 ring-1 ring-indigo-800 dark:bg-indigo-950 dark:text-indigo-100 dark:ring-indigo-300",
+  low: "bg-low-bg text-low-fg ring-1 ring-low-border",
+  medium: "bg-medium-bg text-medium-fg ring-1 ring-medium-border",
+  high: "bg-high-bg text-high-fg ring-1 ring-high-border",
 };
 const CHANGED_BADGE =
-  "bg-teal-100 text-teal-900 ring-1 ring-teal-700 dark:bg-teal-950 dark:text-teal-100 dark:ring-teal-300";
+  "bg-main-bg text-main-fg ring-1 ring-main-border";
 
 export type BlockImpactState =
   | { kind: "none" }
@@ -76,7 +76,7 @@ export function ImpactDetails({ state }: { state: BlockImpactState }) {
   return (
     <details className="text-xs">
       <summary className="cursor-pointer font-medium">Opis wpływu (analiza AI)</summary>
-      <p className="mt-1 whitespace-pre-wrap break-words text-zinc-700 dark:text-zinc-300">{state.highlight.impact}</p>
+      <p className="mt-1 whitespace-pre-wrap break-words text-muted">{state.highlight.impact}</p>
     </details>
   );
 }

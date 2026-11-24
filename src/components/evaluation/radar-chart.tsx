@@ -14,10 +14,11 @@ const VIEW_HEIGHT = 330;
 const GEOMETRY: RadarGeometry = { cx: 210, cy: 165, radius: 95, labelOffset: 16 };
 const LINE_HEIGHT = 15;
 
-// Serie różnią się nie tylko kolorem: linia ciągła i kółka vs linia przerywana i romby.
+// Serie różnią się nie tylko kolorem: linia ciągła i kółka (niebieski) vs linia przerywana i romby (koral). Kolory to tokeny
+// wyglądu o kontraście co najmniej 3:1 na powierzchni (test `design-tokens.test.ts`); geometria pochodzi z `radar.ts`.
 const SERIES_STYLE = [
-  { color: "text-sky-700 dark:text-sky-400", dash: undefined, marker: "circle" },
-  { color: "text-amber-700 dark:text-amber-400", dash: "6 4", marker: "diamond" },
+  { color: "text-primary-from", dash: undefined, marker: "circle", strokeWidth: 2.5, fillOpacity: 0.18 },
+  { color: "text-accent-from", dash: "6 4", marker: "diamond", strokeWidth: 2, fillOpacity: 0.1 },
 ] as const;
 
 function describeSeries(series: RadarSeries): string {
@@ -46,18 +47,18 @@ export function RadarChart({ series }: { series: RadarSeries[] }) {
         role="img"
         aria-label={label}
         viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
-        className="mx-auto h-auto w-full max-w-md text-zinc-900 dark:text-zinc-100"
+        className="mx-auto h-auto w-full max-w-md text-text"
       >
-        <g className="text-zinc-300 dark:text-zinc-700" fill="none" stroke="currentColor" strokeWidth={1}>
+        <g className="text-grid" fill="none" stroke="currentColor" strokeWidth={1}>
           {RADAR_RINGS.map((level) => (
-            <polygon key={level} points={toPolygonPoints(radarRing(level, GEOMETRY))} />
+            <polygon key={level} points={toPolygonPoints(radarRing(level, GEOMETRY))} strokeWidth={level === 10 ? 1.5 : 1} />
           ))}
           {axes.map((axis) => (
             <line key={axis.criterion} x1={GEOMETRY.cx} y1={GEOMETRY.cy} x2={axis.end.x} y2={axis.end.y} />
           ))}
         </g>
 
-        <g fill="currentColor" className="text-zinc-500 dark:text-zinc-400" fontSize={9}>
+        <g fill="currentColor" className="text-muted" fontSize={10}>
           {RADAR_RINGS.map((level) => {
             const top = radarRing(level, GEOMETRY)[0];
             return (
@@ -76,9 +77,9 @@ export function RadarChart({ series }: { series: RadarSeries[] }) {
               <polygon
                 points={toPolygonPoints(points)}
                 fill="currentColor"
-                fillOpacity={0.12}
+                fillOpacity={style.fillOpacity}
                 stroke="currentColor"
-                strokeWidth={2}
+                strokeWidth={style.strokeWidth}
                 strokeDasharray={style.dash}
                 strokeLinejoin="round"
               />
@@ -89,7 +90,7 @@ export function RadarChart({ series }: { series: RadarSeries[] }) {
           );
         })}
 
-        <g fill="currentColor" fontSize={12} fontWeight={500}>
+        <g fill="currentColor" fontSize={13} fontWeight={700}>
           {axes.map((axis) => {
             const lines = splitLabel(CRITERION_LABELS[axis.criterion]);
             const top = axis.anchor === "middle" && axis.end.y < GEOMETRY.cy;

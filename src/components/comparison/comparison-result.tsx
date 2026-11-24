@@ -43,14 +43,14 @@ export function ComparisonResult({
       />
 
       {stale.length > 0 ? (
-        <ul className="flex flex-col gap-1 text-sm text-amber-800 dark:text-amber-300">
+        <ul className="flex flex-col gap-1 text-sm text-medium-fg">
           {stale.map((item) => (
             <li key={item.label}>{describeStale(item)}</li>
           ))}
         </ul>
       ) : null}
 
-      <p className="text-xs text-zinc-600 dark:text-zinc-400">
+      <p className="text-xs text-muted">
         Etykiety w tekście modelu: {COMPARE_LABELS.filter((label) => labels.includes(label)).map((label) => `${label} = ${names[label]}`).join("; ")}.
       </p>
 
@@ -77,7 +77,7 @@ export function ComparisonResult({
         <h4 className="text-sm font-semibold">Zalety i wady wariantów</h4>
         <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {assessments.map((assessment) => (
-            <li key={assessment.label} className="flex min-w-0 flex-col gap-2 rounded-md border border-zinc-300 p-3 text-sm dark:border-zinc-700">
+            <li key={assessment.label} className="flex min-w-0 flex-col gap-2 rounded-xl border border-border p-3 text-sm">
               <p className="font-semibold break-words">{names[assessment.label]}</p>
               <div>
                 <p className="font-medium">Zalety</p>
@@ -100,7 +100,7 @@ export function ComparisonResult({
         </ul>
       </div>
 
-      <div className="flex flex-col gap-1 rounded-md border border-zinc-300 p-3 text-sm dark:border-zinc-700">
+      <div className="flex flex-col gap-1 rounded-xl border border-border p-3 text-sm">
         <h4 className="font-semibold">Rekomendacja</h4>
         <p className="font-medium break-words">
           {recommended === null || !names[recommended] ? "brak jednoznacznego wskazania" : `Wariant: ${names[recommended]}`}

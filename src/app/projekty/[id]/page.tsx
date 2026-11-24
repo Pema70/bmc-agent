@@ -12,6 +12,7 @@ import { EvaluationPanel } from "@/components/evaluation/evaluation-panel";
 import { ExportPanel } from "@/components/export/export-panel";
 import { ImpactPanel } from "@/components/impact/impact-panel";
 import { ImpactProvider } from "@/components/impact/impact-provider";
+import { ProjectShell } from "@/components/project/project-shell";
 import { ProjectForm } from "@/components/projects/project-form";
 import { RefinementPanel } from "@/components/refinement/refinement-panel";
 import { StrategiesPanel } from "@/components/strategies/strategies-panel";
@@ -31,6 +32,8 @@ import { listRoundProposalIds, listRoundsForVariant } from "@/lib/db/refinement"
 import { listStrategyGenerationsForVariant } from "@/lib/db/strategies";
 import { getVariantDetails, listVariants } from "@/lib/db/variants";
 import { VariantId } from "@/lib/schemas/bmc";
+import { MAX_REFINEMENT_ROUNDS } from "@/lib/schemas/refinement";
+import { availablePanels, parseChatParam, parsePanelParam } from "@/lib/ui/panels";
 import { PROJECT_ROLE_LABELS } from "@/lib/schemas/project";
 import type { ProposalItem } from "@/lib/schemas/proposal";
 import { toVariantSummary } from "@/lib/variants/presentation";
@@ -57,10 +60,10 @@ export default async function ProjectPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ wariant?: string | string[] }>;
+  searchParams: Promise<{ wariant?: string | string[]; panel?: string | string[]; czat?: string | string[] }>;
 }) {
   const { id } = await params;
-  const { wariant } = await searchParams;
+  const { wariant, panel, czat } = await searchParams;
   const access = await requireProjectRole(id, "VIEWER");
   if (!access.ok) {
     notFound();
@@ -153,118 +156,91 @@ export default async function ProjectPage({
         }
       : null;
 
-  return (
-    <main className="mx-auto flex w-full max-w-[96rem] flex-1 flex-col gap-10 px-6 py-16">
-      <header className="flex flex-col gap-2">
-        <Link href="/projekty" className="text-sm text-zinc-600 hover:underline dark:text-zinc-400">
-          ← Wszystkie projekty
-        </Link>
-        <div className="flex items-baseline justify-between gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight break-words">{project.name}</h1>
-          <span className="shrink-0 text-sm text-zinc-500">Twoja rola: {PROJECT_ROLE_LABELS[access.role]}</span>
-        </div>
-        {project.description ? (
-          <p className="whitespace-pre-line text-zinc-600 dark:text-zinc-400">{project.description}</p>
-        ) : (
-          <p className="text-zinc-500">Brak opisu.</p>
-        )}
-      </header>
+  // Pasek narzędzi i panele (plan `docs/plan-design.md`): panel i stan czatu z adresu (`?panel=`, `?czat=`) tylko z allowlisty
+  // i tylko dla paneli dostępnych dla roli; wartości obce są ignorowane. Zmiana panelu po stronie klienta nie woła serwera.
+  const available = availablePanels({ hasVariant: variant !== null, canEditCanvas });
+  const initialPanel = parsePanelParam(panel, available);
+  const initialChatOpen = parseChatParam(czat);
+  const chatKind = chatMessages && variant ? "chat" : variant && canEditCanvas ? "notice" : "none";
+  const chatNode =
+    chatMessages && variant ? (
+      <AgentChat key={variant.id} projectId={access.projectId} variantId={variant.id} initialMessages={chatMessages} />
+    ) : variant && canEditCanvas ? (
+      <aside className="flex flex-col gap-2 p-5 text-sm">
+        <p className="font-bold">Czat działa na wariancie głównym</p>
+        <p className="text-muted">
+          Ten wariant nie jest główny, więc rozmowa z agentem jest tu niedostępna. Oceny i analizy wpływu działają na każdym
+          wariancie.
+        </p>
+        {mainListed ? (
+          <Link href={`/projekty/${access.projectId}`} className="w-fit font-bold underline">
+            Przejdź do wariantu głównego
+          </Link>
+        ) : null}
+      </aside>
+    ) : null;
 
-      <Workspace key={variant?.id ?? "brak"} provider={workspaceProvider}>
-        <ImpactProvider
-          // Bez key zależnego od listy: dostawca obejmuje płótno i czat, więc remount po router.refresh() zgubiłby
-          // niezapisane zmiany w edytorze i rozmowę. Nowe analizy dołącza sam z props initialItems.
-          projectId={access.projectId}
-          variantId={variant?.id ?? ""}
-          canAnalyze={canEditCanvas}
-          currentVersion={variant?.version ?? 0}
-          initialItems={impactAnalyses}
-        >
-        {variant ? (
-          <section className="flex flex-col gap-3" aria-labelledby="variants-heading">
-            <h2 id="variants-heading" className="text-lg font-semibold">
-              Warianty i strategie
-            </h2>
-            <VariantSwitcher projectId={access.projectId} variants={variantSummaries} currentId={variant.id} />
-            <VariantActions
-              projectId={access.projectId}
-              current={{ id: variant.id, name: variant.name, isMain: variant.isMain }}
-              mainVariantId={mainListed?.id ?? null}
-              canEdit={canEditCanvas}
-              isOwner={isOwner}
-              pendingOnMain={pendingOnMain}
-            />
-            <ComparePicker projectId={access.projectId} variants={variantSummaries} />
-            <StrategiesPanel
-              // Bez key zależnego od listy: nowe generacje dołącza sam z props initialItems (bez remountu).
+  const canvasNode =
+    variant && canEditCanvas ? (
+      <CanvasEditor />
+    ) : variant ? (
+      <BmcCanvas state={variant.state} />
+    ) : (
+      <p className="text-muted">Ten projekt nie ma jeszcze wariantu głównego. Powstał przed dodaniem płótna BMC.</p>
+    );
+
+  const panels = {
+    ...(variant
+      ? {
+          ocena: (
+            <EvaluationPanel
+              // Nowa ocena (np. z czatu, po router.refresh()) zmienia klucz, więc panel wczytuje świeżą listę.
+              key={`${variant.id}:${evaluations.length}:${newestEvaluationId(evaluations)}`}
               projectId={access.projectId}
               variantId={variant.id}
-              canGenerate={canEditCanvas}
+              canEvaluate={canEditCanvas}
               currentVersion={variant.version}
-              initialItems={strategyGenerations}
+              initialItems={evaluations}
             />
-          </section>
-        ) : null}
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_24rem]">
-          <section className="flex min-w-0 flex-col gap-4" aria-labelledby="canvas-heading">
-            <h2 id="canvas-heading" className="text-lg font-semibold break-words">
-              {variant ? variant.name : "Business Model Canvas"}
-            </h2>
-            {variant && canEditCanvas ? (
-              <CanvasEditor />
-            ) : variant ? (
-              <BmcCanvas state={variant.state} />
-            ) : (
-              <p className="text-zinc-600 dark:text-zinc-400">
-                Ten projekt nie ma jeszcze wariantu głównego. Powstał przed dodaniem płótna BMC.
-              </p>
-            )}
-          </section>
-          {variant && chatMessages ? (
-            <AgentChat
-              key={variant.id}
-              projectId={access.projectId}
-              variantId={variant.id}
-              initialMessages={chatMessages}
+          ),
+          wplyw: <ImpactPanel />,
+          warianty: (
+            <>
+              <VariantSwitcher projectId={access.projectId} variants={variantSummaries} currentId={variant.id} />
+              <VariantActions
+                projectId={access.projectId}
+                current={{ id: variant.id, name: variant.name, isMain: variant.isMain }}
+                mainVariantId={mainListed?.id ?? null}
+                canEdit={canEditCanvas}
+                isOwner={isOwner}
+                pendingOnMain={pendingOnMain}
+              />
+              <StrategiesPanel
+                // Bez key zależnego od listy: nowe generacje dołącza sam z props initialItems (bez remountu).
+                projectId={access.projectId}
+                variantId={variant.id}
+                canGenerate={canEditCanvas}
+                currentVersion={variant.version}
+                initialItems={strategyGenerations}
+              />
+            </>
+          ),
+          porownanie: <ComparePicker projectId={access.projectId} variants={variantSummaries} />,
+          eksport: <ExportPanel projectId={access.projectId} variantId={variant.id} variantVersion={variant.version} />,
+        }
+      : {}),
+    ...(variant && canEditCanvas
+      ? {
+          poprawki: (
+            <RefinementPanel
+              initialRounds={refinementRounds}
+              initialRoundProposalIds={refinementProposalIds}
+              latestEvaluationVersion={latestEvaluationVersion}
             />
-          ) : variant && canEditCanvas ? (
-            <aside className="flex flex-col gap-2 self-start rounded-md border border-zinc-200 p-4 text-sm dark:border-zinc-800">
-              <p className="font-medium">Czat działa na wariancie głównym</p>
-              <p className="text-zinc-600 dark:text-zinc-400">
-                Ten wariant nie jest główny, więc rozmowa z agentem jest tu niedostępna. Oceny i analizy wpływu działają na
-                każdym wariancie.
-              </p>
-              {mainListed ? (
-                <Link href={`/projekty/${access.projectId}`} className="font-medium underline">
-                  Przejdź do wariantu głównego
-                </Link>
-              ) : null}
-            </aside>
-          ) : null}
-        </div>
-        {variant ? <ExportPanel projectId={access.projectId} variantId={variant.id} variantVersion={variant.version} /> : null}
-        {variant ? (
-          <EvaluationPanel
-            // Nowa ocena (np. z czatu, po router.refresh()) zmienia klucz, więc panel wczytuje świeżą listę.
-            key={`${variant.id}:${evaluations.length}:${newestEvaluationId(evaluations)}`}
-            projectId={access.projectId}
-            variantId={variant.id}
-            canEvaluate={canEditCanvas}
-            currentVersion={variant.version}
-            initialItems={evaluations}
-          />
-        ) : null}
-        {variant && canEditCanvas ? (
-          <RefinementPanel
-            initialRounds={refinementRounds}
-            initialRoundProposalIds={refinementProposalIds}
-            latestEvaluationVersion={latestEvaluationVersion}
-          />
-        ) : null}
-        {variant ? <ImpactPanel /> : null}
-        </ImpactProvider>
-      </Workspace>
-
+          ),
+        }
+      : {}),
+    zalaczniki: (
       <AttachmentsPanel
         projectId={access.projectId}
         canEdit={canEditCanvas}
@@ -272,19 +248,73 @@ export default async function ProjectPage({
         maxPerProject={attachmentLimits.maxPerProject}
         maxMegabytes={Math.floor(attachmentLimits.maxBytes / (1024 * 1024))}
       />
+    ),
+  };
 
-      {canEdit ? (
-        <section className="flex flex-col gap-4">
-          <h2 className="text-lg font-semibold">Edycja projektu</h2>
-          <ProjectForm
-            action={updateProjectAction.bind(null, project.id)}
-            initial={{ name: project.name, description: project.description }}
-            submitLabel="Zapisz zmiany"
-            pendingLabel="Zapisywanie…"
-          />
-        </section>
-      ) : null}
-    </main>
+  const header = (
+    <header className="flex flex-col gap-2">
+      <h1 className="text-gradient-title w-fit max-w-full pb-1 text-4xl leading-tight font-bold break-words sm:text-5xl lg:text-6xl">
+        {project.name}
+      </h1>
+      {project.description ? (
+        <p className="max-w-4xl text-lg whitespace-pre-line text-muted">{project.description}</p>
+      ) : (
+        <p className="text-muted">Brak opisu.</p>
+      )}
+      <p className="text-sm text-muted">Twoja rola: {PROJECT_ROLE_LABELS[access.role]}</p>
+    </header>
+  );
+
+  const footer = canEdit ? (
+    <section className="flex flex-col gap-4">
+      <h2 className="text-lg font-bold">Edycja projektu</h2>
+      <ProjectForm
+        action={updateProjectAction.bind(null, project.id)}
+        initial={{ name: project.name, description: project.description }}
+        submitLabel="Zapisz zmiany"
+        pendingLabel="Zapisywanie…"
+      />
+    </section>
+  ) : null;
+
+  const awaitingAnswers = refinementRounds.some((item) => item.ok && item.round.status === "AWAITING_ANSWERS");
+
+  return (
+    // Workspace ma key zależny wyłącznie od wariantu (jak dotąd): remount tylko przy zmianie wariantu. Przełączanie paneli,
+    // zwijanie czatu i zmiana adresu `?panel=` odbywają się w kliencie i niczego nie przemontowują.
+    <Workspace key={variant?.id ?? "brak"} provider={workspaceProvider}>
+      <ImpactProvider
+        // Bez key zależnego od listy: dostawca obejmuje płótno i czat, więc remount po router.refresh() zgubiłby
+        // niezapisane zmiany w edytorze i rozmowę. Nowe analizy dołącza sam z props initialItems.
+        projectId={access.projectId}
+        variantId={variant?.id ?? ""}
+        canAnalyze={canEditCanvas}
+        currentVersion={variant?.version ?? 0}
+        initialItems={impactAnalyses}
+      >
+        <ProjectShell
+          header={header}
+          variant={
+            variant
+              ? { name: variant.name, isMain: variant.isMain, fromStrategy: variant.origin === "AI_STRATEGY", version: variant.version }
+              : null
+          }
+          canvas={canvasNode}
+          chatKind={chatKind}
+          chat={chatNode}
+          panels={panels}
+          initialPanel={initialPanel}
+          initialChatOpen={initialChatOpen}
+          badgeData={{
+            evaluation: { hasAny: evaluations.length > 0, latestVersion: latestEvaluationVersion },
+            variantCount: variantList.length,
+            refinement: { rounds: refinementRounds.length, awaitingAnswers, max: MAX_REFINEMENT_ROUNDS },
+            attachments: { count: attachments.length, max: attachmentLimits.maxPerProject },
+          }}
+          footer={footer}
+        />
+      </ImpactProvider>
+    </Workspace>
   );
 }
 

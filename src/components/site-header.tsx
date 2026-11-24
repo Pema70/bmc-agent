@@ -7,14 +7,14 @@ export async function SiteHeader() {
   const session = await getSession();
 
   return (
-    <header className="border-b border-zinc-200 dark:border-zinc-800">
+    <header className="border-b border-border">
       <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-4 px-6 py-3">
         <Link href={session ? "/projekty" : "/"} className="font-semibold">
           {APP_NAME}
         </Link>
         {session ? (
           <div className="flex items-center gap-3 text-sm">
-            <span className="text-zinc-600 dark:text-zinc-400">{session.user.email}</span>
+            <span className="text-muted">{session.user.email}</span>
             <SignOutButton />
           </div>
         ) : (

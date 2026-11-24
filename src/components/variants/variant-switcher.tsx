@@ -18,7 +18,7 @@ type VariantSwitcherProps = {
 
 const cardBase = "flex h-full flex-col gap-1 rounded-md border-2 p-3 text-sm";
 const badgeClass =
-  "rounded border border-zinc-500 px-1.5 py-0.5 text-xs font-semibold text-zinc-800 dark:border-zinc-400 dark:text-zinc-200";
+  "rounded border border-border px-1.5 py-0.5 text-xs font-semibold text-muted";
 
 /**
  * Lista wariantów projektu. Zmiana wariantu przemontowuje płótno, więc przy niezapisanych zmianach (dirty z
@@ -32,7 +32,7 @@ export function VariantSwitcher({ projectId, variants, currentId }: VariantSwitc
   return (
     <nav aria-label="Warianty modelu" className="flex flex-col gap-2">
       {blockReason ? (
-        <p role="status" className="text-sm text-amber-900 dark:text-amber-200">
+        <p role="status" className="text-sm text-medium-fg">
           {blockReason}
         </p>
       ) : null}
@@ -51,7 +51,7 @@ export function VariantSwitcher({ projectId, variants, currentId }: VariantSwitc
                 ))}
                 {current ? <span className={badgeClass}>Otwarty</span> : null}
               </span>
-              <span className="text-xs text-zinc-600 dark:text-zinc-400">
+              <span className="text-xs text-muted">
                 Wersja {variant.version} · zmieniono {variant.updatedLabel}
                 {variant.entryCount !== null ? ` · wpisów: ${variant.entryCount}` : ""}
               </span>
@@ -63,21 +63,21 @@ export function VariantSwitcher({ projectId, variants, currentId }: VariantSwitc
               {current ? (
                 <div
                   aria-current="true"
-                  className={`${cardBase} border-zinc-900 bg-zinc-50 dark:border-zinc-100 dark:bg-zinc-900`}
+                  className={`${cardBase} border-ring bg-tint`}
                 >
                   {content}
                 </div>
               ) : blockReason ? (
                 <div
                   aria-disabled="true"
-                  className={`${cardBase} border-dashed border-zinc-300 opacity-60 dark:border-zinc-700`}
+                  className={`${cardBase} border-dashed border-border opacity-60`}
                 >
                   {content}
                 </div>
               ) : (
                 <Link
                   href={variantHref(projectId, variant)}
-                  className={`${cardBase} border-zinc-300 hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-900`}
+                  className={`${cardBase} border-border hover:bg-tint`}
                 >
                   {content}
                 </Link>

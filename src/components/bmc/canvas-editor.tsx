@@ -2,7 +2,16 @@
 
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { saveCanvasAction } from "@/app/projekty/[id]/actions";
-import { BLOCK_CARD_BASE, BLOCK_PLACEMENT, CANVAS_GRID } from "@/components/bmc/layout";
+import {
+  BLOCK_BODY,
+  BLOCK_CARD_BASE,
+  BLOCK_HEADER,
+  BLOCK_PLACEMENT,
+  CANVAS_CONTAINER,
+  CANVAS_GRID,
+  ENTRY_LIST_SCROLL,
+  SCROLL_HINT_FROM,
+} from "@/components/bmc/layout";
 import { useVariantWorkspace } from "@/components/bmc/variant-workspace";
 import { ProposalCard } from "@/components/chat/proposal-card";
 import { ImpactCanvasBanner } from "@/components/impact/canvas-banner";
@@ -31,9 +40,9 @@ import {
 type SaveStatus = { kind: "saved" | "error" | "conflict"; message: string } | null;
 
 const inputClass =
-  "min-w-0 flex-1 rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 outline-none focus:border-zinc-900 aria-invalid:border-red-600 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-300";
+  "min-w-0 flex-1 rounded-lg border border-border bg-surface px-2 py-1 text-sm text-text outline-none focus:border-ring aria-invalid:border-danger";
 const smallButtonClass =
-  "rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800";
+  "rounded-lg border border-border px-2 py-1 text-xs font-bold hover:bg-tint disabled:opacity-50";
 
 export function CanvasEditor() {
   // Wersja, stan zapisany na serwerze i propozycje są wspólne z czatem (VariantWorkspaceProvider).
@@ -123,14 +132,14 @@ export function CanvasEditor() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-md border border-zinc-200 bg-white/95 px-4 py-3 text-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
+    <div className={`${CANVAS_CONTAINER} flex flex-col gap-4`}>
+      <div className="sticky top-0 z-10 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border bg-surface/95 px-4 py-3 text-sm backdrop-blur">
         <span>
           Wpisy:{" "}
           <strong>
             {total}/{MAX_ENTRIES_TOTAL}
           </strong>{" "}
-          <span className="text-zinc-500">(zostało {remainingTotal(current)})</span>
+          <span className="text-muted">(zostało {remainingTotal(current)})</span>
         </span>
         <span aria-live="polite">
           Niezapisane zmiany: <strong>{changes}</strong>
@@ -152,14 +161,14 @@ export function CanvasEditor() {
           type="button"
           onClick={handleSave}
           disabled={!dirty || pending || locked}
-          className="rounded-md bg-zinc-900 px-4 py-2 font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+          className="rounded-lg bg-cta px-4 py-2 font-bold disabled:opacity-50"
         >
           {pending ? "Zapisywanie…" : "Zapisz"}
         </button>
         {status ? (
           <p
             role={status.kind === "saved" ? "status" : "alert"}
-            className={`w-full ${status.kind === "saved" ? "text-green-700" : "text-red-600"}`}
+            className={`w-full ${status.kind === "saved" ? "text-low-fg" : "text-danger"}`}
           >
             {status.message}
           </p>
@@ -262,13 +271,13 @@ function BlockEditor({
   return (
     <section aria-labelledby={headingId} className={`${BLOCK_CARD_BASE} ${impactBorderClass(impact)} ${BLOCK_PLACEMENT[blockKey]}`}
     >
-      <header className="flex flex-col gap-0.5">
+      <header className={BLOCK_HEADER}>
         <div className="flex items-baseline justify-between gap-2">
-          <h3 id={headingId} className="text-sm font-semibold">
+          <h3 id={headingId} className="text-sm font-bold">
             {BLOCK_INFO[blockKey].label}
           </h3>
           <span
-            className={`shrink-0 text-xs ${remainingBlock === 0 ? "text-red-600" : "text-zinc-500"}`}
+            className={`shrink-0 text-xs ${remainingBlock === 0 ? "text-danger" : "text-muted"}`}
             title={`Zostało ${remainingBlock} z ${MAX_ENTRIES_PER_BLOCK} wpisów w bloku`}
           >
             {entries.length}/{MAX_ENTRIES_PER_BLOCK}
@@ -276,18 +285,21 @@ function BlockEditor({
         </div>
         <ImpactBadge state={impact} />
         {proposalCount > 0 ? (
-          <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+          <p className="text-xs font-medium text-medium-fg">
             Propozycje AI w bloku: {proposalCount}
           </p>
         ) : null}
-        <p className="text-xs text-zinc-500">{BLOCK_INFO[blockKey].description}</p>
+        <p className="text-xs text-muted">{BLOCK_INFO[blockKey].description}</p>
       </header>
+      <div className={BLOCK_BODY}>
       <ImpactDetails state={impact} />
 
       {entries.length === 0 ? (
-        <p className="text-sm text-zinc-400 italic">Brak wpisów.</p>
+        <p className="text-sm text-muted italic">Brak wpisów.</p>
       ) : (
-        <ul className="flex flex-col gap-1 text-sm">
+        <>
+        {entries.length >= SCROLL_HINT_FROM ? <p className="text-xs text-muted">Przewiń: wpisów w bloku {entries.length}</p> : null}
+        <ul className={`flex flex-col gap-1.5 text-[0.9375rem] leading-normal ${ENTRY_LIST_SCROLL}`}>
           {entries.map((entry, index) =>
             editingIndex === index ? (
               <li key={index}>
@@ -321,11 +333,7 @@ function BlockEditor({
               <li key={index} className="flex flex-col gap-1">
                 <div className="group flex items-start gap-1">
                   <span
-                    className={`min-w-0 flex-1 break-words before:mr-1 before:content-['•'] ${
-                      diff.entries[index]?.status !== "unchanged"
-                        ? "rounded bg-red-100 px-1 text-red-900 line-through dark:bg-red-950/50 dark:text-red-200"
-                        : ""
-                    }`}
+                    className={`min-w-0 flex-1 break-words before:mr-1 before:content-['•'] ${ diff.entries[index]?.status !== "unchanged" ? "rounded bg-high-bg px-1 text-high-fg line-through" : "" }`}
                   >
                     {entry}
                   </span>
@@ -334,7 +342,7 @@ function BlockEditor({
                     onClick={() => startEditing(index)}
                     disabled={locked}
                     aria-label={`Edytuj wpis: ${entry}`}
-                    className="shrink-0 text-xs text-zinc-500 hover:underline disabled:opacity-50"
+                    className="shrink-0 text-xs text-muted hover:underline disabled:opacity-50"
                   >
                     Edytuj
                   </button>
@@ -343,7 +351,7 @@ function BlockEditor({
                     onClick={() => handleRemove(index)}
                     disabled={locked}
                     aria-label={`Usuń wpis: ${entry}`}
-                    className="shrink-0 text-xs text-red-600 hover:underline disabled:opacity-50"
+                    className="shrink-0 text-xs text-danger hover:underline disabled:opacity-50"
                   >
                     Usuń
                   </button>
@@ -355,6 +363,7 @@ function BlockEditor({
             ),
           )}
         </ul>
+        </>
       )}
 
       {diff.additions.length > 0 || diff.stale.length > 0 ? (
@@ -390,10 +399,11 @@ function BlockEditor({
       </form>
 
       {error ? (
-        <p id={errorId} role="alert" className="text-xs text-red-600">
+        <p id={errorId} role="alert" className="text-xs text-danger">
           {error}
         </p>
       ) : null}
+      </div>
     </section>
   );
 }

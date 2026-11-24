@@ -34,7 +34,7 @@ type SavedInfo = { variantId: string; name: string | null };
 
 const GENERIC_ERROR = "Nie udało się wykonać operacji. Sprawdź połączenie i spróbuj ponownie.";
 const buttonClass =
-  "rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800";
+  "rounded-lg border border-border px-3 py-1.5 text-sm font-bold hover:bg-tint disabled:opacity-50";
 
 const savedKey = (generationId: string, index: number) => `${generationId}:${index}`;
 
@@ -165,28 +165,28 @@ export function StrategiesPanel({ projectId, variantId, canGenerate, currentVers
               rows={3}
               disabled={busy}
               placeholder="np. skup się na klientach firmowych"
-              className="rounded-md border border-zinc-300 bg-transparent px-2 py-1.5 dark:border-zinc-700"
+              className="rounded-lg border border-border bg-transparent px-2 py-1.5"
             />
-            <span className="text-xs text-zinc-500">
+            <span className="text-xs text-muted">
               {trimmedLength}/{STRATEGY_GUIDELINES_MAX_LENGTH} znaków
             </span>
           </label>
           <button
             type="submit"
             disabled={busy || dirty}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+            className="rounded-lg bg-cta px-4 py-2 text-sm font-bold hover:bg-tint disabled:opacity-50"
           >
             {generating ? "Generuję…" : "Generuj strategie"}
           </button>
-          {dirtyReason ? <p className="text-sm text-zinc-600 dark:text-zinc-400">{dirtyReason}</p> : null}
+          {dirtyReason ? <p className="text-sm text-muted">{dirtyReason}</p> : null}
           {generateError ? (
-            <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+            <p role="alert" className="text-sm text-danger">
               {generateError}
             </p>
           ) : null}
         </form>
       ) : (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted">
           Generowanie i zapisywanie strategii jest dostępne dla edytorów i właścicieli projektu.
         </p>
       )}
@@ -201,7 +201,7 @@ export function StrategiesPanel({ projectId, variantId, canGenerate, currentVers
             createdAt={generation.createdAt}
           />
           {isStrategyStale(generation.variantVersion, version) ? (
-            <p className="text-sm text-amber-800 dark:text-amber-300">
+            <p className="text-sm text-medium-fg">
               Wynik dotyczy wersji {generation.variantVersion} wariantu, aktualna to {version}.
             </p>
           ) : null}
@@ -230,7 +230,7 @@ export function StrategiesPanel({ projectId, variantId, canGenerate, currentVers
           </ul>
         </div>
       ) : (
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        <p className="text-sm text-muted">
           {items.length === 0 ? "Ten wariant nie ma jeszcze wygenerowanych strategii." : "Wybierz generację z historii."}
         </p>
       )}
@@ -246,7 +246,7 @@ export function StrategiesPanel({ projectId, variantId, canGenerate, currentVers
                     type="button"
                     onClick={() => setSelectedId(item.generation.id)}
                     aria-pressed={item.generation.id === selectedId}
-                    className="w-full rounded-md border border-zinc-300 px-3 py-1.5 text-left text-sm break-words hover:bg-zinc-100 aria-pressed:border-zinc-900 aria-pressed:font-medium dark:border-zinc-700 dark:hover:bg-zinc-800 dark:aria-pressed:border-zinc-300"
+                    className="w-full rounded-lg border border-border px-3 py-1.5 text-left text-sm break-words hover:bg-tint aria-pressed:border-primary-from aria-pressed:font-medium"
                   >
                     {describeGeneration(item.generation)}
                   </button>
@@ -254,7 +254,7 @@ export function StrategiesPanel({ projectId, variantId, canGenerate, currentVers
               ) : (
                 <li
                   key={item.id}
-                  className="rounded-md border border-red-600 px-3 py-1.5 text-sm break-words text-red-700 dark:text-red-400"
+                  className="rounded-lg border border-danger px-3 py-1.5 text-sm break-words text-danger"
                 >
                   Nie można wyświetlić zapisanych strategii ({item.id}): {item.error}
                 </li>
@@ -288,11 +288,11 @@ function CandidateCard({ projectId, strategy, saved, canSave, busy, saving, link
   const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
-    <li className="flex min-w-0 flex-col gap-2 rounded-md border border-zinc-300 p-3 dark:border-zinc-700">
+    <li className="flex min-w-0 flex-col gap-2 rounded-xl border border-border p-3">
       <div className="flex flex-wrap items-center gap-2">
         <h5 className="min-w-0 break-words font-semibold">{strategy.name}</h5>
         <AiBadge label={STRATEGIES_LABEL} />
-        <span className="text-xs text-zinc-600 dark:text-zinc-400">wpisów: {candidateEntryCount(strategy.state)}</span>
+        <span className="text-xs text-muted">wpisów: {candidateEntryCount(strategy.state)}</span>
       </div>
       <p className="whitespace-pre-wrap break-words text-sm">
         <span className="font-medium">Założenie: </span>
@@ -309,7 +309,7 @@ function CandidateCard({ projectId, strategy, saved, canSave, busy, saving, link
               {saved.name ? `Zapisano jako wariant „${saved.name}”.` : "Ta strategia jest już zapisana jako wariant."}
             </span>
             {linkBlockedReason ? (
-              <span className="text-zinc-600 dark:text-zinc-400">{linkBlockedReason}, aby przejść do wariantu.</span>
+              <span className="text-muted">{linkBlockedReason}, aby przejść do wariantu.</span>
             ) : (
               <Link href={variantHref(projectId, { id: saved.variantId, isMain: false })} className="font-medium underline">
                 Otwórz wariant
@@ -324,7 +324,7 @@ function CandidateCard({ projectId, strategy, saved, canSave, busy, saving, link
       </div>
 
       {error ? (
-        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+        <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       ) : null}

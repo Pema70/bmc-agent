@@ -9,7 +9,7 @@ import type { ImpactListItem } from "@/lib/db/impact";
 type State = { status: "loading" } | { status: "error"; message: string } | { status: "ready"; item: ImpactListItem };
 
 const buttonClass =
-  "rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800";
+  "rounded-lg border border-border px-2 py-1 text-xs font-bold hover:bg-tint";
 
 /**
  * Karta wyniku analizy wpływu w czacie. Dane czytamy z bazy po identyfikatorze zwróconym przez narzędzie
@@ -50,13 +50,13 @@ export function ImpactCard({
   }, [projectId, variantId, analysisId]);
 
   if (state.status === "loading") {
-    return <p className="text-zinc-500">Wczytuję analizę…</p>;
+    return <p className="text-muted">Wczytuję analizę…</p>;
   }
   if (state.status === "error") {
-    return <p className="text-red-700 dark:text-red-400">{state.message}</p>;
+    return <p className="text-danger">{state.message}</p>;
   }
   if (!state.item.ok) {
-    return <p className="text-red-700 dark:text-red-400">Nie można wyświetlić zapisanej analizy: {state.item.error}</p>;
+    return <p className="text-danger">Nie można wyświetlić zapisanej analizy: {state.item.error}</p>;
   }
 
   const analysis = state.item.analysis;
@@ -64,7 +64,7 @@ export function ImpactCard({
   const available = impact?.items.some((item) => item.ok && item.analysis.id === analysis.id) ?? false;
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-zinc-300 p-3 dark:border-zinc-700">
+    <div className="flex flex-col gap-2 rounded-xl border border-border p-3">
       <span className="font-semibold">Analiza wpływu zmiany</span>
       <ImpactNotice />
       <ImpactResult analysis={analysis} currentVersion={impact?.currentVersion ?? analysis.variantVersion} />

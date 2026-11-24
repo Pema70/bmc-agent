@@ -19,23 +19,23 @@ export default async function ProjectsPage() {
       <section className="flex flex-col gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">Projekty</h1>
         {projects.length === 0 ? (
-          <p className="text-zinc-600 dark:text-zinc-400">Nie masz jeszcze żadnego projektu. Utwórz pierwszy poniżej.</p>
+          <p className="text-muted">Nie masz jeszcze żadnego projektu. Utwórz pierwszy poniżej.</p>
         ) : (
-          <ul className="flex flex-col divide-y divide-zinc-200 rounded-md border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+          <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
             {projects.map((project) => (
               <li key={project.id}>
                 <Link
                   href={`/projekty/${project.id}`}
-                  className="flex flex-col gap-1 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900"
+                  className="flex flex-col gap-1 px-4 py-3 hover:bg-tint"
                 >
                   <span className="flex items-center justify-between gap-4">
                     <span className="font-medium">{project.name}</span>
-                    <span className="shrink-0 text-xs text-zinc-500">{PROJECT_ROLE_LABELS[project.role]}</span>
+                    <span className="shrink-0 text-xs text-muted">{PROJECT_ROLE_LABELS[project.role]}</span>
                   </span>
                   {project.description ? (
-                    <span className="line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">{project.description}</span>
+                    <span className="line-clamp-2 text-sm text-muted">{project.description}</span>
                   ) : null}
-                  <span className="text-xs text-zinc-500">Zmieniono: {dateFormat.format(project.updatedAt)}</span>
+                  <span className="text-xs text-muted">Zmieniono: {dateFormat.format(project.updatedAt)}</span>
                 </Link>
               </li>
             ))}

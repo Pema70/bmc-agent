@@ -6,7 +6,7 @@ export function EvaluationTable({ result }: { result: EvaluationOutput }) {
     <table className="w-full border-collapse text-left text-sm">
       <caption className="sr-only">Oceny kryteriów modelu BMC w skali 1-{SCORE_MAX}</caption>
       <thead>
-        <tr className="border-b border-zinc-300 dark:border-zinc-700">
+        <tr className="border-b border-border">
           <th scope="col" className="py-2 pr-4 font-medium">
             Kryterium
           </th>
@@ -20,7 +20,7 @@ export function EvaluationTable({ result }: { result: EvaluationOutput }) {
       </thead>
       <tbody>
         {EVALUATION_CRITERIA.map((criterion) => (
-          <tr key={criterion} className="border-b border-zinc-200 align-top dark:border-zinc-800">
+          <tr key={criterion} className="border-b border-border align-top">
             <th scope="row" className="py-2 pr-4 font-medium">
               {CRITERION_LABELS[criterion]}
             </th>

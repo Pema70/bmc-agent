@@ -12,9 +12,9 @@ type ComparePickerProps = {
 };
 
 const badgeClass =
-  "rounded border border-zinc-500 px-1.5 py-0.5 text-xs font-semibold text-zinc-800 dark:border-zinc-400 dark:text-zinc-200";
+  "rounded border border-border px-1.5 py-0.5 text-xs font-semibold text-muted";
 const actionClass =
-  "w-fit rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800";
+  "w-fit rounded-lg border border-border px-3 py-1.5 text-sm font-bold hover:bg-tint";
 
 /**
  * Wybór 2-3 wariantów do porównania i przejście na /projekty/[id]/porownanie. Nawigacja jest zwykłym linkiem, więc przy
@@ -55,9 +55,9 @@ export function ComparePicker({ projectId, variants }: ComparePickerProps) {
           );
         })}
       </ul>
-      <p className="text-xs text-zinc-600 dark:text-zinc-400">{state.hint}</p>
+      <p className="text-xs text-muted">{state.hint}</p>
       {blockReason && state.canCompare ? (
-        <p role="status" className="text-sm text-amber-900 dark:text-amber-200">
+        <p role="status" className="text-sm text-medium-fg">
           {blockReason}
         </p>
       ) : null}

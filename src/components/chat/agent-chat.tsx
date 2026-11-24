@@ -65,12 +65,16 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
   const [input, setInput] = useState("");
   // Propozycje z wiadomości dołączonych w tej sesji są świeże (PENDING), starsze znamy z bazy.
   const [initialIds] = useState(() => new Set(initialMessages.map((message) => message.id)));
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const busy = status === "submitted" || status === "streaming";
   const errorMessage = errorText(error);
 
+  // Przewija tylko listę wiadomości, a nie całą stronę: czat leży pod płótnem, więc przewinięcie okna zabrałoby widok z płótna.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
+    const list = listRef.current;
+    if (list) {
+      list.scrollTop = list.scrollHeight;
+    }
   }, [messages, status]);
 
   // Nowe propozycje z tej sesji trafiają do wspólnego stanu, więc od razu widać je jako diff w blokach.
@@ -146,16 +150,16 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
 
   return (
     <section
-      className="flex h-[32rem] flex-col rounded-lg border border-zinc-300 dark:border-zinc-700 xl:h-[40rem]"
+      className="flex h-[26rem] flex-col sm:h-[28rem]"
       aria-labelledby="chat-heading"
     >
-      <h2 id="chat-heading" className="border-b border-zinc-300 px-4 py-3 text-lg font-semibold dark:border-zinc-700">
+      <h2 id="chat-heading" className="sr-only">
         Agent BMC
       </h2>
 
-      <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-3" aria-live="polite">
+      <div ref={listRef} className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-3" aria-live="polite">
         {messages.length === 0 ? (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-sm text-muted">
             Opisz swój pomysł na biznes, a agent dopyta o szczegóły i pomoże uporządkować model.
           </p>
         ) : null}
@@ -165,11 +169,11 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
             key={message.id}
             className={
               message.role === "user"
-                ? "ml-6 rounded-md bg-zinc-100 px-3 py-2 dark:bg-zinc-800"
-                : "mr-6 rounded-md border border-zinc-300 px-3 py-2 dark:border-zinc-700"
+                ? "ml-6 rounded-lg bg-tint px-3 py-2"
+                : "mr-6 rounded-lg border border-border px-3 py-2"
             }
           >
-            <p className="mb-1 text-xs font-medium text-zinc-500">{message.role === "user" ? "Ty" : "Agent"}</p>
+            <p className="mb-1 text-xs font-medium text-muted">{message.role === "user" ? "Ty" : "Agent"}</p>
             <div className="flex flex-col gap-2 text-sm">
               {message.parts.map((part, index) => {
                 if (part.type === "text") {
@@ -193,7 +197,7 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
                                   key={answer}
                                   type="button"
                                   onClick={() => send(answer)}
-                                  className="rounded-md border border-zinc-300 px-2 py-1 text-xs hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+                                  className="rounded-lg border border-border px-2 py-1 text-xs hover:bg-tint"
                                 >
                                   {answer}
                                 </button>
@@ -204,13 +208,13 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
                       );
                     case "output-error":
                       return (
-                        <p key={index} className="text-red-700 dark:text-red-400">
+                        <p key={index} className="text-danger">
                           Agent zadał niepoprawne pytanie. Napisz, co chcesz zrobić dalej.
                         </p>
                       );
                     default:
                       return (
-                        <p key={index} className="text-zinc-500">
+                        <p key={index} className="text-muted">
                           Agent formułuje pytanie…
                         </p>
                       );
@@ -231,13 +235,13 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
                       ) : null;
                     case "output-error":
                       return (
-                        <p key={index} className="text-red-700 dark:text-red-400">
+                        <p key={index} className="text-danger">
                           Agent przygotował niepoprawną propozycję. Napisz, co chcesz zrobić dalej.
                         </p>
                       );
                     default:
                       return (
-                        <p key={index} className="text-zinc-500">
+                        <p key={index} className="text-muted">
                           Agent przygotowuje propozycję…
                         </p>
                       );
@@ -257,13 +261,13 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
                       ) : null;
                     case "output-error":
                       return (
-                        <p key={index} className="text-red-700 dark:text-red-400">
+                        <p key={index} className="text-danger">
                           Ocena nie powiodła się. Spróbuj ponownie za chwilę.
                         </p>
                       );
                     default:
                       return (
-                        <p key={index} className="text-zinc-500">
+                        <p key={index} className="text-muted">
                           Oceniam model…
                         </p>
                       );
@@ -273,7 +277,7 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
                   switch (part.state) {
                     case "output-available":
                       return (
-                        <p key={index} className="text-xs text-zinc-500">
+                        <p key={index} className="text-xs text-muted">
                           {part.output.ok
                             ? `Agent przeczytał załącznik: ${part.output.name}`
                             : "Agent próbował przeczytać załącznik, ale się nie udało."}
@@ -281,13 +285,13 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
                       );
                     case "output-error":
                       return (
-                        <p key={index} className="text-xs text-red-700 dark:text-red-400">
+                        <p key={index} className="text-xs text-danger">
                           Nie udało się odczytać załącznika.
                         </p>
                       );
                     default:
                       return (
-                        <p key={index} className="text-xs text-zinc-500">
+                        <p key={index} className="text-xs text-muted">
                           Agent czyta załącznik…
                         </p>
                       );
@@ -307,13 +311,13 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
                       ) : null;
                     case "output-error":
                       return (
-                        <p key={index} className="text-red-700 dark:text-red-400">
+                        <p key={index} className="text-danger">
                           Analiza wpływu nie powiodła się. Spróbuj ponownie za chwilę.
                         </p>
                       );
                     default:
                       return (
-                        <p key={index} className="text-zinc-500">
+                        <p key={index} className="text-muted">
                           Analizuję wpływ zmiany…
                         </p>
                       );
@@ -325,16 +329,15 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
           </article>
         ))}
 
-        {status === "submitted" ? <p className="text-sm text-zinc-500">Agent pisze…</p> : null}
+        {status === "submitted" ? <p className="text-sm text-muted">Agent pisze…</p> : null}
         {errorMessage ? (
-          <p role="alert" className="rounded-md border border-red-600 px-3 py-2 text-sm text-red-700 dark:text-red-400">
+          <p role="alert" className="rounded-lg border border-danger px-3 py-2 text-sm text-danger">
             {errorMessage}
           </p>
         ) : null}
-        <div ref={bottomRef} />
       </div>
 
-      <form onSubmit={onSubmit} className="flex flex-col gap-2 border-t border-zinc-300 p-3 dark:border-zinc-700">
+      <form onSubmit={onSubmit} className="flex flex-col gap-2 border-t border-border p-3">
         <label htmlFor="chat-input" className="sr-only">
           Wiadomość do agenta
         </label>
@@ -346,14 +349,14 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
           maxLength={CHAT_MESSAGE_MAX_CHARS}
           rows={3}
           placeholder="Napisz do agenta… (Enter wysyła, Shift+Enter nowa linia)"
-          className="w-full resize-none rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 outline-none focus:border-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100 dark:focus:border-zinc-300"
+          className="w-full resize-none rounded-lg border border-border bg-surface px-2 py-1 text-sm text-text outline-none focus:border-ring"
         />
         <div className="flex justify-end gap-2">
           {busy ? (
             <button
               type="button"
               onClick={() => void stop()}
-              className="rounded-md border border-zinc-300 px-3 py-1 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800"
+              className="rounded-lg border border-border px-3 py-1 text-sm hover:bg-tint"
             >
               Zatrzymaj
             </button>
@@ -361,7 +364,7 @@ export function AgentChat({ projectId, variantId, initialMessages }: AgentChatPr
           <button
             type="submit"
             disabled={busy || input.trim().length === 0}
-            className="rounded-md bg-zinc-900 px-3 py-1 text-sm font-medium text-white disabled:opacity-50 dark:bg-zinc-100 dark:text-zinc-900"
+            className="rounded-lg bg-cta px-3 py-1 text-sm font-bold disabled:opacity-50"
           >
             Wyślij
           </button>
