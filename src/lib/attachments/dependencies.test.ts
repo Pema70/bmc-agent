@@ -45,3 +45,29 @@ describe("zależności ekstrakcji tekstu", () => {
     }
   });
 });
+
+// Krok 9b: biblioteki eksportu. Instalacja z `--before` (wersje i ich zalezności przechodnie sprzed progu 14 dni), `--ignore-scripts`.
+describe("zaleznosci eksportu PDF i DOCX (krok 9b)", () => {
+  it("@react-pdf/renderer i docx sa przypiete do dokladnych wersji", () => {
+    expect(pkg.dependencies["@react-pdf/renderer"]).toBe("4.9.0");
+    expect(pkg.dependencies.docx).toBe("9.15.3");
+    expect(lock.packages["node_modules/@react-pdf/renderer"]?.version).toBe("4.9.0");
+    expect(lock.packages["node_modules/docx"]?.version).toBe("9.15.3");
+  });
+
+  it("w calym lockfile tylko znane pakiety Prismy i fsevents maja skrypty instalacyjne (zadna zaleznosc eksportu ich nie ma)", () => {
+    const withScripts = Object.entries(lock.packages)
+      .filter(([path, meta]) => path !== "" && meta.hasInstallScript === true)
+      .map(([path]) => path)
+      .sort();
+
+    expect(withScripts).toEqual(["node_modules/@prisma/engines", "node_modules/fsevents", "node_modules/prisma"]);
+  });
+
+  it("wersja Reacta bez zmian (19.3.0), a docx ma wlasna, zagniezdzona kopie @types/node 26 (projekt: 22)", () => {
+    expect(lock.packages["node_modules/react"]?.version).toBe("19.3.0");
+    expect(lock.packages["node_modules/react-dom"]?.version).toBe("19.3.0");
+    expect(lock.packages["node_modules/@types/node"]?.version).toMatch(/^22\./);
+    expect(lock.packages["node_modules/docx/node_modules/@types/node"]?.version).toMatch(/^26\./);
+  });
+});
