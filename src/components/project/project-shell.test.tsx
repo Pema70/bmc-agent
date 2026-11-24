@@ -178,7 +178,8 @@ describe("niezmienność montowania (test statyczny źródeł)", () => {
     expect(shell).not.toContain("useRouter");
     expect(shell).not.toContain("next/navigation");
     expect(shell).not.toMatch(/router\.(push|replace|refresh)/);
-    expect(shell).toContain("window.history.replaceState");
+    expect(shell).toContain("History.prototype.replaceState.call(window.history");
+    expect(shell).not.toMatch(/^\s*window\.history\.replaceState\(/m);
   });
 
   it("czat i panele są ukrywane atrybutem hidden, nie odmontowywane warunkiem", () => {

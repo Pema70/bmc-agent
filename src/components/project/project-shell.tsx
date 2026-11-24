@@ -51,11 +51,16 @@ const isWide = (): boolean => window.matchMedia(WIDE_QUERY).matches;
 // Po stronie serwera i podczas hydracji zakładamy szeroki ekran (czat rozwinięty), potem React poprawia na bieżący.
 const isWideOnServer = (): boolean => true;
 
-/** Zapis `?panel=` i `?czat=` w adresie bez żądania do serwera i bez przemontowania (replaceState; inne parametry zostają). */
+/**
+ * Zapis `?panel=` i `?czat=` w adresie bez żądania do serwera i bez przemontowania (replaceState; inne parametry zostają).
+ * Używa natywnej metody z prototypu, a nie `window.history.replaceState` podmienionego przez Next: ta wersja wysyła akcję
+ * do routera Next, co przy trwającym odświeżeniu danych serwera (po zapisie, akceptacji) kończyło się w konsoli błędem Reacta
+ * „called use() to suspend in a previous render but did not call use()”. Stan historii (`history.state`) zostaje bez zmian.
+ */
 function syncUrl(update: { panel?: PanelId | null; chat?: boolean | null }): void {
   try {
     const url = `${window.location.pathname}${withUiParams(window.location.search, update)}${window.location.hash}`;
-    window.history.replaceState(window.history.state, "", url);
+    History.prototype.replaceState.call(window.history, window.history.state, "", url);
   } catch {
     // Adres nie jest niezbędny do działania (np. przeglądarka blokuje History API): panel działa dalej.
   }
