@@ -30,7 +30,7 @@ const ROUND_NOT_FOUND_MESSAGE = "Nie znaleziono tej rundy poprawek.";
 const ALREADY_RESOLVED_MESSAGE = "Którąś z propozycji rozpatrzono w międzyczasie. Odśwież stronę.";
 const NOTHING_PENDING_MESSAGE = "W tej rundzie nie ma oczekujących propozycji.";
 const ALREADY_CANCELLED_MESSAGE = "Ta runda jest już zamknięta.";
-export const EMPTY_BATCH_MESSAGE = "Na podstawie odpowiedzi nie ma czego zmienić.";
+const EMPTY_BATCH_MESSAGE = "Na podstawie odpowiedzi nie ma czego zmienić.";
 
 const ExpectedVersion = z.number().int().min(1);
 
