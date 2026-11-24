@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { prisma } from "@/lib/db/client";
-import type { PrismaClient } from "@/generated/prisma/client";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client";
+import { originsAfterManualSave, originsForCopy } from "@/lib/bmc/origins";
+import { parseStoredOrigins, type EntryOrigin } from "@/lib/schemas/origin";
 import { nextCopyName } from "@/lib/bmc/variant-names";
 import { BmcState, countEntries } from "@/lib/schemas/bmc";
 import type { VariantOrigin } from "@/lib/schemas/variant";
@@ -70,10 +72,12 @@ export async function writeVariantStateIfVersion(
   variantId: string,
   expectedVersion: number,
   state: BmcState,
+  // Wymagane, żeby żadna ścieżka zapisu stanu nie pominęła pochodzenia wpisów (krok 9): zapisywane tym samym UPDATE.
+  origins: readonly EntryOrigin[],
 ): Promise<number> {
   const { count } = await client.bmcVariant.updateMany({
     where: { id: variantId, version: expectedVersion },
-    data: { state, version: { increment: 1 } },
+    data: { state, entryOrigins: origins as unknown as Prisma.InputJsonValue, version: { increment: 1 } },
   });
   return count;
 }
@@ -93,7 +97,24 @@ export async function saveVariantState(
     return { ok: false, error: "VALIDATION", message: z.prettifyError(parsed.error) };
   }
 
-  const count = await writeVariantStateIfVersion(prisma, variantId, expectedVersion, parsed.data);
+  // Stary stan i pochodzenie są potrzebne do rozstrzygnięcia, które wpisy są nowe (ręczne). Zapis nadal chroni wersja:
+  // jeśli ktoś zmienił wariant po odczycie, updateMany nic nie zmieni (konflikt), więc pochodzenie nie rozjedzie się ze stanem.
+  const current = await prisma.bmcVariant.findFirst({
+    where: { id: variantId },
+    select: { version: true, state: true, entryOrigins: true },
+  });
+  if (!current || current.version !== expectedVersion) {
+    return { ok: false, error: "VERSION_CONFLICT" };
+  }
+  const oldState = BmcState.safeParse(current.state);
+  const origins = originsAfterManualSave(
+    oldState.success ? oldState.data : null,
+    parsed.data,
+    parseStoredOrigins(current.entryOrigins).origins,
+    expectedVersion + 1,
+  );
+
+  const count = await writeVariantStateIfVersion(prisma, variantId, expectedVersion, parsed.data, origins);
   return count === 0 ? { ok: false, error: "VERSION_CONFLICT" } : { ok: true, version: expectedVersion + 1 };
 }
 
@@ -219,7 +240,7 @@ export async function createVariant(args: {
 
     const source = await tx.bmcVariant.findFirst({
       where: { id: sourceVariantId, projectId },
-      select: { id: true, name: true, state: true },
+      select: { id: true, name: true, state: true, entryOrigins: true },
     });
     if (!source) {
       return { ok: false, error: "NOT_FOUND" } as const;
@@ -243,6 +264,8 @@ export async function createVariant(args: {
         ),
         isMain: false,
         state: state.data,
+        // Kopia dziedziczy pochodzenie wpisów źródła (stan jest ten sam).
+        entryOrigins: originsForCopy(parseStoredOrigins(source.entryOrigins).origins, state.data) as unknown as Prisma.InputJsonValue,
         origin: "MANUAL",
         createdById,
       },

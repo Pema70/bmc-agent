@@ -158,6 +158,7 @@ model BmcVariant {
   createdById         String?
   generationId        String? // generacja, z której pochodzi wariant (AI_STRATEGY)
   generationIndex     Int? // numer kandydata w generacji
+  entryOrigins        Json                 @default("[]") // pochodzenie wpisów (EntryOrigin[], Zod); klucz (blockKey, tekst); zapisywane tym samym UPDATE co stan
   project             Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdBy           User?                @relation("VariantCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   generation          StrategyGeneration?  @relation("GeneratedVariants", fields: [generationId], references: [id], onDelete: SetNull)

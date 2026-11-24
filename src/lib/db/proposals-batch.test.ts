@@ -44,7 +44,7 @@ function expectNoWrites() {
 beforeEach(() => {
   vi.clearAllMocks();
   m.transaction.mockImplementation(async (callback: (client: typeof tx) => Promise<unknown>) => callback(tx));
-  m.txRound.findFirst.mockResolvedValue({ id: "r1" });
+  m.txRound.findFirst.mockResolvedValue({ id: "r1", roundNumber: 2 });
   m.txVariant.findFirst.mockResolvedValue({ version: 3, state });
   m.txVariant.updateMany.mockResolvedValue({ count: 1 });
   m.txProposal.updateMany.mockImplementation(async (a: { where: { id: { in: string[] } } }) => ({ count: a.where.id.in.length }));
@@ -67,7 +67,15 @@ describe("acceptRoundBatch", () => {
     expect(next.channels).toEqual(["Sklep online", "Targi"]);
     expect(m.txVariant.updateMany).toHaveBeenCalledWith({
       where: { id: "v1", version: 3 },
-      data: { state: next, version: { increment: 1 } },
+      data: {
+        state: next,
+        // Pochodzenie z paczki: każdy nowy tekst to propozycja z cyklu poprawek (runda 2) z numerem pytania z zapisu propozycji.
+        entryOrigins: [
+          expect.objectContaining({ blockKey: "customer_segments", text: "Pracownicy pobliskich biur", kind: "PROPOSAL", proposalId: "pr2", sourceKind: "REFINEMENT", roundNumber: 2, recordedVersion: 4 }),
+          expect.objectContaining({ blockKey: "channels", text: "Targi", kind: "PROPOSAL", proposalId: "pr3", roundNumber: 2 }),
+        ],
+        version: { increment: 1 },
+      },
     });
     expect(m.txProposal.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ["pr1", "pr2", "pr3"] }, variantId: "v1", status: "PENDING" },

@@ -222,6 +222,10 @@ describe("saveStrategyAsVariant", () => {
           name: "Szkolenia firmowe",
           isMain: false,
           state: stateA,
+          entryOrigins: [
+            { blockKey: "customer_segments", text: "Firmy", kind: "STRATEGY", strategyName: "Szkolenia firmowe", recordedVersion: 1 },
+            { blockKey: "channels", text: "Sprzedaż bezpośrednia", kind: "STRATEGY", strategyName: "Szkolenia firmowe", recordedVersion: 1 },
+          ],
           origin: "AI_STRATEGY",
           description: "Sprzedaż firmom.",
           generationId: "g1",
@@ -231,6 +235,17 @@ describe("saveStrategyAsVariant", () => {
       }),
     );
     expect(outcome).toMatchObject({ ok: true, variant: { id: "v-nowy", origin: "AI_STRATEGY", isMain: false, version: 1 } });
+  });
+
+  it("pochodzenie wpisów wariantu ze strategii: każdy wpis to STRATEGY z nazwą wybranej strategii (index 1)", async () => {
+    setup();
+
+    await saveStrategyAsVariant({ ...args, index: 1 });
+
+    expect(m.txVarCreate.mock.calls[0][0].data.entryOrigins).toEqual([
+      expect.objectContaining({ blockKey: "customer_segments", text: "Seniorzy", kind: "STRATEGY", strategyName: "Seniorzy" }),
+      expect.objectContaining({ blockKey: "channels", text: "Domy kultury", kind: "STRATEGY", strategyName: "Seniorzy" }),
+    ]);
   });
 
   it("zapisuje wskazaną strategię (index 1)", async () => {

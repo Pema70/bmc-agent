@@ -1,5 +1,7 @@
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/client";
 import { LIST_SELECT as VARIANT_LIST_SELECT, toListItem, type VariantListItem } from "@/lib/db/variants";
+import { originsForStrategy } from "@/lib/bmc/origins";
 import { uniqueVariantName } from "@/lib/bmc/variant-names";
 import { BmcState } from "@/lib/schemas/bmc";
 import {
@@ -237,6 +239,8 @@ export async function saveStrategyAsVariant(args: {
           ),
           isMain: false,
           state: state.data,
+          // Każdy wpis pochodzi z kandydata strategii (nazwa strategii z chwili zapisu).
+          entryOrigins: originsForStrategy(state.data, strategy.name, 1) as unknown as Prisma.InputJsonValue,
           origin: "AI_STRATEGY",
           description: strategy.assumption,
           generationId,
