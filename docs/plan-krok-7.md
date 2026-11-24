@@ -588,3 +588,61 @@ Plan zaakceptowany 2026-11-22 z poniższymi poprawkami. **Tabela decyzji (D1 do 
      ORDER BY p.name, r."roundNumber", q.ord;
      ```
    - Reguły ważności jak w PR „P”: próba jest nieważna przy statusie `LlmCallLog` innym niż `OK` (np. `SCHEMA_ERROR` w `generate_questions` lub `refine_from_answers`; wtedy runda nie powstaje albo zostaje `AWAITING_ANSWERS`) i przy zmianie modelu lub promptu w trakcie; pusta paczka w próbie 1 (konkretne odpowiedzi) jest wynikiem do odnotowania, nie błędem.
+
+18. **PR 7g (2026-11-24): panel „Cykl poprawek”, doprecyzowania po implementacji.**
+   - **Miejsce i uprawnienia:** `RefinementPanel` jest renderowany po panelu oceny, wewnątrz przestrzeni roboczej wariantu (tylko EDITOR i wyżej, dla wyświetlanego wariantu; VIEWER panelu nie widzi). Dane z serwera: `listRoundsForVariant`, `listRoundProposalIds` (oba po `projectId` i `variantId`) oraz wersja wariantu najnowszej oceny (`latestEvaluationVersion`; tylko gdy najnowsza ocena jest czytelna).
+   - **Stan i propozycje:** propozycje rundy trafiają do przestrzeni roboczej płótna (`registerProposals`), więc płótno pokazuje je jako diff, a karty w rundzie to te same `ProposalCard` z „Zaakceptuj” / „Odrzuć” (rozstrzyganie pojedyncze po konflikcie). `submitAnswersAction` zwraca widoki propozycji z bazy (`listProposalsForRound` + `toProposalView` z lekkiego modułu `src/lib/proposals/view.ts`), `applyRoundAction` zwraca id przyjętych propozycji, a przestrzeń robocza ma nową metodę `applyBatch` (wersja, stan, status przyjętych, ponowne przejęcie stanu przez edytor). `acceptRoundBatch` zwraca `proposalIds`.
+   - **Logika prezentacji (`src/lib/refinement/presentation.ts`, testowana):** fazy rundy (`AWAITING_ANSWERS`, `EMPTY` = pusta paczka, `PENDING`, `RESOLVED`, `CANCELLED`) liczone ze statusów propozycji; dostępność „Rozpocznij rundę” (kolejność przyczyn: 3 rundy wykorzystane, aktywna runda, niezapisane zmiany, brak aktualnej oceny z odnośnikiem do panelu oceny), „Przygotuj poprawki” (co najmniej jedna niepusta odpowiedź, do 1000 znaków, niezapisane zmiany), „Zastosuj poprawki (n)”, baner „Zastosowano poprawki: oceń model ponownie” (ostatnia runda ma przyjęte propozycje, a najnowsza ocena nie dotyczy bieżącej wersji; bez automatycznego wywołania oceny).
+   - **Koszt rundy (punkt 17):** przy „Rozpocznij rundę” stały tekst „To będzie runda N z 3. Runda zużywa jedną z 3 prób, także gdy na podstawie odpowiedzi nie powstaną żadne propozycje.”, przy „Przygotuj poprawki” to samo dla bieżącej rundy. Pusta paczka: komunikat „Na podstawie odpowiedzi nie ma czego zmienić.”, faza „Bez poprawek”, brak „Zastosuj poprawki”.
+   - **„Zamknij rundę” (D16):** dwuetapowe („Zamknąć rundę N? Zamknięta runda liczy się do limitu 3 rund na wariant i nie można jej wznowić.” → „Potwierdź zamknięcie” / „Anuluj”), dostępne tylko dla rund aktywnych; po zamknięciu komunikat „Runda N zamknięta. Wykorzystano N z 3 rund.”. Propozycje zamkniętej rundy zostają do rozstrzygnięcia.
+   - **Podpowiedzi odpowiedzi:** przycisk z podpowiedzią wstawia jej tekst w pole odpowiedzi (które użytkownik może zmienić); podpowiedź jest zwykłym tekstem (punkt 16).
+   - **Niezmierzone:** zachowanie panelu na prawdziwym modelu to krok 0b (poniżej instrukcja); nie ma testów komponentów (konwencja repozytorium), a logika jest w funkcjach z testami.
+   - **Dane kroku 0b (Q0 dla prefiksu `P-7g-`, dwa projekty „Kawiarnia Ziarno” z modelem 19 wpisów):**
+     ```sql
+     \encoding UTF8
+     \set email 'TWÓJ_E-MAIL'
+     BEGIN;
+     WITH u AS (SELECT id FROM "User" WHERE email = :'email'),
+     spec AS (SELECT kod FROM (VALUES ('proba1'), ('proba2')) AS s(kod)),
+     nowe AS MATERIALIZED (
+       SELECT 'c' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 24) AS pid,
+              'c' || substr(replace(gen_random_uuid()::text, '-', ''), 1, 24) AS vid,
+              'P-7g-' || spec.kod AS nazwa, u.id AS uid
+       FROM spec CROSS JOIN u
+       WHERE NOT EXISTS (
+         SELECT 1 FROM "Project" p JOIN "ProjectMember" m ON m."projectId" = p.id
+         WHERE m."userId" = u.id AND p.name = 'P-7g-' || spec.kod)
+     ),
+     p AS (
+       INSERT INTO "Project" (id, name, description, "updatedAt")
+       SELECT pid, nazwa, 'Kawiarnia w centrum miasta (dane przykładowe).', now() FROM nowe RETURNING id
+     ),
+     m AS (
+       INSERT INTO "ProjectMember" ("projectId", "userId", role) SELECT pid, uid, 'OWNER' FROM nowe RETURNING "projectId"
+     )
+     INSERT INTO "BmcVariant" (id, "projectId", name, "isMain", state, "updatedAt")
+     SELECT vid, pid, 'Wariant główny', true,
+       '{"customer_segments":["Studenci okolicznych uczelni","Pracownicy biurowi z centrum"],
+         "value_propositions":["Świeżo palona kawa speciality w cenie sieciówki","Szybkie zamówienie z odbiorem na miejscu"],
+         "channels":["Lokal stacjonarny","Strona zamówień online"],
+         "customer_relationships":["Karta lojalnościowa","Profil w mediach społecznościowych"],
+         "revenue_streams":["Sprzedaż napojów i wypieków","Sprzedaż kawy w ziarnach"],
+         "key_resources":["Ekspres ciśnieniowy i młynek","Wykwalifikowani bariści"],
+         "key_activities":["Przygotowanie kawy","Obsługa klientów w lokalu"],
+         "key_partnerships":["Lokalna palarnia","Piekarnia dostarczająca wypieki"],
+         "cost_structure":["Czynsz za lokal","Wynagrodzenia baristów","Zakup ziarna"]}'::jsonb,
+       now()
+     FROM nowe;
+
+     -- Kontrola: 2 wiersze (przy pierwszym uruchomieniu), warianty_glowne = 1, rola = OWNER, wpisow_w_modelu = 19.
+     SELECT p.name, p.id AS id_projektu, m.role AS rola,
+            (SELECT count(*) FROM "BmcVariant" v WHERE v."projectId" = p.id AND v."isMain") AS warianty_glowne,
+            (SELECT sum(jsonb_array_length(e.value)) FROM "BmcVariant" v, jsonb_each(v.state) e
+              WHERE v."projectId" = p.id AND v."isMain") AS wpisow_w_modelu
+     FROM "Project" p JOIN "ProjectMember" m ON m."projectId" = p.id
+     WHERE m."userId" = (SELECT id FROM "User" WHERE email = :'email') AND p.name LIKE 'P-7g-%'
+     ORDER BY p.name;
+
+     ROLLBACK;  -- po próbie zamień na COMMIT i uruchom całość ponownie
+     ```
+     Zapytanie jest przeniesionym i skróconym Q0 z `docs/plan-pr-p.md` (tylko dodaje wiersze, bez zmian i kasowania; bez konta o podanym e-mailu nie powstanie nic; ponowne uruchomienie nie dubluje projektów). Nie było uruchamiane przez Claude Code (brak połączenia z bazą): próba z `ROLLBACK` jest obowiązkowa, a błąd kolumny należy wkleić, nie poprawiać ręcznie.
