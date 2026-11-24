@@ -7,7 +7,7 @@ import type { ImpactLevel } from "@/lib/schemas/impact";
 
 // Obramowanie niesie stopień także bez koloru: niski = cienkie przerywane, średni = grube przerywane,
 // wysoki = grube ciągłe. Blok zmieniany: podwójna ramka. Kolory to tokeny stanów (zielony, bursztynowy, czerwony); ponieważ
-// diff propozycji też używa czerwieni i zieleni, a oznaczenie AI fioletu, stopień zawsze rozróżnia kształt ramki i etykieta.
+// diff propozycji też używa czerwieni i zieleni, a oznaczenie AI pomarańczu, stopień zawsze rozróżnia kształt ramki i etykieta.
 const LEVEL_BORDER: Record<ImpactLevel, string> = {
   low: "border border-dashed border-low-border",
   medium: "border-2 border-dashed border-medium-border",

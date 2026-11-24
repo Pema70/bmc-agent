@@ -147,7 +147,7 @@ describe("tokeny wyglądu: kontrast WCAG AA", () => {
       expect(hueDistance(globalsDark["accent-to"], dDark["high-border"])).toBeGreaterThanOrEqual(28);
     });
 
-    it("fiolet oznaczenia AI jest wyraźnie inny niż niebieski przycisków i stanu „Główny” (≥ 40°)", () => {
+    it("pomarańcz oznaczenia AI jest wyraźnie inny niż niebieski przycisków i stanu „Główny” (≥ 40°)", () => {
       expect(hueDistance(globalsDark["ai-fg"], dDark["primary-from"])).toBeGreaterThanOrEqual(40);
       expect(hueDistance(globalsDark["ai-fg"], dDark["main-fg"])).toBeGreaterThanOrEqual(40);
       expect(hueDistance(globalsDark["ai-border"], dDark["main-border"])).toBeGreaterThanOrEqual(40);
