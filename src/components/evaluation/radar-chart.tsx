@@ -14,11 +14,13 @@ const VIEW_HEIGHT = 330;
 const GEOMETRY: RadarGeometry = { cx: 210, cy: 165, radius: 95, labelOffset: 16 };
 const LINE_HEIGHT = 15;
 
-// Serie różnią się nie tylko kolorem: linia ciągła i kółka (niebieski) vs linia przerywana i romby (koral). Kolory to tokeny
-// wyglądu o kontraście co najmniej 3:1 na powierzchni (test `design-tokens.test.ts`); geometria pochodzi z `radar.ts`.
+// Serie różnią się nie tylko kolorem: linia ciągła i kółka (niebieski), linia przerywana i romby (koral), linia kropkowana
+// i kwadraty (zielony). Kolory to tokeny wyglądu o kontraście co najmniej 3:1 na powierzchni i tincie (test
+// `design-tokens.test.ts`); geometria pochodzi z `radar.ts`.
 const SERIES_STYLE = [
   { color: "text-primary-from", dash: undefined, marker: "circle", strokeWidth: 2.5, fillOpacity: 0.18 },
   { color: "text-accent-from", dash: "6 4", marker: "diamond", strokeWidth: 2, fillOpacity: 0.1 },
+  { color: "text-low-fg", dash: "2 4", marker: "square", strokeWidth: 2, fillOpacity: 0.06 },
 ] as const;
 
 function describeSeries(series: RadarSeries): string {
@@ -26,16 +28,19 @@ function describeSeries(series: RadarSeries): string {
   return `${series.legend}: ${values}`;
 }
 
-function Marker({ kind, point }: { kind: "circle" | "diamond"; point: Point }) {
+function Marker({ kind, point }: { kind: "circle" | "diamond" | "square"; point: Point }) {
   if (kind === "circle") {
     return <circle cx={point.x} cy={point.y} r={4} fill="currentColor" />;
+  }
+  if (kind === "square") {
+    return <rect x={point.x - 4} y={point.y - 4} width={8} height={8} fill="currentColor" />;
   }
   const r = 5;
   const points = `${point.x},${point.y - r} ${point.x + r},${point.y} ${point.x},${point.y + r} ${point.x - r},${point.y}`;
   return <polygon points={points} fill="currentColor" />;
 }
 
-/** Wykres radarowy ocen (jedna lub dwie serie). Tabela ocen w panelu jest jego alternatywą tekstową. */
+/** Wykres radarowy ocen (od jednej do trzech serii). Tabela ocen w panelu jest jego alternatywą tekstową. */
 export function RadarChart({ series }: { series: RadarSeries[] }) {
   const axes = radarAxes(GEOMETRY);
   const shown = series.slice(0, SERIES_STYLE.length);

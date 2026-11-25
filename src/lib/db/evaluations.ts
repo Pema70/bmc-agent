@@ -114,6 +114,47 @@ export async function createEvaluation(input: CreateEvaluationInput): Promise<Ev
   return parsed.evaluation;
 }
 
+export type CreateManualEvaluationInput = {
+  projectId: string;
+  variantId: string;
+  variantVersion: number;
+  stateSnapshot: BmcState;
+  result: EvaluationOutput;
+  createdById: string;
+};
+
+/**
+ * Zapis oceny ręcznej (referencyjnej): bez modelu, bez wywołania LLM i bez wiersza LlmCallLog. Walidacja Zod przed zapisem.
+ * `trigger` zostaje null (to odróżnia ocenę ręczną), a `provider`, `model` i `promptVersion` są puste.
+ */
+export async function createManualEvaluation(input: CreateManualEvaluationInput): Promise<EvaluationView> {
+  const result = EvaluationOutput.parse(input.result);
+  const stateSnapshot = BmcState.parse(input.stateSnapshot);
+  const row = await prisma.evaluationResult.create({
+    data: {
+      projectId: input.projectId,
+      variantId: input.variantId,
+      schemaVersion: EVALUATION_SCHEMA_VERSION,
+      variantVersion: input.variantVersion,
+      stateSnapshot,
+      result,
+      source: "MANUAL",
+      trigger: null,
+      provider: null,
+      model: null,
+      promptVersion: null,
+      llmCallLogId: null,
+      createdById: input.createdById,
+    },
+    select: LIST_SELECT,
+  });
+  const parsed = parseEvaluationRow(row);
+  if (!parsed.ok) {
+    throw new Error(`Zapisana ocena ${row.id} jest niepoprawna: ${parsed.error}`);
+  }
+  return parsed.evaluation;
+}
+
 /**
  * Lista ocen wariantu od najnowszej, bez migawki stanu. Filtruje po projectId ORAZ variantId,
  * więc wariant z innego projektu daje pustą listę.
