@@ -227,3 +227,16 @@ Plan zaakceptowany 2026-11-25: **D1 do D12 zgodnie z rekomendacjami, z jedną zm
    - **Niepotwierdzone (sprawdza właściciel w przeglądarce):** zachowanie `replaceState` z `router.refresh()` i przyciskiem „wstecz” w Next 16, klasy `@container` i `@5xl:` w buildzie, wygląd stron D4 po migracji, czytelność plakietek na wąskim ekranie, kolejność fokusu i Esc.
    - **Poprawka po przeglądzie D2:** błąd w konsoli „called use() to suspend in a previous render but did not call use()” pochodzi z routera Next (`useActionQueue` używa `use()` warunkowo): `window.history.replaceState` jest podmieniony przez Next i wysyła akcję `restore` do routera, co przy trwającym odświeżeniu danych (po zapisie, akceptacji) koliduje z oczekującą akcją. `syncUrl` używa teraz natywnej `History.prototype.replaceState` (adres się zmienia, router Next o tym nie wie; `useSearchParams` nie jest używany, a `history.state` zostaje). Nie potwierdzone na żywo: sprawdza właściciel.
    - **Zmiana koloru oznaczenia AI (po przeglądzie D2, na prośbę właściciela):** propozycje na płótnie i w czacie, „Propozycja AI” i „Strategia AI” są pomarańczowe, nie fioletowe (`--ai-bg` #3A1A08, `--ai-fg` #FFB27A, `--ai-border` #E0702A, w `globals.css` i `d.html`). Stan nadal rozróżnia etykieta tekstowa „AI”; pomarańcz jest bliższy koralowi akcentu i bursztynowi „wpływ średni”, więc kolor nigdy nie jest jedyną informacją.
+
+## Stan po zmianach wyglądu (2026-11-25)
+
+**Zrobione i zmergowane:**
+- **PR #55 (D1):** plan, tokeny i podglądy palet A do D (`docs/design-preview/`), zaakceptowana paleta D (wyłącznie tryb ciemny), testy kontrastu WCAG AA.
+- **PR #56 (D2):** tokeny D w `globals.css`, Space Grotesk tylko dla nagłówków (`src/app/fonts/`, licencja OFL), układ strony projektu (przyklejony pasek narzędzi z plakietkami, tytuł z gradientem, płótno na całą szerokość, zwijany czat pod płótnem, jeden otwarty panel, `?panel=` i `?czat=`, klawiatura), restyling radaru bez zmian w `radar.ts`, migracja kolorów całej aplikacji na tokeny (test pilnuje braku surowych kolorów). Poprawki po przeglądzie: adres zmieniany natywnym `replaceState` (bez akcji routera Next), klucze elementów `header` i `footer`, pomarańczowe oznaczenie AI.
+- **Oznaczenie AI jest pomarańczowe i zawsze ma etykietę tekstową „AI”** (propozycje, „Propozycja AI”, „Strategia AI”); kolor nigdy nie jest jedyną informacją (pomarańcz jest bliski koralowi akcentu i bursztynowi „wpływ średni”).
+- Po #56: `npm run build` przechodzi, konsola w `npm run dev` jest czysta (potwierdzone przez właściciela).
+
+**Odłożone (wpis „Dopracowanie wyglądu (D3 czat, D4 pozostałe strony)” w `docs/zadania.md`, status otwarte):** D3 (wygląd wiadomości i kart czatu), D4 (pozostałe strony, dostępność, wąskie ekrany), ewentualnie D5 (dokumentacja po zmianach). Decyzja właściciela: na razie nie robimy.
+
+**Nie zmieniało się (pomiary kroków 10 i 11 pozostają porównywalne):** prompty i ich wersje, opisy narzędzi agenta, schematy Zod wyników AI, logika wywołań modelu, schemat bazy, zależności (poza dodaną czcionką jako plik w repozytorium).
+
