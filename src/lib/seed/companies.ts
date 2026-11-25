@@ -28,7 +28,7 @@ const RAW_COMPANIES: SeedCompany[] = [
     name: `${SEED_PROJECT_PREFIX}Netflix`,
     outcome: "SUCCESS",
     description: describe(
-      "Netflix (założony w 1997 roku): model usługi streamingu wideo w abonamencie, z okresu dojrzałej usługi, z treściami własnymi i licencjonowanymi.",
+      "Netflix (założony w 1997 roku): model usługi streamingu wideo w abonamencie, z okresu przed wprowadzeniem planu z reklamami, z treściami własnymi i licencjonowanymi.",
     ),
     state: {
       customer_segments: [
@@ -168,11 +168,10 @@ const RAW_COMPANIES: SeedCompany[] = [
         "Wypożyczenie od ręki, bez czekania na przesyłkę",
         "Przekąski i dodatki przy kasie",
       ],
-      channels: ["Sieć sklepów stacjonarnych", "Późniejsze wypożyczenia wysyłkowe i online"],
+      channels: ["Sieć sklepów stacjonarnych"],
       customer_relationships: [
         "Obsługa w sklepie przez pracowników",
         "Karta członkowska",
-        "Przypomnienia o terminie zwrotu",
       ],
       revenue_streams: [
         "Opłaty za wypożyczenie nośników",
@@ -240,7 +239,7 @@ const RAW_COMPANIES: SeedCompany[] = [
     ),
     state: {
       customer_segments: [
-        "Zamożni miłośnicy zdrowego stylu życia",
+        "Klienci gotowi zapłacić więcej za wygodę i świeży sok w domu",
         "Osoby ceniące wygodę przygotowania świeżego soku w domu",
       ],
       value_propositions: [
@@ -254,7 +253,7 @@ const RAW_COMPANIES: SeedCompany[] = [
       key_resources: [
         "Zaprojektowane urządzenie z prasą",
         "Sieć dostawców świeżych składników",
-        "Kapitał od inwestorów",
+        "Własny system paczek dopasowanych do urządzenia",
       ],
       key_activities: [
         "Projektowanie i produkcja urządzenia",
