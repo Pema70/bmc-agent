@@ -79,6 +79,16 @@ beforeEach(() => {
 });
 
 describe("runObjectOperation", () => {
+  it("model: domyślnie nazwa logiczna chat, a spec.modelName wybiera inną (np. judge)", async () => {
+    setModel(generateModel('{"answer":"tak"}'));
+
+    await runObjectOperation(makeSpec(), ctx);
+    expect(mocks.getChatModel).toHaveBeenLastCalledWith("chat");
+
+    await runObjectOperation(makeSpec({ modelName: "judge" }), ctx);
+    expect(mocks.getChatModel).toHaveBeenLastCalledWith("judge");
+  });
+
   it("sukces: haki w kolejności, jeden log OK, wynik z haka save", async () => {
     const trace: string[] = [];
     mocks.checkUserLimits.mockImplementation(async () => (trace.push("limits"), { ok: true }));

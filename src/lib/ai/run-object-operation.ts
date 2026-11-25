@@ -4,7 +4,7 @@ import { loadAiLimits, type AiLimits } from "@/lib/ai/config";
 import { classifyLlmError } from "@/lib/ai/errors";
 import { checkUserLimits } from "@/lib/ai/limits";
 import { logLlmCall, type TokenUsage } from "@/lib/ai/log";
-import { getChatModel, type ResolvedModel } from "@/lib/ai/models";
+import { getChatModel, type LogicalModelName, type ResolvedModel } from "@/lib/ai/models";
 
 const MAX_RETRIES = 2;
 
@@ -41,6 +41,8 @@ export type ObjectOperationSpec<
 > = {
   /** Prefiks wpisów w logu serwera, np. "evaluate". */
   tag: string;
+  /** Nazwa logiczna modelu z `models.ts`; domyślnie `chat` (operacje dotychczasowe bez zmian). */
+  modelName?: LogicalModelName;
   /** Wartość kolumn LlmCallLog.operation i promptVersion. */
   operation: string;
   promptVersion: string;
@@ -129,7 +131,7 @@ export async function runObjectOperation<
 
   let resolved: ResolvedModel;
   try {
-    resolved = getChatModel("chat");
+    resolved = getChatModel(spec.modelName ?? "chat");
   } catch (error) {
     console.error(`[${spec.tag}] Błędna konfiguracja modelu:`, errorMessage(error));
     return { ok: false, error: "CONFIG", message: spec.messages.config };
