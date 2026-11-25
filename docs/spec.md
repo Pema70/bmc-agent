@@ -278,7 +278,7 @@ Działa na zapisanym stanie wariantu, z załącznikiem albo bez niego, gdy model
 
 0. **Narzędzie deweloperskie:** Claude Code z subskrypcji Claude Pro, bez kredytów API. To nie jest model aplikacji, tylko narzędzie do pisania kodu.
 1. **Rozwój mechaniki** (czat krok po kroku, narzędzia agenta, baza danych, interfejs): darmowy klucz Gemini (Google AI Studio), model z rodziny Flash-Lite lub Flash (dziś `gemini-3.5-flash-lite`). Nazwy modeli i limity darmowego planu weryfikujemy w dokumentacji dostawcy.
-2. **Przykłady do testów i porównanie modeli:** 2 do 3 modeli Gemini o różnej klasie i cenie (kandydaci: `gemini-3.5-flash-lite`, `gemini-3.6-flash`, opcjonalnie `gemini-3.8-flash`), płatny plan Gemini API, kilka serii testów na końcu. Bez Claude Sonnet 5.5 i bez modeli OpenAI.
+2. **Przykłady do testów i porównanie modeli:** 2 do 3 modeli Gemini o różnej klasie i cenie (`gemini-3.5-flash-lite` i mocniejszy: preferowany `gemini-3.8-flash`, jeśli zadziała na płatnym planie, w przeciwnym razie `gemini-3.6-flash`), płatny plan Gemini API, kilka serii testów na końcu. Bez Claude Sonnet 5.5 i bez modeli OpenAI.
 3. **Porównanie modeli** (rozdział testowy): te same przypadki testowe, te same prompty i te same schematy Zod dla wszystkich modeli.
 4. **Niezależna ocena:** sędzia (tani model Claude, `claude-haiku-5-5`, jedyne użycie API Anthropic w aplikacji) ocenia wyniki wszystkich modeli generujących i obu architektur tym samym promptem (§6).
 5. **Porównanie architektur** (po wersji 2, §16): jeden agent vs dziewięć agentów, ten sam model generujący, te same przypadki, ten sam sędzia.
