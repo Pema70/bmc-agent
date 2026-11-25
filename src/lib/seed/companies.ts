@@ -76,7 +76,7 @@ const RAW_COMPANIES: SeedCompany[] = [
     name: `${SEED_PROJECT_PREFIX}Airbnb`,
     outcome: "SUCCESS",
     description: describe(
-      "Airbnb (założony w 2008 roku): model platformy dwustronnej łączącej gospodarzy oferujących noclegi z podróżnymi.",
+      "Airbnb (założony w 2008 roku): model platformy dwustronnej łączącej gospodarzy oferujących noclegi z podróżnymi, z okresu, w którym opłaty pobierano zarówno od gości, jak i od gospodarzy.",
     ),
     state: {
       customer_segments: [
@@ -235,7 +235,7 @@ const RAW_COMPANIES: SeedCompany[] = [
     name: `${SEED_PROJECT_PREFIX}Juicero`,
     outcome: "FAILURE",
     description: describe(
-      "Juicero (zamknięty w 2017 roku): model sprzedaży urządzenia do wyciskania soków wraz z paczkami składników w subskrypcji.",
+      "Juicero (zamknięty w 2017 roku): model sprzedaży urządzenia do wyciskania soków wraz z paczkami składników kupowanymi osobno i pasującymi tylko do tego urządzenia.",
     ),
     state: {
       customer_segments: [
