@@ -71,3 +71,27 @@ describe("zaleznosci eksportu PDF i DOCX (krok 9b)", () => {
     expect(lock.packages["node_modules/docx/node_modules/@types/node"]?.version).toMatch(/^26\./);
   });
 });
+
+// Krok 10a: runner skryptu seeda. jiti jest jawną zależnością deweloperską (wcześniej tylko przechodnią); tsx odrzucony (postinstall w esbuild).
+describe("jiti: runner seeda (krok 10a)", () => {
+  const devPkg = JSON.parse(readFileSync(root("package.json"), "utf8")) as {
+    devDependencies: Record<string, string>;
+
+  };
+
+  it("jiti jest przypięty do dokładnej wersji 2.7.0 w devDependencies i w lockfile", () => {
+    expect(devPkg.devDependencies.jiti).toBe("2.7.0");
+    expect(lock.packages["node_modules/jiti"]?.version).toBe("2.7.0");
+  });
+
+  it("jiti nie ma skryptu instalacyjnego ani zależności", () => {
+    const entry = lock.packages["node_modules/jiti"] as { hasInstallScript?: boolean; dependencies?: unknown };
+    expect(entry.hasInstallScript).not.toBe(true);
+    expect(entry.dependencies).toBeUndefined();
+  });
+
+  it("prisma.config.ts uruchamia seed przez jiti", () => {
+    const config = readFileSync(root("prisma.config.ts"), "utf8");
+    expect(config).toContain('seed: "jiti prisma/seed.ts"');
+  });
+});
