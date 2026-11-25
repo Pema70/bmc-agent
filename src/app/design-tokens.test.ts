@@ -166,6 +166,8 @@ describe("tokeny wyglądu: kontrast WCAG AA", () => {
       for (const background of ["surface", "tint"]) {
         expect(contrast(dDark["primary-from"], dDark[background]), `seria bieżąca na ${background}`).toBeGreaterThanOrEqual(3);
         expect(contrast(dDark["accent-from"], dDark[background]), `seria poprzednia na ${background}`).toBeGreaterThanOrEqual(3);
+        expect(contrast(dDark["low-fg"], dDark[background]), `trzecia seria na ${background}`).toBeGreaterThanOrEqual(3);
+        expect(contrast(globalsDark["low-fg"], globalsDark[background]), `trzecia seria (aplikacja) na ${background}`).toBeGreaterThanOrEqual(3);
       }
       expect(previewD).toContain('<g fill="var(--text)" font-size="13" font-weight="700">');
     });

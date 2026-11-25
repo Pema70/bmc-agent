@@ -14,6 +14,11 @@ export function formatEvaluationSource(evaluation: Pick<EvaluationView, "source"
   return `Ocena AI: ${evaluation.provider ?? "?"} / ${evaluation.model ?? "?"}`;
 }
 
+/** Krótka etykieta źródła do legendy wykresu: „AI”, „ręczna” (10d doda „sędzia”). */
+export function formatEvaluationSourceShort(evaluation: Pick<EvaluationView, "source">): string {
+  return evaluation.source === "MANUAL" ? "ręczna" : "AI";
+}
+
 /** Ocena dotyczy starszej wersji modelu niż aktualna. */
 export function isEvaluationStale(evaluationVariantVersion: number, currentVersion: number): boolean {
   return evaluationVariantVersion < currentVersion;

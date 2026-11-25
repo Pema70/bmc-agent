@@ -5,8 +5,14 @@ import { evaluateModelAction } from "@/app/projekty/[id]/evaluation-actions";
 import { DIRTY_MESSAGE, useOptionalVariantWorkspace } from "@/components/bmc/variant-workspace";
 import type { EvaluationListItem } from "@/lib/db/evaluations";
 import { EvaluationTable } from "@/components/evaluation/evaluation-table";
+import { ManualEvaluationForm } from "@/components/evaluation/manual-evaluation-form";
 import { RadarChart, type RadarSeries } from "@/components/evaluation/radar-chart";
-import { formatEvaluationDate, formatEvaluationSource, isEvaluationStale } from "@/lib/evaluation/format";
+import {
+  formatEvaluationDate,
+  formatEvaluationSource,
+  formatEvaluationSourceShort,
+  isEvaluationStale,
+} from "@/lib/evaluation/format";
 import { comparableEvaluations } from "@/lib/evaluation/radar";
 import { type EvaluationView } from "@/lib/schemas/evaluation";
 
@@ -30,6 +36,9 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
   const [items, setItems] = useState<EvaluationListItem[]>(initialItems);
   const [selectedId, setSelectedId] = useState<string | null>(() => firstValidId(initialItems));
   const [compareId, setCompareId] = useState<string>("");
+  const [compareId2, setCompareId2] = useState<string>("");
+  // Formularz oceny ręcznej: dopóki jest otwarty, panel nie pokazuje żadnych wyników ocen (ślepa próba).
+  const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -38,11 +47,25 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
   // Do nałożenia tylko poprawnie odczytane oceny z tym samym schemaVersion; uszkodzone wiersze nie są wybieralne.
   const comparable = comparableEvaluations(items, selectedId);
   const overlay = comparable.find((item) => item.id === compareId) ?? null;
+  // Druga nakładka: z pozostałych ocen, dostępna dopiero po wyborze pierwszej.
+  const comparable2 = overlay ? comparable.filter((item) => item.id !== overlay.id) : [];
+  const overlay2 = comparable2.find((item) => item.id === compareId2) ?? null;
   const series: RadarSeries[] = evaluation
     ? [{ id: evaluation.id, legend: `Wybrana: ${describe(evaluation)}`, result: evaluation.result }]
     : [];
   if (evaluation && overlay) {
     series.push({ id: overlay.id, legend: `Nałożona: ${describe(overlay)}`, result: overlay.result });
+    if (overlay2) {
+      series.push({ id: overlay2.id, legend: `Nałożona (druga): ${describe(overlay2)}`, result: overlay2.result });
+    }
+  }
+
+  function handleSaved(saved: EvaluationView) {
+    setItems((current) => [{ ok: true, evaluation: saved }, ...current]);
+    setSelectedId(saved.id);
+    setCompareId("");
+    setCompareId2("");
+    setFormOpen(false);
   }
 
   function evaluate() {
@@ -72,26 +95,50 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
         <h2 id="evaluation-heading" className="sr-only">
           Ocena modelu
         </h2>
-        <span className="rounded-full border border-ai-border bg-ai-bg px-2 py-0.5 text-xs font-bold text-ai-fg">
-          Ocena AI
-        </span>
+        {formOpen ? null : evaluation?.source === "MANUAL" ? (
+          <span className="rounded-full border border-border px-2 py-0.5 text-xs font-bold">Ocena ręczna</span>
+        ) : (
+          <span className="rounded-full border border-ai-border bg-ai-bg px-2 py-0.5 text-xs font-bold text-ai-fg">
+            Ocena AI
+          </span>
+        )}
       </div>
 
       <p className="text-sm text-muted">
-        To subiektywna opinia modelu językowego na podstawie wpisów w płótnie, a nie weryfikacja biznesowa. Model nie
-        sprawdza rynku ani danych liczbowych. Ocena dotyczy zapisanego stanu wariantu, nie niezapisanych zmian w edytorze.
+        Ocena AI to subiektywna opinia modelu językowego na podstawie wpisów w płótnie, a nie weryfikacja biznesowa. Model
+        nie sprawdza rynku ani danych liczbowych. Ocena ręczna to Twoja własna ocena według tej samej rubryki. Obie dotyczą
+        zapisanego stanu wariantu, nie niezapisanych zmian w edytorze.
       </p>
 
-      {canEvaluate ? (
+      {formOpen ? (
+        <ManualEvaluationForm
+          projectId={projectId}
+          variantId={variantId}
+          onSaved={handleSaved}
+          onCancel={() => setFormOpen(false)}
+        />
+      ) : null}
+
+      {canEvaluate && !formOpen ? (
         <div className="flex flex-col items-start gap-2">
-          <button
-            type="button"
-            onClick={evaluate}
-            disabled={pending || dirty}
-            className="rounded-lg bg-cta px-4 py-2 text-sm font-bold hover:bg-tint disabled:opacity-50"
-          >
-            {pending ? "Oceniam…" : "Oceń model"}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={evaluate}
+              disabled={pending || dirty}
+              className="rounded-lg bg-cta px-4 py-2 text-sm font-bold hover:bg-tint disabled:opacity-50"
+            >
+              {pending ? "Oceniam…" : "Oceń model"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormOpen(true)}
+              disabled={pending || dirty}
+              className="rounded-lg border border-border px-4 py-2 text-sm font-bold hover:bg-tint disabled:opacity-50"
+            >
+              Dodaj ocenę ręczną
+            </button>
+          </div>
           {dirty ? <p className="text-sm text-muted">{DIRTY_MESSAGE}</p> : null}
           {error ? (
             <p role="alert" className="text-sm text-danger">
@@ -101,10 +148,11 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
         </div>
       ) : null}
 
-      {evaluation ? (
+      {formOpen ? null : evaluation ? (
         <div className="flex flex-col gap-3">
           <p className="text-sm text-muted">
-            {formatEvaluationSource(evaluation)} · prompt: {evaluation.promptVersion ?? "brak"} ·{" "}
+            {formatEvaluationSource(evaluation)}
+            {evaluation.source === "AI" ? ` · prompt: ${evaluation.promptVersion ?? "brak"}` : ""} ·{" "}
             {formatEvaluationDate(evaluation.createdAt)} · wersja modelu: {evaluation.variantVersion}
           </p>
           {isEvaluationStale(evaluation.variantVersion, version) ? (
@@ -118,11 +166,31 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
               <span className="font-medium">Nałóż drugą ocenę</span>
               <select
                 value={overlay ? overlay.id : ""}
-                onChange={(event) => setCompareId(event.target.value)}
+                onChange={(event) => {
+                  setCompareId(event.target.value);
+                  setCompareId2("");
+                }}
                 className="rounded-lg border border-border bg-transparent px-2 py-1.5"
               >
                 <option value="">Bez nakładki</option>
                 {comparable.map((item) => (
+                  <option key={item.id} value={item.id} className="bg-surface text-text">
+                    {describe(item)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {comparable2.length > 0 ? (
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="font-medium">Nałóż trzecią ocenę</span>
+              <select
+                value={overlay2 ? overlay2.id : ""}
+                onChange={(event) => setCompareId2(event.target.value)}
+                className="rounded-lg border border-border bg-transparent px-2 py-1.5"
+              >
+                <option value="">Bez drugiej nakładki</option>
+                {comparable2.map((item) => (
                   <option key={item.id} value={item.id} className="bg-surface text-text">
                     {describe(item)}
                   </option>
@@ -138,7 +206,7 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
         </p>
       )}
 
-      {items.length > 0 ? (
+      {!formOpen && items.length > 0 ? (
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-semibold">Historia ocen</h3>
           <ul className="flex flex-col gap-1">
@@ -172,7 +240,7 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
 }
 
 function describe(evaluation: EvaluationView): string {
-  return `${formatEvaluationDate(evaluation.createdAt)} · ${formatEvaluationSource(evaluation)}`;
+  return `${formatEvaluationDate(evaluation.createdAt)} · ${formatEvaluationSourceShort(evaluation)} · wersja modelu ${evaluation.variantVersion}`;
 }
 
 function firstValidId(items: EvaluationListItem[]): string | null {

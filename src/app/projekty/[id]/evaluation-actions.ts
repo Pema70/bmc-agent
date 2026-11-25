@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { runEvaluation, type EvaluationErrorCode } from "@/lib/ai/evaluate";
 import { requireProjectRole } from "@/lib/auth/permissions";
-import { getEvaluation, type EvaluationListItem } from "@/lib/db/evaluations";
-import { getVariantProjectId } from "@/lib/db/variants";
+import { createManualEvaluation, getEvaluation, type EvaluationListItem } from "@/lib/db/evaluations";
+import { getVariantForProject, getVariantProjectId } from "@/lib/db/variants";
 import { VariantId } from "@/lib/schemas/bmc";
-import type { EvaluationView } from "@/lib/schemas/evaluation";
+import { EvaluationOutput, type EvaluationView } from "@/lib/schemas/evaluation";
 
 export type EvaluateActionErrorCode = EvaluationErrorCode | "FORBIDDEN" | "VALIDATION";
 
@@ -23,6 +23,49 @@ export type GetEvaluationActionResult =
   | { ok: false; error: "FORBIDDEN" | "VALIDATION" | "NOT_FOUND"; message: string };
 
 const EvaluationId = z.string().trim().min(1).max(64);
+
+export type CreateManualEvaluationActionResult =
+  | { ok: true; evaluation: EvaluationView }
+  | { ok: false; error: "FORBIDDEN" | "VALIDATION" | "NOT_FOUND"; message: string };
+
+/**
+ * Zapis oceny ręcznej (referencyjnej) zapisanego stanu wariantu, bez wywołania modelu. Kolejność: rola EDITOR (przed
+ * jakimkolwiek odczytem), kształt identyfikatora, przynależność wariantu do projektu (jedno zapytanie po id i projectId),
+ * dopiero potem walidacja Zod oceny. Migawka i wersja pochodzą z bazy, nie od klienta.
+ */
+export async function createManualEvaluationAction(
+  projectId: string,
+  variantId: string,
+  input: unknown,
+): Promise<CreateManualEvaluationActionResult> {
+  const access = await requireProjectRole(projectId, "EDITOR");
+  if (!access.ok) {
+    return { ok: false, error: "FORBIDDEN", message: "Nie masz uprawnień do oceniania modelu w tym projekcie." };
+  }
+  const variantIdParsed = VariantId.safeParse(variantId);
+  if (!variantIdParsed.success) {
+    return { ok: false, error: "VALIDATION", message: `Nie zapisano: ${z.prettifyError(variantIdParsed.error)}` };
+  }
+  const variant = await getVariantForProject(access.projectId, variantIdParsed.data);
+  if (!variant) {
+    return { ok: false, error: "NOT_FOUND", message: NOT_FOUND_MESSAGE };
+  }
+  const parsed = EvaluationOutput.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, error: "VALIDATION", message: `Nie zapisano oceny: ${z.prettifyError(parsed.error)}` };
+  }
+
+  const evaluation = await createManualEvaluation({
+    projectId: access.projectId,
+    variantId: variant.id,
+    variantVersion: variant.version,
+    stateSnapshot: variant.state,
+    result: parsed.data,
+    createdById: access.session.user.id,
+  });
+  revalidatePath(`/projekty/${access.projectId}`);
+  return { ok: true, evaluation };
+}
 
 /**
  * Odczyt jednej zapisanej oceny dla karty w czacie (karta pokazuje dane z bazy, nie z tekstu modelu).

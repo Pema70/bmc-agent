@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatEvaluationDate, formatEvaluationSource, isEvaluationStale } from "@/lib/evaluation/format";
+import {
+  formatEvaluationDate,
+  formatEvaluationSource,
+  formatEvaluationSourceShort,
+  isEvaluationStale,
+} from "@/lib/evaluation/format";
 
 describe("formatEvaluationDate", () => {
   it("formatuje datę w UTC, niezależnie od strefy czasowej", () => {
@@ -22,6 +27,13 @@ describe("formatEvaluationSource", () => {
 
   it("oznacza ocenę ręczną", () => {
     expect(formatEvaluationSource({ source: "MANUAL", provider: null, model: null })).toBe("Ocena ręczna");
+  });
+});
+
+describe("formatEvaluationSourceShort", () => {
+  it("podaje krótką etykietę źródła do legendy wykresu", () => {
+    expect(formatEvaluationSourceShort({ source: "AI" })).toBe("AI");
+    expect(formatEvaluationSourceShort({ source: "MANUAL" })).toBe("ręczna");
   });
 });
 

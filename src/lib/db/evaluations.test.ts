@@ -8,6 +8,7 @@ vi.mock("@/lib/db/client", () => ({
 
 import {
   createEvaluation,
+  createManualEvaluation,
   getEvaluation,
   getEvaluationSnapshot,
   listEvaluationsForVariant,
@@ -178,5 +179,56 @@ describe("getEvaluation", () => {
 
     mocks.findFirst.mockResolvedValueOnce(row({ result: { zepsute: true } }));
     expect(await getEvaluation("p1", "v1", "e1")).toMatchObject({ ok: false, id: "e1" });
+  });
+});
+
+describe("createManualEvaluation", () => {
+  const manualInput = {
+    projectId: "p1",
+    variantId: "v1",
+    variantVersion: 4,
+    stateSnapshot: emptyBmcState(),
+    result,
+    createdById: "u1",
+  };
+  const manualRow = (overrides: Record<string, unknown> = {}) =>
+    row({ id: "m1", source: "MANUAL", trigger: null, provider: null, model: null, promptVersion: null, ...overrides });
+
+  it("zapisuje source MANUAL, trigger null, brak modelu i brak powiązania z LlmCallLog", async () => {
+    mocks.create.mockResolvedValue(manualRow());
+
+    const evaluation = await createManualEvaluation(manualInput);
+
+    const data = mocks.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      projectId: "p1",
+      variantId: "v1",
+      schemaVersion: 1,
+      variantVersion: 4,
+      source: "MANUAL",
+      trigger: null,
+      provider: null,
+      model: null,
+      promptVersion: null,
+      llmCallLogId: null,
+      createdById: "u1",
+    });
+    expect(data.stateSnapshot).toEqual(emptyBmcState());
+    expect(data.result).toEqual(result);
+    expect(evaluation).toMatchObject({ id: "m1", source: "MANUAL", trigger: null, model: null });
+  });
+
+  it("odrzuca wynik niezgodny ze schematem przed zapisem", async () => {
+    const bad = { ...result, coherence: { score: 11, justification: "x" } };
+
+    await expect(createManualEvaluation({ ...manualInput, result: bad })).rejects.toThrow();
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("odrzuca migawkę niezgodną z BmcState przed zapisem", async () => {
+    await expect(
+      createManualEvaluation({ ...manualInput, stateSnapshot: { channels: [] } as never }),
+    ).rejects.toThrow();
+    expect(mocks.create).not.toHaveBeenCalled();
   });
 });
