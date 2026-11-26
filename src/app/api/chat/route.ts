@@ -17,6 +17,12 @@ import { logLlmCall, type TokenUsage } from "@/lib/ai/log";
 import { getChatModel } from "@/lib/ai/models";
 import { PROMPT_VERSION, buildSystemPrompt } from "@/lib/ai/prompts/system";
 import { createChatTools } from "@/lib/ai/tools";
+import {
+  TRUNCATION_ERROR_CODE,
+  TRUNCATION_NOTICE,
+  dropIncompleteToolParts,
+  withTruncationNotice,
+} from "@/lib/ai/truncation";
 import { getProjectAccess } from "@/lib/auth/permissions";
 import { listAttachmentsForProject } from "@/lib/db/attachments";
 import { listChatMessages, newChatMessageId, saveChatMessage } from "@/lib/db/chat";
@@ -201,27 +207,40 @@ export async function POST(req: Request): Promise<Response> {
       return;
     }
 
+    // Tura ucięta limitem długości: odpowiedź (ze znacznikiem) i tak zapisujemy, żeby wiadomość użytkownika nie została
+    // bez odpowiedzi (agent odpowiadałby na nią drugi raz). Nieukończone wywołania narzędzi nie trafiają do historii.
+    const truncated = truncation.wasTruncated();
+    let parts = truncated ? dropIncompleteToolParts(responseMessage.parts) : responseMessage.parts;
     const validated = await safeValidateUIMessages<ChatUIMessage>({
-      messages: [responseMessage],
+      messages: [{ ...responseMessage, parts }],
       tools: chatValidationTools,
     });
     if (!validated.success) {
-      console.error("[chat] Odpowiedź modelu niezgodna ze schematem, nie zapisano.");
-      await logLlmCall({ ...base, ...usage, status: "SCHEMA_ERROR", errorCode: "INVALID_RESPONSE" });
-      return;
+      if (!truncated) {
+        console.error("[chat] Odpowiedź modelu niezgodna ze schematem, nie zapisano.");
+        await logLlmCall({ ...base, ...usage, status: "SCHEMA_ERROR", errorCode: "INVALID_RESPONSE" });
+        return;
+      }
+      console.error("[chat] Ucięta odpowiedź niezgodna ze schematem, zapisano sam znacznik.");
+      parts = [{ type: "text", text: TRUNCATION_NOTICE }];
     }
 
     try {
-      await saveChatMessage({ id: assistantId, projectId, userId: null, role: "assistant", parts: responseMessage.parts });
-      await logLlmCall({ ...base, ...usage, status: "OK" });
+      await saveChatMessage({ id: assistantId, projectId, userId: null, role: "assistant", parts });
+      await logLlmCall(
+        truncated
+          ? { ...base, ...usage, status: "SCHEMA_ERROR", errorCode: TRUNCATION_ERROR_CODE }
+          : { ...base, ...usage, status: "OK" },
+      );
     } catch (error) {
       console.error("[chat] Nie udało się zapisać odpowiedzi:", error instanceof Error ? error.message : "nieznany błąd");
       await logLlmCall({ ...base, ...usage, status: "ERROR", errorCode: "SAVE_FAILED" });
     }
   }
 
+  const truncation = withTruncationNotice(result.stream, `${assistantId}-truncated`);
   const stream = toUIMessageStream({
-    stream: result.stream,
+    stream: truncation.stream,
     tools: chatTools,
     originalMessages: messages,
     generateMessageId: () => assistantId,
