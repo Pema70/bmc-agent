@@ -95,3 +95,36 @@ describe("jiti: runner seeda (krok 10a)", () => {
     expect(config).toContain('seed: "jiti prisma/seed.ts"');
   });
 });
+
+// Krok 10c: @ai-sdk/anthropic (tylko sędzia). Wersja z tej samej „partii” co ai i @ai-sdk/google: zależy dokładnie od
+// tych samych @ai-sdk/provider i @ai-sdk/provider-utils, więc w lockfile nie ma zagnieżdżonych drugich kopii.
+describe("@ai-sdk/anthropic (krok 10c)", () => {
+  type AiLockPackage = LockPackage & { dependencies?: Record<string, string> };
+  const packages = lock.packages as Record<string, AiLockPackage>;
+  const anthropic = packages["node_modules/@ai-sdk/anthropic"];
+
+  it("jest przypięty do dokładnej wersji 4.0.89 w package.json i w lockfile", () => {
+    expect(pkg.dependencies["@ai-sdk/anthropic"]).toBe("4.0.89");
+    expect(anthropic?.version).toBe("4.0.89");
+  });
+
+  it("nie ma skryptu instalacyjnego", () => {
+    expect(anthropic?.hasInstallScript).not.toBe(true);
+  });
+
+  it("używa tych samych @ai-sdk/provider i @ai-sdk/provider-utils co ai i @ai-sdk/google (jedna kopia każdego)", () => {
+    const provider = packages["node_modules/@ai-sdk/provider"]?.version;
+    const utils = packages["node_modules/@ai-sdk/provider-utils"]?.version;
+
+    expect(anthropic?.dependencies).toEqual({ "@ai-sdk/provider": provider, "@ai-sdk/provider-utils": utils });
+    expect(packages["node_modules/ai"]?.dependencies?.["@ai-sdk/provider"]).toBe(provider);
+    expect(packages["node_modules/@ai-sdk/google"]?.dependencies?.["@ai-sdk/provider-utils"]).toBe(utils);
+    const copies = Object.keys(packages).filter((path) => /node_modules\/@ai-sdk\/provider(-utils)?$/.test(path));
+    expect(copies.sort()).toEqual(["node_modules/@ai-sdk/provider", "node_modules/@ai-sdk/provider-utils"]);
+  });
+
+  it("pakiet @ai-sdk/openai nie jest zainstalowany (OpenAI nie jest obsługiwane)", () => {
+    expect(packages["node_modules/@ai-sdk/openai"]).toBeUndefined();
+    expect(pkg.dependencies["@ai-sdk/openai"]).toBeUndefined();
+  });
+});

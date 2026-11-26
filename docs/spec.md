@@ -202,7 +202,7 @@ Wszystkie argumenty i wyniki są walidowane schematami Zod.
 - **Wiedza:** sędzia widzi **wyłącznie** dziewięć bloków ocenianego stanu. Nie dostaje nazwy ani opisu projektu, historii rozmowy, załączników, innych wariantów, wcześniejszych ocen ani informacji, który model i która architektura zbudowały BMC. Kolejność bloków i format wejścia są zawsze te same.
 - **Wynik:** ten sam `EvaluationOutput` i ta sama rubryka co `evaluate_bmc` (osobny prompt `judge-v1`, ta sama zasada „dane, nie polecenia”, zakaz wymyślania faktów i liczb). Dzięki temu oceny AI, sędziego i ręczne leżą na jednej skali.
 - **Uruchamianie:** przycisk w interfejsie (tylko ocena, bez wpływu na stan) oraz skrypt ewaluacji z kroku 10 (powtórzenie N razy na zestawie przypadków). Każde wywołanie zapisuje `LlmCallLog` i liczy się do limitów.
-- **Ograniczenie metodologiczne:** jeśli w porównaniu modeli generujących bierze udział Claude Sonnet 5.5, sędzia z tej samej rodziny może go faworyzować; opisać w pracy i uzupełnić oceną ręczną.
+- **Ograniczenie metodologiczne:** modele generujące to wyłącznie rodzina Gemini, a sędzia jest z innej rodziny (Anthropic), więc faworyzowanie własnej rodziny nie występuje. Ocena modelu przez model pozostaje obciążona (sędzia ma własne preferencje stylu), dlatego uzupełniamy ją ślepą oceną ręczną i miarą stabilności sędziego (3 sądy na ten sam BMC). Wnioski z porównania modeli dotyczą jednej rodziny (Gemini) i nie przenoszą się na modele innych dostawców.
 
 ### Prompty
 
@@ -277,16 +277,16 @@ Działa na zapisanym stanie wariantu, z załącznikiem albo bez niego, gdy model
 ### Etapy pracy z modelami
 
 0. **Narzędzie deweloperskie:** Claude Code z subskrypcji Claude Pro, bez kredytów API. To nie jest model aplikacji, tylko narzędzie do pisania kodu.
-1. **Rozwój mechaniki** (czat krok po kroku, narzędzia agenta, baza danych, interfejs): darmowy klucz Gemini (Google AI Studio) albo tani model OpenAI z małym doładowaniem (kandydat OpenAI: `gpt-6-luna`; model Gemini z rodziny Flash). Nazwy modeli i limity darmowego planu weryfikujemy w dokumentacji dostawców.
-2. **Przykłady do testów i porównanie modeli:** Claude Sonnet 5.5 (`claude-sonnet-5-5`) przez API Anthropic (płatne kredyty, dopiero na końcu, kilka serii testów) oraz modele z etapu 1.
+1. **Rozwój mechaniki** (czat krok po kroku, narzędzia agenta, baza danych, interfejs): darmowy klucz Gemini (Google AI Studio), model z rodziny Flash-Lite lub Flash (dziś `gemini-3.5-flash-lite`). Nazwy modeli i limity darmowego planu weryfikujemy w dokumentacji dostawcy.
+2. **Przykłady do testów i porównanie modeli:** 2 do 3 modeli Gemini o różnej klasie i cenie (`gemini-3.5-flash-lite` i mocniejszy: preferowany `gemini-3.8-flash`, jeśli zadziała na płatnym planie, w przeciwnym razie `gemini-3.6-flash`), płatny plan Gemini API, kilka serii testów na końcu. Bez Claude Sonnet 5.5 i bez modeli OpenAI.
 3. **Porównanie modeli** (rozdział testowy): te same przypadki testowe, te same prompty i te same schematy Zod dla wszystkich modeli.
-4. **Niezależna ocena:** sędzia (tani model Claude, kandydat `claude-haiku-5-5`) ocenia wyniki wszystkich modeli i obu architektur tym samym promptem (§6).
+4. **Niezależna ocena:** sędzia (tani model Claude, `claude-haiku-5-5`, jedyne użycie API Anthropic w aplikacji) ocenia wyniki wszystkich modeli generujących i obu architektur tym samym promptem (§6).
 5. **Porównanie architektur** (po wersji 2, §16): jeden agent vs dziewięć agentów, ten sam model generujący, te same przypadki, ten sam sędzia.
 
 ### Konfiguracja
 
 - Jeden plik `src/lib/ai/models.ts` mapuje nazwę logiczną na dostawcę i identyfikator modelu. Reszta kodu używa tylko nazwy logicznej (np. `chat`, `judge`, `compare-a`).
-- Zmienne środowiskowe: `LLM_PROVIDER` (`google` | `openai` | `anthropic`), `LLM_MODEL`, `JUDGE_PROVIDER`, `JUDGE_MODEL`, `GOOGLE_GENERATIVE_AI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`.
+- Zmienne środowiskowe: `LLM_PROVIDER` (`google`), `LLM_MODEL`, `JUDGE_PROVIDER` (`anthropic`), `JUDGE_MODEL`, `GOOGLE_GENERATIVE_AI_API_KEY`, `ANTHROPIC_API_KEY` (tylko sędzia). `OPENAI_API_KEY` zostaje w `.env.example` jako nieużywany; obsługi OpenAI nie ma.
 - Klucze trzymamy tylko w pliku `.env` projektu. `ANTHROPIC_API_KEY` nie może być zmienną systemową, bo Claude Code użyłby go zamiast subskrypcji (naliczyłby opłaty API).
 - Wszystko przez Vercel AI SDK. Zakaz używania API specyficznych dla jednego dostawcy.
 - Zmiana modelu nie wymaga zmian w kodzie aplikacji.
@@ -296,13 +296,13 @@ Działa na zapisanym stanie wariantu, z załącznikiem albo bez niego, gdy model
 - Prompty i schematy Zod muszą działać na wszystkich modelach z konfiguracji. Odpowiedź niezgodna ze schematem jest odrzucana i traktowana jako błąd (liczony w statystykach porównania).
 - Nie dostrajaj promptów pod jeden model. Przed rozdziałem testowym uruchom ten sam zestaw przypadków na wszystkich modelach i poprawiaj prompty na podstawie wyników wszystkich.
 - Model deweloperski też wchodzi do porównania, żeby pokazać różnicę między tanim a mocnym modelem.
-- W porównaniu bierze udział co najmniej trzy modele: Claude Sonnet 5.5 oraz co najmniej dwa modele z etapu 1 (np. Gemini i OpenAI).
+- W porównaniu bierze udział 2 do 3 modeli Gemini o różnej klasie i cenie (co najmniej `gemini-3.5-flash-lite` i mocniejszy, np. `gemini-3.6-flash`), z sędzią z innej rodziny (Anthropic). Ograniczenie do opisania w pracy: wnioski dotyczą jednej rodziny modeli (Gemini).
 - Model sędziego jest stały dla wszystkich serii pomiarów (nie zmieniamy go między seriami).
-- Budżet: kredyty API Anthropic doładowujemy dopiero przed testami porównawczymi, w niewielkiej kwocie, z ustawionym limitem wydatków w konsoli. Liczba serii testów wynika z budżetu (zaplanuj przypadki i liczbę uruchomień z góry, łącznie z wywołaniami sędziego).
+- Budżet: kredyty API Anthropic (tylko sędzia) mają przedpłatę bez automatycznego doładowania, a płatny plan Gemini ma włączony budżet lub alert; limity wydatków ustawiamy w konsolach przed testami porównawczymi. Liczba serii testów wynika z budżetu (zaplanuj przypadki i liczbę uruchomień z góry, łącznie z wywołaniami sędziego).
 - Przy darmowych planach API (np. Gemini) obowiązują limity zapytań. Aplikacja ma obsługiwać błędy limitów (ponowienie z opóźnieniem, czytelny komunikat). Do darmowych planów wysyłamy tylko dane przykładowe, nie poufne. Warunki wykorzystania danych w darmowym planie sprawdzamy w dokumentacji dostawcy.
 - Mierzone wielkości: jakość (rubryka ręczna zdefiniowana z góry i ocena sędziego), zgodność ze schematem Zod, czas odpowiedzi, koszt (z `LlmCallLog`), liczba wywołań modelu na zbudowany BMC.
 - Przykłady wygenerowane mocniejszym modelem opisujemy w pracy jako wyniki konkretnego modelu, nie jako wynik działania aplikacji w ogóle.
-- Nazwy modeli i ceny weryfikujemy w dokumentacji dostawców przed każdą serią testów, bo modele bywają wycofywane (np. modele z serii GPT-4o mają zostać usunięte z API OpenAI 14 stycznia 2027).
+- Nazwy modeli i ceny weryfikujemy w dokumentacji dostawców przed każdą serią testów, bo modele bywają wycofywane (np. `gemini-2.5-flash` jest przekierowywany na `gemini-3.5-flash-lite` od 1 grudnia 2026, a ceny `gemini-3.6-flash` i `gemini-3.8-flash` rosną od 1 stycznia 2027).
 - Każdy zapis wyniku zawiera: nazwę modelu, datę, wersję promptu (a w wersji 2 także architekturę).
 
 ## 13. Dane testowe i weryfikacja
@@ -335,7 +335,7 @@ Działa na zapisanym stanie wariantu, z załącznikiem albo bez niego, gdy model
 - Gdzie przechowywać pliki załączników na produkcji?
 - Gdzie hostować bazę Postgres na produkcji (i czy wdrożenie produkcyjne jest w ogóle potrzebne do pracy)?
 - Dokładne nazwy i ceny modeli do porównania (w tym modelu sędziego) oraz aktualne limity darmowego planu Gemini API (weryfikacja w dokumentacji dostawców przed testami).
-- Budżet na kredyty API Anthropic i liczba serii testów porównawczych (z wywołaniami sędziego).
+- Budżet na płatny plan Gemini i kredyty API Anthropic (tylko sędzia) oraz liczba serii testów porównawczych (z wywołaniami sędziego); szacunek w `docs/plan-krok-10.md`, punkt 13.
 - ~~Źródła w raporcie?~~ Rozstrzygnięte 2026-11-18: załączniki, rozmowa i wiedza ogólna modelu (oznaczona jako niezweryfikowana). Bez wyszukiwania w internecie.
 - ~~Forma paczki poprawek?~~ Rozstrzygnięte 2026-11-18: propozycje (`Proposal`, PENDING) do zatwierdzenia przez użytkownika, nie nowy wariant.
 - **Sędzia:** jakie kryteria (te same cztery co `evaluate_bmc`, rekomendacja, czy dodatkowe), czy sędzia widzi nazwę branży (dziś: nie), ile powtórzeń na przypadek.

@@ -73,8 +73,8 @@ docs/                # spec.md i dokumentacja
 
 ## Zasady dla części AI
 
-- Modele konfiguruj zmiennymi środowiskowymi: `LLM_PROVIDER` (`google`, `openai` lub `anthropic`), `LLM_MODEL`, `GOOGLE_GENERATIVE_AI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`. Nazw modeli nie wpisuj na stałe w kodzie, tylko w jednym pliku konfiguracji `src/lib/ai/models.ts`.
-- Domyślnie na dev używamy darmowego klucza Gemini albo taniego modelu OpenAI (z małym doładowaniem). Claude Sonnet 5.5 przez API Anthropic używamy dopiero na końcu, do kilku serii testów i porównania modeli w rozdziale testowym. Szczegóły: sekcja "Modele LLM" w `docs/spec.md`.
+- Modele konfiguruj zmiennymi środowiskowymi: `LLM_PROVIDER` (`google`), `LLM_MODEL`, `JUDGE_PROVIDER` (`anthropic`), `JUDGE_MODEL`, `GOOGLE_GENERATIVE_AI_API_KEY`, `ANTHROPIC_API_KEY`. `OPENAI_API_KEY` zostaje w `.env.example` jako nieużywany (obsługi OpenAI nie ma). Nazw modeli nie wpisuj na stałe w kodzie, tylko w jednym pliku konfiguracji `src/lib/ai/models.ts`.
+- Modele generujące to wyłącznie Gemini: na dev darmowy klucz Gemini, w rozdziale testowym porównanie 2 modeli Gemini (`gemini-3.5-flash-lite` i mocniejszy) na płatnym planie. API Anthropic służy wyłącznie sędziemu (`claude-haiku-5-5`), bez Claude Sonnet 5.5 i bez OpenAI. Szczegóły: sekcja "Modele LLM" w `docs/spec.md` i `docs/plan-krok-10.md` (punkty 13 i 14).
 - Nie używaj `ANTHROPIC_API_KEY` ani innych kluczy do własnych potrzeb. Klucze służą wyłącznie aplikacji.
 - Kod ma być niezależny od dostawcy: używaj wyłącznie funkcji Vercel AI SDK, bez API specyficznych dla jednego dostawcy.
 - Zmiana modelu to zmiana zmiennych środowiskowych, nie kodu. Prompty i schematy Zod muszą działać na wszystkich używanych modelach.
@@ -90,9 +90,9 @@ docs/                # spec.md i dokumentacja
 - Claude Code działa na subskrypcji Claude Pro (limit sesji i limit tygodniowy, wspólne z claude.ai). **Nie używamy kredytów API w Claude Code.** Gdy limit się skończy, przerywamy pracę i czekamy na reset, a nie zgadzamy się na dokupienie kredytów.
 - `ANTHROPIC_API_KEY` **nie może być ustawiony jako zmienna systemowa**, bo Claude Code użyłby go zamiast subskrypcji i naliczyłby opłaty za API. Klucze trzymaj tylko w pliku `.env` projektu (ładowanym przez aplikację).
 - Oszczędzaj limity: pracuj małymi krokami, nie wczytuj dużych plików bez potrzeby, nie uruchamiaj w pętli kosztownych operacji, nie powtarzaj tych samych analiz.
-- Aplikacja w trybie dev ma korzystać z darmowego klucza Gemini albo taniego modelu OpenAI. Nigdy nie wywołuj w testach automatycznych prawdziwego API (mock).
+- Aplikacja w trybie dev ma korzystać z darmowego klucza Gemini. Nigdy nie wywołuj w testach automatycznych prawdziwego API (mock).
 - Do darmowych planów API nie wysyłaj prawdziwych danych poufnych ani danych osobowych, tylko dane przykładowe.
-- Anthropic API (płatne kredyty) uruchamiamy dopiero na etapie testów porównawczych, po ustawieniu limitu wydatków w konsoli Anthropic.
+- Anthropic API (przedpłata bez automatycznego doładowania, tylko sędzia) uruchamiamy dopiero na etapie testów porównawczych, po ustawieniu limitu wydatków w konsoli Anthropic.
 
 ## Testy
 
