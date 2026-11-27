@@ -84,6 +84,14 @@ describe("listEvaluationsForVariant", () => {
     expect(args.select).not.toHaveProperty("stateSnapshot");
   });
 
+  it("opcjonalny filtr źródła trafia do zapytania (np. tylko oceny AI)", async () => {
+    mocks.findMany.mockResolvedValue([]);
+
+    await listEvaluationsForVariant("p1", "v1", 1, "AI");
+
+    expect(mocks.findMany.mock.calls[0][0].where).toEqual({ projectId: "p1", variantId: "v1", source: "AI" });
+  });
+
   it("wariant z innego projektu daje pustą listę", async () => {
     mocks.findMany.mockResolvedValue([]);
 

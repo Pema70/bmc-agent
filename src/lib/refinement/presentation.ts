@@ -7,7 +7,8 @@ export const REFINEMENT_LABEL = "Poprawki AI";
 export const REFINEMENT_NOTICE =
   "Agent zadaje kilka pytań na podstawie najnowszej oceny modelu, a z Twoich odpowiedzi przygotowuje paczkę propozycji zmian. To sugestie modelu językowego do rozważenia, a nie weryfikacja biznesowa: nic nie zmienia się samo, dopóki sam nie zastosujesz poprawek albo nie zaakceptujesz propozycji. Najwyżej 3 rundy na wariant.";
 export const DIRTY_BLOCK_MESSAGE = "Najpierw zapisz albo cofnij swoje zmiany";
-export const NEEDS_EVALUATION_MESSAGE = "Najpierw oceń model: runda poprawek zaczyna się od aktualnej oceny.";
+export const NEEDS_EVALUATION_MESSAGE =
+  "Najpierw oceń model przyciskiem „Oceń model”: runda poprawek zaczyna się od aktualnej oceny AI (ocena ręczna i ocena sędziego nie są używane).";
 export const ROUNDS_EXHAUSTED_MESSAGE = `Wykorzystano wszystkie ${MAX_REFINEMENT_ROUNDS} rundy poprawek tego wariantu. Dalsze zmiany wprowadzaj ręcznie.`;
 export const ROUND_ACTIVE_MESSAGE = "Dokończ bieżącą rundę (odpowiedz na pytania albo rozstrzygnij propozycje) albo ją zamknij.";
 export const NO_ANSWERS_MESSAGE = "Odpowiedz na co najmniej jedno pytanie.";

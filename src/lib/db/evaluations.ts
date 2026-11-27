@@ -163,15 +163,16 @@ export async function createManualEvaluation(input: CreateManualEvaluationInput)
 
 /**
  * Lista ocen wariantu od najnowszej, bez migawki stanu. Filtruje po projectId ORAZ variantId,
- * więc wariant z innego projektu daje pustą listę.
+ * więc wariant z innego projektu daje pustą listę. Opcjonalny `source` zawęża listę do jednego źródła (np. tylko `AI`).
  */
 export async function listEvaluationsForVariant(
   projectId: string,
   variantId: string,
   limit: number,
+  source?: z.infer<typeof EvaluationSource>,
 ): Promise<EvaluationListItem[]> {
   const rows = await prisma.evaluationResult.findMany({
-    where: { projectId, variantId },
+    where: { projectId, variantId, ...(source ? { source } : {}) },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit,
     select: LIST_SELECT,
