@@ -1446,3 +1446,41 @@ describe("POST /api/chat: charakteryzacja tury (10e)", () => {
     expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ operation: "chat", status: "ERROR", errorCode: "ABORTED" }));
   });
 });
+
+// Charakteryzacja anulowania ciała odpowiedzi (klient zamyka kartę lub odświeża stronę), bez przerywania req.signal.
+describe("POST /api/chat: charakteryzacja anulowania odpowiedzi (10e)", () => {
+  it("anulowanie response.body w trakcie odpowiedzi: log ERROR/ABORTED, odpowiedź asystenta nie jest zapisywana", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    useModel(
+      new MockLanguageModelV4({
+        doStream: async () => ({
+          stream: new ReadableStream({
+            async start(streamController) {
+              streamController.enqueue({ type: "text-start", id: "t1" });
+              streamController.enqueue({ type: "text-delta", id: "t1", delta: "Zaczynam" });
+              // Model kończy dopiero po anulowaniu przez odbiorcę (jak prawdziwy dostawca, który dopowiada do końca).
+              await gate;
+              streamController.enqueue({ type: "text-end", id: "t1" });
+              streamController.enqueue({ type: "finish", finishReason: { unified: "stop", raw: undefined }, logprobs: undefined, usage });
+              streamController.close();
+            },
+          }),
+        }),
+      }),
+    );
+
+    const response = await POST(request(validBody));
+    const reader = response.body!.getReader();
+    await reader.read();
+    await reader.cancel();
+    release();
+    await vi.waitFor(() => expect(mocks.logLlmCall).toHaveBeenCalled());
+
+    expect(mocks.saveChatMessage.mock.calls.map((call) => call[0].role)).toEqual(["user"]);
+    expect(mocks.logLlmCall).toHaveBeenCalledTimes(1);
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ operation: "chat", status: "ERROR", errorCode: "ABORTED" }));
+  });
+});
