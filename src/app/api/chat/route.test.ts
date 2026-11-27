@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   chatCreate: vi.fn(),
   listAttachmentsForProject: vi.fn(),
   getAttachmentByOrdinal: vi.fn(),
+  streamText: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/permissions", () => ({ getProjectAccess: mocks.getProjectAccess }));
@@ -50,10 +51,13 @@ vi.mock("@/lib/db/chat", () => {
 vi.mock("ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("ai")>();
   mocks.safeValidateUIMessages.mockImplementation(actual.safeValidateUIMessages);
-  return { ...actual, safeValidateUIMessages: mocks.safeValidateUIMessages };
+  // Przepuszcza do prawdziwego streamText, ale pozwala sprawdzić opcje wywołania (testy charakteryzujące 10e).
+  mocks.streamText.mockImplementation(actual.streamText);
+  return { ...actual, safeValidateUIMessages: mocks.safeValidateUIMessages, streamText: mocks.streamText };
 });
 
 import { POST } from "@/app/api/chat/route";
+import { buildSystemPrompt } from "@/lib/ai/prompts/system";
 import { emptyBmcState } from "@/lib/schemas/bmc";
 
 const session = { user: { id: "u1", email: "jan@example.com", name: null } };
@@ -1279,5 +1283,166 @@ describe("POST /api/chat: tokeny myślenia (reasoningTokens)", () => {
     expect(mocks.logLlmCall).toHaveBeenCalledWith(
       expect.objectContaining({ status: "OK", usage: { inputTokens: 4375, outputTokens: 2498, reasoningTokens: 2400 } }),
     );
+  });
+});
+
+// Testy charakteryzujące przed refaktoryzacją rdzenia tury (plan kroku 10, PR 10e): opisują dzisiejsze zachowanie trasy
+// i muszą pozostać zielone, niezmienione, po wydzieleniu `prepareChatTurn` i `runChatTurn`.
+describe("POST /api/chat: charakteryzacja tury (10e)", () => {
+  it("kolejność odczytów i zapisów: sesja, wariant, wariant główny, limity, konfiguracja modelu, projekt, historia, załączniki, zapis wiadomości użytkownika, dopiero potem model", async () => {
+    const order: string[] = [];
+    mocks.getProjectAccess.mockImplementation(async () => (order.push("sesja"), editorAccess));
+    mocks.getVariantForProject.mockImplementation(async () => (order.push("wariant"), { id: "v1", version: 3, state }));
+    mocks.getVariantMeta.mockImplementation(async () => (order.push("wariant-glowny"), { id: "v1", isMain: true }));
+    mocks.checkUserLimits.mockImplementation(async () => (order.push("limity"), { ok: true }));
+    mocks.getProject.mockImplementation(async () => (order.push("projekt"), { id: "p1", name: "Kawiarnia", description: "Opis" }));
+    mocks.listChatMessages.mockImplementation(async () => (order.push("historia"), []));
+    mocks.listAttachmentsForProject.mockImplementation(async () => (order.push("zalaczniki"), []));
+    mocks.saveChatMessage.mockImplementation(async (message: { role: string }) => {
+      order.push(`zapis-${message.role}`);
+    });
+    mocks.getChatModel.mockImplementation(() => {
+      order.push("konfiguracja-modelu");
+      return { model: textModel(), provider: "google", modelId: "gemini-3.5-flash-lite" };
+    });
+    const { streamText: actualStreamText } = await vi.importActual<typeof import("ai")>("ai");
+    mocks.streamText.mockImplementationOnce((options: Parameters<typeof actualStreamText>[0]) => {
+      order.push("model");
+      return actualStreamText(options);
+    });
+
+    await finish(await POST(request(validBody)));
+
+    expect(order.slice(0, 10)).toEqual([
+      "sesja",
+      "wariant",
+      "wariant-glowny",
+      "limity",
+      "konfiguracja-modelu",
+      "projekt",
+      "historia",
+      "zalaczniki",
+      "zapis-user",
+      "model",
+    ]);
+    expect(order[order.length - 1]).toBe("zapis-assistant");
+  });
+
+  it("opcje wywołania modelu: prompt systemowy z danymi projektu i stanu, historia, wiadomość użytkownika, zestaw narzędzi i limity", async () => {
+    const model = useModel(textModel());
+    mocks.listChatMessages.mockResolvedValue([
+      { id: "h1", role: "user", parts: [{ type: "text", text: "Wcześniejsze pytanie" }] },
+      { id: "h2", role: "assistant", parts: [{ type: "text", text: "Wcześniejsza odpowiedź" }] },
+    ]);
+
+    await finish(await POST(request(validBody)));
+
+    const call = model.doStreamCalls[0];
+    const system = call.prompt.find((message) => message.role === "system");
+    expect(system?.content).toBe(buildSystemPrompt({ name: "Kawiarnia", description: "Mała kawiarnia w centrum" }, state, []));
+    const dialogue = call.prompt.filter((message) => message.role !== "system").map((message) => message.role);
+    expect(dialogue).toEqual(["user", "assistant", "user"]);
+    const lastUser = call.prompt[call.prompt.length - 1];
+    expect(JSON.stringify(lastUser)).toContain("Chcę otworzyć kawiarnię");
+    expect(call.tools?.map((tool) => tool.name).sort()).toEqual([
+      "analyze_impact",
+      "ask_clarification",
+      "evaluate_bmc",
+      "propose_block_change",
+      "read_attachment",
+    ]);
+    expect(call.maxOutputTokens).toBe(2000);
+  });
+
+  it("opcje streamText: limit kroków (MAX_STEPS), zatrzymanie po ask_clarification, maxRetries 2, abortSignal żądania", async () => {
+    useModel(textModel());
+    const controller = new AbortController();
+
+    await finish(
+      await POST(
+        new Request("http://localhost/api/chat", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(validBody),
+          signal: controller.signal,
+        }),
+      ),
+    );
+
+    const options = mocks.streamText.mock.calls[0][0];
+    expect(options.maxRetries).toBe(2);
+    expect(options.maxOutputTokens).toBe(2000);
+    expect(options.stopWhen).toHaveLength(2);
+    expect(options.abortSignal).toBeInstanceOf(AbortSignal);
+    expect(options.abortSignal.aborted).toBe(false);
+    controller.abort();
+    expect(options.abortSignal.aborted).toBe(true);
+  });
+
+  it("tura z kolejnymi wywołaniami narzędzi kończy się po MAX_STEPS = 3 krokach (stepCount 3 w logu)", async () => {
+    mocks.createProposal.mockResolvedValue({
+      ok: true,
+      proposal: {
+        id: "pr-1",
+        variantId: "v1",
+        blockKey: "channels",
+        operation: "add",
+        before: null,
+        after: "Sprzedaż w social media",
+        rationale: "Klienci są na Instagramie.",
+        status: "PENDING",
+        baseVersion: 3,
+        createdAt: new Date("2026-11-11T10:00:00Z"),
+      },
+    });
+    const input = { blockKey: "channels", operation: "add", before: null, after: "Sprzedaż w social media", rationale: "Klienci są na Instagramie." };
+    const model = useModel(
+      sequenceModel(
+        toolCallChunks("propose_block_change", input),
+        toolCallChunks("propose_block_change", { ...input, after: "Targi" }),
+        toolCallChunks("propose_block_change", { ...input, after: "Sklep online" }),
+        toolCallChunks("propose_block_change", { ...input, after: "Czwarty krok" }),
+      ),
+    );
+
+    await finish(await POST(request(validBody)));
+
+    expect(model.doStreamCalls).toHaveLength(3);
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ operation: "chat", stepCount: 3 }));
+  });
+
+  it("przerwanie żądania w trakcie odpowiedzi: log ABORTED, odpowiedź asystenta nie jest zapisywana, wiadomość użytkownika zostaje", async () => {
+    const controller = new AbortController();
+    useModel(
+      new MockLanguageModelV4({
+        doStream: async () => ({
+          stream: new ReadableStream({
+            start(streamController) {
+              streamController.enqueue({ type: "text-start", id: "t1" });
+              streamController.enqueue({ type: "text-delta", id: "t1", delta: "Zaczynam" });
+              // Strumień nie kończy się sam: kończy go dopiero przerwanie żądania.
+              controller.signal.addEventListener("abort", () => streamController.error(new DOMException("Przerwano", "AbortError")));
+            },
+          }),
+        }),
+      }),
+    );
+
+    const response = await POST(
+      new Request("http://localhost/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(validBody),
+        signal: controller.signal,
+      }),
+    );
+    const reading = response.text().catch(() => "");
+    controller.abort();
+    await reading;
+    await vi.waitFor(() => expect(mocks.logLlmCall).toHaveBeenCalled());
+
+    expect(mocks.saveChatMessage.mock.calls.map((call) => call[0].role)).toEqual(["user"]);
+    expect(mocks.logLlmCall).toHaveBeenCalledTimes(1);
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ operation: "chat", status: "ERROR", errorCode: "ABORTED" }));
   });
 });
