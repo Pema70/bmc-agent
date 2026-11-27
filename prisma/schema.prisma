@@ -22,11 +22,13 @@ enum ChatRole {
 enum EvaluationSource {
   AI
   MANUAL
+  JUDGE
 }
 
 enum EvaluationTrigger {
   UI
   CHAT
+  SCRIPT
 }
 
 enum ImpactChangeKind {
@@ -177,12 +179,13 @@ model LlmCallLog {
   projectId          String?
   userId             String?
   operation          String // "chat"; w krokach 4-6 np. "evaluate_bmc"
-  provider           String // google | openai | anthropic
+  provider           String // google | anthropic
   model              String // identyfikator modelu u dostawcy
   promptVersion      String
   durationMs         Int
   inputTokens        Int?
   outputTokens       Int?
+  reasoningTokens    Int? // tokeny „thinking” (część outputTokens); null, gdy dostawca ich nie podaje
   costUsd            Decimal?            @db.Decimal(12, 6)
   stepCount          Int?
   status             LlmCallStatus
