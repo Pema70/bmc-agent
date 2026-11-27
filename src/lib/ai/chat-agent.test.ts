@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   loadAttachmentLimits: vi.fn(),
   createChatTools: vi.fn(),
   streamText: vi.fn(),
+  toUIMessageStream: vi.fn(),
 }));
 
 vi.mock("@/lib/db/variants", () => ({
@@ -39,7 +40,8 @@ vi.mock("@/lib/db/chat", () => {
 vi.mock("ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("ai")>();
   mocks.streamText.mockImplementation(actual.streamText);
-  return { ...actual, streamText: mocks.streamText };
+  mocks.toUIMessageStream.mockImplementation(actual.toUIMessageStream);
+  return { ...actual, streamText: mocks.streamText, toUIMessageStream: mocks.toUIMessageStream };
 });
 
 import { prepareChatTurn, runChatTurn, type ChatTurn } from "@/lib/ai/chat-agent";
@@ -75,7 +77,7 @@ function modelWith(text: string, finish: "stop" | "length" = "stop") {
   });
 }
 
-function useModel(model: MockLanguageModelV4) {
+function mockModel(model: MockLanguageModelV4) {
   mocks.getChatModel.mockReturnValue({ model, provider: "google", modelId: "gemini-3.5-flash-lite" });
   return model;
 }
@@ -198,7 +200,7 @@ describe("prepareChatTurn", () => {
 
 describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
   it("odpowiedź ukończona: zapis asystenta, log OK, status completed (zdarzenie onEnd, outcome completed)", async () => {
-    useModel(modelWith("Cześć! Opowiedz o swoim pomyśle."));
+    mockModel(modelWith("Cześć! Opowiedz o swoim pomyśle."));
     const { stream, finished } = await runChatTurn(makeTurn());
     await drain(stream);
 
@@ -209,7 +211,7 @@ describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
   });
 
   it("ucięcie limitem długości: znacznik zapisany, log SCHEMA_ERROR/TRUNCATED, status truncated", async () => {
-    useModel(modelWith("Początek odpowiedzi", "length"));
+    mockModel(modelWith("Początek odpowiedzi", "length"));
     const { stream, finished } = await runChatTurn(makeTurn());
     await drain(stream);
 
@@ -219,7 +221,7 @@ describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
   });
 
   it("błąd dostawcy przed pierwszym tokenem: finished = failed, log błędu, brak zapisu asystenta", async () => {
-    useModel(
+    mockModel(
       new MockLanguageModelV4({
         doStream: async () => {
           throw new APICallError({ message: "Bad request", url: "https://example.test", requestBodyValues: {}, statusCode: 400, isRetryable: false });
@@ -236,7 +238,7 @@ describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
   });
 
   it("przerwanie przed startem strumienia (sygnał już przerwany): finished = aborted, log ABORTED", async () => {
-    useModel(modelWith("Nie powinno być widoczne"));
+    mockModel(modelWith("Nie powinno być widoczne"));
     const controller = new AbortController();
     controller.abort();
     const { stream, finished } = await runChatTurn(makeTurn(), { signal: controller.signal });
@@ -250,7 +252,7 @@ describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
 
   it("przerwanie w trakcie odpowiedzi: finished = aborted, log ABORTED, wiadomość asystenta nie jest zapisywana", async () => {
     const controller = new AbortController();
-    useModel(
+    mockModel(
       new MockLanguageModelV4({
         doStream: async () => ({
           stream: new ReadableStream({
@@ -274,7 +276,7 @@ describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
   });
 
   it("odbiorca anuluje strumień przed końcem: onEnd z outcome aborted rozwiązuje finished, bez zapisu odpowiedzi", async () => {
-    useModel(modelWith("Długa odpowiedź"));
+    mockModel(modelWith("Długa odpowiedź"));
     const { stream, finished } = await runChatTurn(makeTurn());
     await stream.cancel();
 
@@ -283,7 +285,7 @@ describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
   });
 
   it("strumień zepsuty w połowie (zerwane połączenie): onEnd z outcome failed rozwiązuje finished", async () => {
-    useModel(
+    mockModel(
       new MockLanguageModelV4({
         doStream: async () => ({
           stream: new ReadableStream({
@@ -302,7 +304,7 @@ describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
   });
 
   it("wyjątek w obsłudze zakończenia (log się wywraca): finished = failed END_HANDLER, a nie zawieszenie", async () => {
-    useModel(modelWith("Cześć"));
+    mockModel(modelWith("Cześć"));
     mocks.logLlmCall.mockRejectedValue(new Error("baza niedostępna"));
     const { stream, finished } = await runChatTurn(makeTurn());
     await drain(stream);
@@ -311,7 +313,7 @@ describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
   });
 
   it("zapis odpowiedzi się nie udaje: finished = save_failed, log SAVE_FAILED", async () => {
-    useModel(modelWith("Cześć"));
+    mockModel(modelWith("Cześć"));
     mocks.saveChatMessage.mockRejectedValue(new Error("baza niedostępna"));
     const { stream, finished } = await runChatTurn(makeTurn());
     await drain(stream);
@@ -321,7 +323,7 @@ describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
   });
 
   it("wyjątek w createChatTools: runChatTurn odrzuca Promise, model nie jest wywoływany, nic nie jest logowane", async () => {
-    const model = useModel(modelWith("Cześć"));
+    const model = mockModel(modelWith("Cześć"));
     mocks.createChatTools.mockImplementation(() => {
       throw new Error("błąd narzędzi");
     });
@@ -333,7 +335,7 @@ describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
   });
 
   it("wyjątek w streamText: runChatTurn odrzuca Promise i nic nie jest zapisywane ani logowane", async () => {
-    useModel(modelWith("Cześć"));
+    mockModel(modelWith("Cześć"));
     mocks.streamText.mockImplementationOnce(() => {
       throw new Error("błąd streamText");
     });
@@ -341,5 +343,62 @@ describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
     await expect(runChatTurn(makeTurn())).rejects.toThrow("błąd streamText");
     expect(mocks.saveChatMessage).not.toHaveBeenCalled();
     expect(mocks.logLlmCall).not.toHaveBeenCalled();
+  });
+
+  describe("siatka bezpieczeństwa no_end (strumień UI bez wywołania onEnd)", () => {
+    // Podmieniony toUIMessageStream (tylko w teście) zwraca strumień, który nigdy nie woła onEnd, więc `finished` może
+    // się rozwiązać wyłącznie przez siatkę w `runChatTurn`.
+    function withFakeUiStream(build: (controller: ReadableStreamDefaultController) => void) {
+      mocks.toUIMessageStream.mockImplementationOnce(
+        () => new ReadableStream({ start: build }) as unknown as ReturnType<typeof import("ai").toUIMessageStream>,
+      );
+      mockModel(modelWith("Cześć"));
+    }
+
+    it("strumień zamyka się bez onEnd: finished = no_end, bez zapisu i bez logu", async () => {
+      withFakeUiStream((controller) => {
+        controller.enqueue({ type: "start" });
+        controller.close();
+      });
+      const { stream, finished } = await runChatTurn(makeTurn());
+      await drain(stream);
+
+      await expect(finished).resolves.toEqual({ status: "no_end" });
+      expect(mocks.saveChatMessage).not.toHaveBeenCalled();
+      expect(mocks.logLlmCall).not.toHaveBeenCalled();
+    });
+
+    it("strumień psuje się bez onEnd: finished = no_end, a odbiorca dostaje ten sam błąd", async () => {
+      withFakeUiStream((controller) => {
+        controller.enqueue({ type: "start" });
+        controller.error(new Error("zerwane"));
+      });
+      const { stream, finished } = await runChatTurn(makeTurn());
+      const reader = stream.getReader();
+      await expect((async () => { for (;;) { if ((await reader.read()).done) return; } })()).rejects.toThrow("zerwane");
+
+      await expect(finished).resolves.toEqual({ status: "no_end" });
+      expect(mocks.logLlmCall).not.toHaveBeenCalled();
+    });
+
+    it("odbiorca anuluje strumień bez onEnd: finished = no_end, a anulowanie dociera do strumienia wewnętrznego", async () => {
+      const cancelled = vi.fn();
+      mocks.toUIMessageStream.mockImplementationOnce(
+        () =>
+          new ReadableStream({
+            start(controller) {
+              controller.enqueue({ type: "start" });
+            },
+            cancel: cancelled,
+          }) as unknown as ReturnType<typeof import("ai").toUIMessageStream>,
+      );
+      mockModel(modelWith("Cześć"));
+      const { stream, finished } = await runChatTurn(makeTurn());
+      await stream.cancel("zamknięta karta");
+
+      await expect(finished).resolves.toEqual({ status: "no_end" });
+      expect(cancelled).toHaveBeenCalledWith("zamknięta karta");
+      expect(mocks.logLlmCall).not.toHaveBeenCalled();
+    });
   });
 });

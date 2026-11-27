@@ -1464,7 +1464,7 @@ describe("POST /api/chat: charakteryzacja anulowania odpowiedzi (10e)", () => {
               // Model kończy dopiero po anulowaniu przez odbiorcę (jak prawdziwy dostawca, który dopowiada do końca).
               await gate;
               streamController.enqueue({ type: "text-end", id: "t1" });
-              streamController.enqueue({ type: "finish", finishReason: { unified: "stop", raw: undefined }, logprobs: undefined, usage });
+              streamController.enqueue({ type: "finish", finishReason: { unified: "stop", raw: undefined }, usage });
               streamController.close();
             },
           }),
