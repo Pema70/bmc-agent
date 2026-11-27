@@ -157,7 +157,31 @@ export async function buildReportDocx(data: ReportExportData): Promise<Uint8Arra
       ),
     );
   } else {
-    children.push(p("Ten wariant nie ma czytelnej oceny.", { small: true }));
+    children.push(
+      p(data.judgeEvaluation ? "Ten wariant nie ma oceny AI (evaluate_bmc) ani ręcznej." : "Ten wariant nie ma czytelnej oceny.", {
+        small: true,
+      }),
+    );
+  }
+  if (data.judgeEvaluation) {
+    const judge = data.judgeEvaluation;
+    children.push(h("H3", "Ocena sędziego (AI)"));
+    children.push(
+      p(
+        `${judge.sourceText}${judge.promptVersion ? `, wersja promptu: ${judge.promptVersion}` : ""}. Osobny model z innej rodziny, który widział wyłącznie dziewięć bloków modelu. Data: ${judge.createdAt}. Dotyczy wersji modelu: ${judge.evaluatedVersion}.`,
+        { small: true },
+      ),
+    );
+    const judgeStale = staleNote(judge, data.version);
+    if (judgeStale) {
+      children.push(p(judgeStale, { bold: true }));
+    }
+    children.push(
+      table(
+        [{ title: "Kryterium", width: 22 }, { title: "Ocena", width: 8 }, { title: "Uzasadnienie (AI)", width: 70 }],
+        judge.rows.map((row) => [row.label, `${row.score}/${SCORE_MAX}`, row.justification]),
+      ),
+    );
   }
   if (data.evaluationHistory.length > 1) {
     children.push(h("H3", "Historia ocen"));

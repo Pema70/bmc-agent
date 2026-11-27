@@ -178,7 +178,14 @@ export async function POST(req: Request): Promise<Response> {
   async function readUsage(): Promise<{ usage?: TokenUsage; stepCount?: number }> {
     try {
       const [usage, steps] = await Promise.all([result.usage, result.steps]);
-      return { usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens }, stepCount: steps.length };
+      return {
+        usage: {
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          reasoningTokens: usage.outputTokenDetails?.reasoningTokens,
+        },
+        stepCount: steps.length,
+      };
     } catch {
       return {};
     }

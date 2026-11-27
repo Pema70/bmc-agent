@@ -165,7 +165,11 @@ export async function runObjectOperation<
       maxRetries: MAX_RETRIES,
       abortSignal: ctx.abortSignal,
     });
-    usage = { inputTokens: result.usage.inputTokens, outputTokens: result.usage.outputTokens };
+    usage = {
+      inputTokens: result.usage.inputTokens,
+      outputTokens: result.usage.outputTokens,
+      reasoningTokens: result.usage.outputTokenDetails?.reasoningTokens,
+    };
 
     // Druga, jawna walidacja: do bazy trafia wyłącznie obiekt, który przeszedł nasz schemat i regułę kontekstową.
     const parsed = spec.schema.safeParse(result.output);
@@ -187,7 +191,11 @@ export async function runObjectOperation<
         ...base,
         durationMs: duration(),
         usage: error.usage
-          ? { inputTokens: error.usage.inputTokens, outputTokens: error.usage.outputTokens }
+          ? {
+              inputTokens: error.usage.inputTokens,
+              outputTokens: error.usage.outputTokens,
+              reasoningTokens: error.usage.outputTokenDetails?.reasoningTokens,
+            }
           : undefined,
         stepCount: 1,
         status: "SCHEMA_ERROR",

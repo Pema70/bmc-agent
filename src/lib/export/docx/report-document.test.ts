@@ -171,3 +171,45 @@ describe("DOCX rozszerzonego raportu", () => {
     }
   });
 });
+
+function withJudge(): ReturnType<typeof reportData> {
+  const base = reportData();
+  const first = base.evaluations.items[0];
+  if (!first.ok) {
+    throw new Error("Fixture bez poprawnej oceny.");
+  }
+  const judge = {
+    ok: true as const,
+    evaluation: {
+      ...first.evaluation,
+      id: "judge-1",
+      source: "JUDGE" as const,
+      trigger: "UI" as const,
+      provider: "anthropic",
+      model: "claude-haiku-5-5",
+      promptVersion: "judge-v1",
+      createdAt: new Date("2026-11-26T12:00:00Z"),
+    },
+  };
+  return { ...base, evaluations: { ...base.evaluations, items: [judge, ...base.evaluations.items] } };
+}
+
+describe("DOCX raportu: ocena sędziego", () => {
+  it("jest osobna sekcja „Ocena sędziego (AI)” z modelem, wersją promptu i opisem, a „Najnowsza ocena” zostaje oceną AI", async () => {
+    const content = await text(await build(withJudge()));
+
+    for (const fragment of [
+      "Najnowsza ocena (AI)",
+      "Ocena sędziego (AI)",
+      "Ocena sędziego (AI): anthropic / claude-haiku-5-5",
+      "wersja promptu: judge-v1",
+      "Osobny model z innej rodziny, który widział wyłącznie dziewięć bloków modelu",
+    ]) {
+      expect(content, fragment).toContain(fragment);
+    }
+  });
+
+  it("bez ocen sędziego nie ma sekcji sędziego", async () => {
+    expect(await text(await build())).not.toContain("Ocena sędziego (AI)");
+  });
+});

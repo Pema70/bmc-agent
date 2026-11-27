@@ -34,6 +34,7 @@ vi.mock("@/lib/db/client", () => {
 });
 
 import {
+  QUESTIONS_NO_AI_EVALUATION_MESSAGE,
   QUESTIONS_ROUNDS_LIMIT_MESSAGE,
   QUESTIONS_SAVE_FAILED_MESSAGE,
   QUESTIONS_STALE_EVALUATION_MESSAGE,
@@ -207,7 +208,7 @@ describe("runGenerateQuestions: poprawny przebieg", () => {
     await runGenerateQuestions(ctx);
 
     expect(mocks.evaluation.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { projectId: "p1", variantId: "v1" }, take: 1 }),
+      expect.objectContaining({ where: { projectId: "p1", variantId: "v1", source: "AI" }, take: 1 }),
     );
   });
 });
@@ -235,11 +236,14 @@ describe("runGenerateQuestions: kontrole przed modelem (model nie jest wołany, 
     expect(mocks.checkUserLimits).not.toHaveBeenCalled();
   });
 
-  it("brak oceny: STALE_EVALUATION z komunikatem „Najpierw oceń model”", async () => {
+  it("brak oceny AI: STALE_EVALUATION z komunikatem „Najpierw oceń model przyciskiem „Oceń model”” (polski, bez błędu technicznego)", async () => {
     const model = setModel(generateModel("{}"));
     mocks.evaluation.findMany.mockResolvedValue([]);
 
-    expect(await runGenerateQuestions(ctx)).toEqual({ ok: false, error: "STALE_EVALUATION", message: QUESTIONS_STALE_EVALUATION_MESSAGE });
+    const result = await runGenerateQuestions(ctx);
+
+    expect(result).toEqual({ ok: false, error: "STALE_EVALUATION", message: QUESTIONS_NO_AI_EVALUATION_MESSAGE });
+    expect(QUESTIONS_NO_AI_EVALUATION_MESSAGE).toContain("Najpierw oceń model przyciskiem „Oceń model”");
     await expectNoModelNoWrite(model);
   });
 
@@ -358,5 +362,106 @@ describe("runGenerateQuestions: odpowiedź modelu i zapis", () => {
 
     expect(await runGenerateQuestions(ctx)).toEqual({ ok: false, error: "SAVE_FAILED", message: QUESTIONS_SAVE_FAILED_MESSAGE });
     expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ status: "OK" }));
+  });
+});
+
+describe("runGenerateQuestions: tylko ocena AI jako wejście (ocena ręczna i sędziego są pomijane)", () => {
+  const aiResult = {
+    coherence: { score: 4, justification: "UZASADNIENIE-AI spójność." },
+    risk_resilience: { score: 5, justification: "UZASADNIENIE-AI ryzyko." },
+    feasibility: { score: 7, justification: "UZASADNIENIE-AI realność." },
+    innovation: { score: 3, justification: "UZASADNIENIE-AI innowacyjność." },
+  };
+  const judgeResult = {
+    coherence: { score: 9, justification: "UZASADNIENIE-SEDZIEGO." },
+    risk_resilience: { score: 9, justification: "UZASADNIENIE-SEDZIEGO." },
+    feasibility: { score: 9, justification: "UZASADNIENIE-SEDZIEGO." },
+    innovation: { score: 9, justification: "UZASADNIENIE-SEDZIEGO." },
+  };
+  const manualResult = {
+    coherence: { score: 1, justification: "UZASADNIENIE-RECZNE." },
+    risk_resilience: { score: 1, justification: "UZASADNIENIE-RECZNE." },
+    feasibility: { score: 1, justification: "UZASADNIENIE-RECZNE." },
+    innovation: { score: 1, justification: "UZASADNIENIE-RECZNE." },
+  };
+  const judgeRow = evaluationRow({
+    id: "j1",
+    source: "JUDGE",
+    provider: "anthropic",
+    model: "claude-haiku-5-5",
+    promptVersion: "judge-v1",
+    createdAt: new Date("2026-11-24T12:00:00Z"),
+    result: judgeResult,
+  });
+  const manualRow = evaluationRow({
+    id: "m1",
+    source: "MANUAL",
+    trigger: null,
+    provider: null,
+    model: null,
+    promptVersion: null,
+    createdAt: new Date("2026-11-24T13:00:00Z"),
+    result: manualResult,
+  });
+  const aiRow = evaluationRow({ id: "ai1", createdAt: new Date("2026-11-24T10:00:00Z"), result: aiResult });
+
+  // Odwzorowuje filtr bazy: findMany zwraca wiersze pasujące do where.source (najnowsze pierwsze).
+  function mockEvaluationRows(rows: Record<string, unknown>[]) {
+    mocks.evaluation.findMany.mockImplementation(async (args: { where?: { source?: string }; take?: number }) =>
+      rows.filter((row) => !args.where?.source || row.source === args.where.source).slice(0, args.take ?? rows.length),
+    );
+  }
+
+  it("najnowsza ocena to JUDGE, a wcześniejsza AI: pytania powstają z oceny AI, a runda wskazuje ocenę AI", async () => {
+    const model = setModel(generateModel(JSON.stringify(goodOutput)));
+    mockEvaluationRows([judgeRow, aiRow]);
+
+    const result = await runGenerateQuestions(ctx);
+
+    expect(result).toMatchObject({ ok: true, round: { evaluationId: "ai1" } });
+    expect(mocks.evaluation.findMany.mock.calls[0][0].where).toMatchObject({ projectId: "p1", variantId: "v1", source: "AI" });
+    const sent = JSON.stringify(model.doGenerateCalls[0].prompt);
+    expect(sent).toContain("UZASADNIENIE-AI");
+    expect(sent).not.toContain("UZASADNIENIE-SEDZIEGO");
+    // Zapis rundy weryfikuje w transakcji dokładnie tę ocenę AI (po id, projekcie i wariancie).
+    expect(mocks.evaluation.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "ai1", variantId: "v1", projectId: "p1" } }));
+  });
+
+  it("najnowsza ocena to MANUAL, a wcześniejsza AI: pytania z oceny AI (ocena ręczna nie trafia do promptu)", async () => {
+    const model = setModel(generateModel(JSON.stringify(goodOutput)));
+    mockEvaluationRows([manualRow, judgeRow, aiRow]);
+
+    await runGenerateQuestions(ctx);
+
+    const sent = JSON.stringify(model.doGenerateCalls[0].prompt);
+    expect(sent).toContain("UZASADNIENIE-AI");
+    expect(sent).not.toContain("UZASADNIENIE-RECZNE");
+    expect(sent).not.toContain("UZASADNIENIE-SEDZIEGO");
+  });
+
+  it("tylko ocena ręczna lub sędziego: komunikat po polsku „Najpierw oceń model…”, bez wywołania modelu, bez logu i zapisu", async () => {
+    for (const rows of [[manualRow], [judgeRow], [manualRow, judgeRow]]) {
+      vi.clearAllMocks();
+      const model = setModel(generateModel("{}"));
+      mockEvaluationRows(rows);
+
+      const result = await runGenerateQuestions(ctx);
+
+      expect(result).toEqual({ ok: false, error: "STALE_EVALUATION", message: QUESTIONS_NO_AI_EVALUATION_MESSAGE });
+      expect((result as { message: string }).message).toMatch(/^Runda poprawek zaczyna się od oceny AI\. Najpierw oceń model przyciskiem „Oceń model”/);
+      expect(model.doGenerateCalls).toHaveLength(0);
+      expect(mocks.round.create).not.toHaveBeenCalled();
+      expect(mocks.logLlmCall).not.toHaveBeenCalled();
+    }
+  });
+
+  it("ocena AI ze starszej wersji wariantu, a nowsza ocena sędziego: nadal STALE_EVALUATION (sędzia nie „odświeża” oceny AI)", async () => {
+    const model = setModel(generateModel("{}"));
+    mockEvaluationRows([judgeRow, evaluationRow({ id: "ai-stara", variantVersion: 3, result: aiResult })]);
+
+    const result = await runGenerateQuestions(ctx);
+
+    expect(result).toEqual({ ok: false, error: "STALE_EVALUATION", message: QUESTIONS_STALE_EVALUATION_MESSAGE });
+    expect(model.doGenerateCalls).toHaveLength(0);
   });
 });

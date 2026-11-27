@@ -47,3 +47,24 @@ describe("stałe teksty i daty", () => {
     expect(formatExportDateTime(new Date("2026-12-01T10:30:00Z"))).toContain("11:30");
   });
 });
+
+describe("toEvaluationExport: sędzia", () => {
+  it("ocena sędziego ma oznaczenie AI, własną etykietę źródła i wersję promptu, i jest rozpoznawalna jako sędzia", () => {
+    const result = toEvaluationExport(
+      evaluationView({ source: "JUDGE", trigger: "SCRIPT", provider: "anthropic", model: "claude-haiku-5-5", promptVersion: "judge-v1" }),
+      3,
+    );
+
+    expect(result).toMatchObject({
+      isAi: true,
+      isJudge: true,
+      sourceText: "Ocena sędziego (AI): anthropic / claude-haiku-5-5",
+      promptVersion: "judge-v1",
+    });
+  });
+
+  it("oceny AI i ręczne nie są sędzią", () => {
+    expect(toEvaluationExport(evaluationView(), 3).isJudge).toBe(false);
+    expect(toEvaluationExport(evaluationView({ source: "MANUAL", provider: null, model: null, promptVersion: null }), 3).isJudge).toBe(false);
+  });
+});

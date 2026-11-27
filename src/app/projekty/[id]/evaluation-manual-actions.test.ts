@@ -14,6 +14,7 @@ vi.mock("@/lib/db/evaluations", () => ({
   getEvaluation: vi.fn(),
 }));
 vi.mock("@/lib/ai/evaluate", () => ({ runEvaluation: vi.fn() }));
+vi.mock("@/lib/ai/judge", () => ({ runJudge: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 
 import { createManualEvaluationAction } from "@/app/projekty/[id]/evaluation-actions";

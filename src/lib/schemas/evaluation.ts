@@ -44,8 +44,8 @@ export const EvaluationOutput = z.strictObject({
 });
 export type EvaluationOutput = z.infer<typeof EvaluationOutput>;
 
-export const EvaluationSource = z.enum(["AI", "MANUAL"]);
-export const EvaluationTrigger = z.enum(["UI", "CHAT"]);
+export const EvaluationSource = z.enum(["AI", "MANUAL", "JUDGE"]);
+export const EvaluationTrigger = z.enum(["UI", "CHAT", "SCRIPT"]);
 
 /** Ocena gotowa do wyświetlenia (bez migawki stanu). Id zawsze z bazy. */
 export type EvaluationView = {

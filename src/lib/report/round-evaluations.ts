@@ -7,7 +7,9 @@ import type { RefinementRoundView } from "@/lib/schemas/refinement";
 /**
  * Para ocen „przed” i „po” dla rundy poprawek (plan kroku 9, jak punkt 3 „Zmian po akceptacji” planu kroku 7):
  * „przed” to ocena, na której runda powstała (`RefinementRound.evaluationId`); „po” to pierwsza ocena wariantu utworzona
- * po ostatnim rozstrzygnięciu propozycji rundy. Brak oceny „po” to jawny stan, nie błąd.
+ * po ostatnim rozstrzygnięciu propozycji rundy **od tego samego źródła co „przed”** (AI, ręczna albo sędzia), żeby
+ * różnica ocen nie porównywała różnych oceniających (np. ocena AI przed rundą i ocena sędziego po niej). Brak oceny „po”
+ * to jawny stan, nie błąd.
  */
 
 export type RoundProposalStatus = { refinementRoundId: string | null; status: ProposalStatus; resolvedAt: Date | null };
@@ -55,7 +57,12 @@ export function pairRoundEvaluations(
       return { ok: true, round, before, after: null, afterStatus: "UNRESOLVED" };
     }
     const lastResolved = own.reduce((latest, proposal) => Math.max(latest, proposal.resolvedAt?.getTime() ?? 0), 0);
-    const after = lastResolved === 0 ? null : (ascending.find((evaluation) => evaluation.createdAt.getTime() > lastResolved) ?? null);
+    const after =
+      lastResolved === 0
+        ? null
+        : (ascending.find(
+            (evaluation) => evaluation.createdAt.getTime() > lastResolved && (!before || evaluation.source === before.source),
+          ) ?? null);
     return { ok: true, round, before, after, afterStatus: after ? "FOUND" : "NONE" };
   });
 }

@@ -21,6 +21,7 @@ import { VariantActions } from "@/components/variants/variant-actions";
 import { VariantSwitcher } from "@/components/variants/variant-switcher";
 import { hasRole, requireProjectRole } from "@/lib/auth/permissions";
 import { loadAiLimits } from "@/lib/ai/config";
+import { isJudgeUiEnabled } from "@/lib/ai/judge-config";
 import { loadAttachmentLimits } from "@/lib/attachments/config";
 import { listAttachmentsForProject } from "@/lib/db/attachments";
 import { listChatMessages } from "@/lib/db/chat";
@@ -131,8 +132,10 @@ export default async function ProjectPage({
   // projectId I variantId. Wersja, której dotyczy najnowsza ocena, pozwala panelowi rozstrzygnąć, czy ocena jest aktualna.
   const refinementRounds = variant && canEditCanvas ? await listRoundsForVariant(access.projectId, variant.id) : [];
   const refinementProposalIds = variant && canEditCanvas ? await listRoundProposalIds(access.projectId, variant.id) : {};
-  const newestEvaluation = evaluations[0];
-  const latestEvaluationVersion = newestEvaluation?.ok ? newestEvaluation.evaluation.variantVersion : null;
+  // Cykl poprawek startuje wyłącznie od oceny AI (nie od ręcznej ani od oceny sędziego), więc „najnowsza ocena” dla panelu
+  // poprawek to najnowsza ocena AI.
+  const newestAiEvaluation = evaluations.find((item) => item.ok && item.evaluation.source === "AI");
+  const latestEvaluationVersion = newestAiEvaluation?.ok ? newestAiEvaluation.evaluation.variantVersion : null;
   // Do potwierdzenia zmiany głównego (tylko właściciel, tylko na wariancie niegłównym): ile propozycji czeka na starym głównym.
   const pendingOnMain =
     isOwner && variant && !variant.isMain && mainListed
@@ -199,6 +202,7 @@ export default async function ProjectPage({
               projectId={access.projectId}
               variantId={variant.id}
               canEvaluate={canEditCanvas}
+              judgeEnabled={isJudgeUiEnabled()}
               currentVersion={variant.version}
               initialItems={evaluations}
             />

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { runEvaluation, type EvaluationErrorCode } from "@/lib/ai/evaluate";
+import { runJudge } from "@/lib/ai/judge";
+import { isJudgeUiEnabled } from "@/lib/ai/judge-config";
 import { requireProjectRole } from "@/lib/auth/permissions";
 import { createManualEvaluation, getEvaluation, type EvaluationListItem } from "@/lib/db/evaluations";
 import { getVariantForProject, getVariantProjectId } from "@/lib/db/variants";
@@ -15,6 +17,13 @@ export type EvaluateModelActionResult =
   | { ok: true; evaluation: EvaluationView }
   | { ok: false; error: EvaluateActionErrorCode; message: string; retryAfterSec?: number };
 
+export type JudgeActionErrorCode = EvaluateActionErrorCode | "DISABLED";
+
+export type JudgeModelActionResult =
+  | { ok: true; evaluation: EvaluationView }
+  | { ok: false; error: JudgeActionErrorCode; message: string; retryAfterSec?: number };
+
+const JUDGE_DISABLED_MESSAGE = "Ocena sędzią jest wyłączona (brak konfiguracji sędziego lub flagi JUDGE_UI_ENABLED).";
 const FORBIDDEN_MESSAGE = "Nie masz uprawnień do oceniania modelu w tym projekcie.";
 const NOT_FOUND_MESSAGE = "Nie znaleziono tego wariantu w projekcie.";
 
@@ -117,6 +126,42 @@ export async function evaluateModelAction(projectId: string, variantId: string):
 
   // 4. Limity, model, walidacja odpowiedzi i zapis.
   const result = await runEvaluation({
+    projectId: access.projectId,
+    variantId: parsed.data,
+    userId: access.session.user.id,
+    trigger: "UI",
+  });
+  if (!result.ok) {
+    return { ok: false, error: result.error, message: result.message, retryAfterSec: result.retryAfterSec };
+  }
+
+  revalidatePath(`/projekty/${access.projectId}`);
+  return { ok: true, evaluation: result.evaluation };
+}
+
+/**
+ * Ocena zapisanego stanu wariantu przez sędziego (niezależny agent, osobny model; wejście wyłącznie stan BMC). Kolejność:
+ * rola EDITOR, flaga i konfiguracja sędziego (JUDGE_UI_ENABLED, JUDGE_*), kształt argumentu, przynależność wariantu do
+ * projektu, dopiero potem limity i model (w runJudge). Wynik ma `source = JUDGE`.
+ */
+export async function judgeModelAction(projectId: string, variantId: string): Promise<JudgeModelActionResult> {
+  const access = await requireProjectRole(projectId, "EDITOR");
+  if (!access.ok) {
+    return { ok: false, error: "FORBIDDEN", message: FORBIDDEN_MESSAGE };
+  }
+  if (!isJudgeUiEnabled()) {
+    return { ok: false, error: "DISABLED", message: JUDGE_DISABLED_MESSAGE };
+  }
+
+  const parsed = VariantId.safeParse(variantId);
+  if (!parsed.success) {
+    return { ok: false, error: "VALIDATION", message: `Nie oceniono: ${z.prettifyError(parsed.error)}` };
+  }
+  if ((await getVariantProjectId(parsed.data)) !== access.projectId) {
+    return { ok: false, error: "NOT_FOUND", message: NOT_FOUND_MESSAGE };
+  }
+
+  const result = await runJudge({
     projectId: access.projectId,
     variantId: parsed.data,
     userId: access.session.user.id,

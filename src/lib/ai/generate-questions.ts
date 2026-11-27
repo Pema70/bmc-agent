@@ -49,7 +49,10 @@ export type RunGenerateQuestionsResult =
 export const QUESTIONS_NOT_FOUND_MESSAGE = "Nie znaleziono tego wariantu w projekcie.";
 export const QUESTIONS_TOO_EMPTY_MESSAGE = `Model jest jeszcze zbyt pusty do cyklu poprawek. Dodaj co najmniej ${EVALUATION_MIN_ENTRIES} wpisów w co najmniej ${EVALUATION_MIN_NON_EMPTY_BLOCKS} blokach.`;
 export const QUESTIONS_VERSION_CONFLICT_MESSAGE = "Model został zmieniony w międzyczasie. Odśwież stronę i spróbuj ponownie.";
-export const QUESTIONS_STALE_EVALUATION_MESSAGE = "Najpierw oceń model: runda poprawek zaczyna się od aktualnej oceny.";
+export const QUESTIONS_STALE_EVALUATION_MESSAGE =
+  "Najpierw oceń model przyciskiem „Oceń model”: runda poprawek zaczyna się od aktualnej oceny AI.";
+export const QUESTIONS_NO_AI_EVALUATION_MESSAGE =
+  "Runda poprawek zaczyna się od oceny AI. Najpierw oceń model przyciskiem „Oceń model” (ocena ręczna i ocena sędziego nie są używane do pytań).";
 export const QUESTIONS_ROUNDS_LIMIT_MESSAGE = `Wykorzystano wszystkie ${MAX_REFINEMENT_ROUNDS} rundy poprawek tego wariantu. Dalsze zmiany wprowadzaj ręcznie.`;
 export const QUESTIONS_ROUND_IN_PROGRESS_MESSAGE =
   "Poprzednia runda nie jest zakończona. Dokończ ją (odpowiedz na pytania lub rozstrzygnij propozycje) albo ją zamknij.";
@@ -61,7 +64,8 @@ export const QUESTIONS_SAVE_FAILED_MESSAGE = "Model odpowiedział, ale nie udał
 type Loaded = {
   variant: NonNullable<Awaited<ReturnType<typeof getVariantForProject>>>;
   project: NonNullable<Awaited<ReturnType<typeof getProject>>>;
-  // Najnowsza zapisana ocena wariantu (null, gdy brak lub nie da się jej odczytać).
+  // Najnowsza zapisana ocena AI wariantu (null, gdy brak lub nie da się jej odczytać). Oceny ręczne i sędziego są pomijane,
+  // żeby generator pytań (a przez round.evaluationId także refine-v1) nigdy nie widział oceny referencyjnej ani oceny sędziego.
   evaluation: EvaluationView | null;
 };
 type Prepared = { evaluation: EvaluationView };
@@ -100,7 +104,7 @@ const QUESTIONS_SPEC: ObjectOperationSpec<
     if (!variant || !project) {
       return null;
     }
-    const [latest] = await listEvaluationsForVariant(ctx.projectId, ctx.variantId, 1);
+    const [latest] = await listEvaluationsForVariant(ctx.projectId, ctx.variantId, 1, "AI");
     return { variant, project, evaluation: latest?.ok ? latest.evaluation : null };
   },
   prepare: async (ctx, { variant, evaluation }) => {
@@ -114,7 +118,10 @@ const QUESTIONS_SPEC: ObjectOperationSpec<
     if (gate.inProgress) {
       return { ok: false, error: "ROUND_IN_PROGRESS", message: QUESTIONS_ROUND_IN_PROGRESS_MESSAGE };
     }
-    if (!evaluation || evaluation.variantVersion !== variant.version) {
+    if (!evaluation) {
+      return { ok: false, error: "STALE_EVALUATION", message: QUESTIONS_NO_AI_EVALUATION_MESSAGE };
+    }
+    if (evaluation.variantVersion !== variant.version) {
       return { ok: false, error: "STALE_EVALUATION", message: QUESTIONS_STALE_EVALUATION_MESSAGE };
     }
     return { ok: true, prepared: { evaluation } };

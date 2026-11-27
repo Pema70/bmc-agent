@@ -48,8 +48,12 @@ export function parseEvaluationRow(row: EvaluationRow): EvaluationListItem {
   if (!result.success || !source.success || !trigger.success) {
     return { ok: false, id: row.id, error: "Zapisana ocena jest niezgodna ze schematem." };
   }
-  if (source.data === "AI" && (!row.provider || !row.model || !row.promptVersion)) {
-    return { ok: false, id: row.id, error: "Ocena AI bez modelu lub wersji promptu." };
+  if (source.data !== "MANUAL" && (!row.provider || !row.model || !row.promptVersion)) {
+    return {
+      ok: false,
+      id: row.id,
+      error: source.data === "JUDGE" ? "Ocena sędziego bez modelu lub wersji promptu." : "Ocena AI bez modelu lub wersji promptu.",
+    };
   }
   return {
     ok: true,
@@ -74,7 +78,9 @@ export type CreateEvaluationInput = {
   variantVersion: number;
   stateSnapshot: BmcState;
   result: EvaluationOutput;
-  trigger: "UI" | "CHAT";
+  /** Źródło oceny modelowej: `AI` (evaluate_bmc, domyślnie) albo `JUDGE` (niezależny agent oceniający). */
+  source?: "AI" | "JUDGE";
+  trigger: "UI" | "CHAT" | "SCRIPT";
   provider: string;
   model: string;
   promptVersion: string;
@@ -83,7 +89,7 @@ export type CreateEvaluationInput = {
 };
 
 /**
- * Zapis oceny AI. Walidacja Zod przed zapisem: wynik niezgodny ze schematem nigdy nie trafia do bazy.
+ * Zapis oceny modelowej (AI lub sędziego). Walidacja Zod przed zapisem: wynik niezgodny ze schematem nigdy nie trafia do bazy.
  * Identyfikator oceny zawsze pochodzi stąd (z bazy), nigdy z tekstu modelu.
  */
 export async function createEvaluation(input: CreateEvaluationInput): Promise<EvaluationView> {
@@ -97,7 +103,7 @@ export async function createEvaluation(input: CreateEvaluationInput): Promise<Ev
       variantVersion: input.variantVersion,
       stateSnapshot,
       result,
-      source: "AI",
+      source: input.source ?? "AI",
       trigger: input.trigger,
       provider: input.provider,
       model: input.model,
@@ -157,15 +163,16 @@ export async function createManualEvaluation(input: CreateManualEvaluationInput)
 
 /**
  * Lista ocen wariantu od najnowszej, bez migawki stanu. Filtruje po projectId ORAZ variantId,
- * więc wariant z innego projektu daje pustą listę.
+ * więc wariant z innego projektu daje pustą listę. Opcjonalny `source` zawęża listę do jednego źródła (np. tylko `AI`).
  */
 export async function listEvaluationsForVariant(
   projectId: string,
   variantId: string,
   limit: number,
+  source?: z.infer<typeof EvaluationSource>,
 ): Promise<EvaluationListItem[]> {
   const rows = await prisma.evaluationResult.findMany({
-    where: { projectId, variantId },
+    where: { projectId, variantId, ...(source ? { source } : {}) },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit,
     select: LIST_SELECT,
