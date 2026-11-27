@@ -163,3 +163,44 @@ describe("PDF rozszerzonego raportu", () => {
     expect(flat).toContain("pokazano najnowsze 20");
   });
 });
+
+function withJudge(): ReturnType<typeof reportData> {
+  const base = reportData();
+  const first = base.evaluations.items[0];
+  if (!first.ok) {
+    throw new Error("Fixture bez poprawnej oceny.");
+  }
+  const judge = {
+    ok: true as const,
+    evaluation: {
+      ...first.evaluation,
+      id: "judge-1",
+      source: "JUDGE" as const,
+      trigger: "UI" as const,
+      provider: "anthropic",
+      model: "claude-haiku-5-5",
+      promptVersion: "judge-v1",
+      createdAt: new Date("2026-11-26T12:00:00Z"),
+    },
+  };
+  return { ...base, evaluations: { ...base.evaluations, items: [judge, ...base.evaluations.items] } };
+}
+
+describe("PDF raportu: ocena sędziego", () => {
+  it("jest osobna sekcja „Ocena sędziego (AI)” z modelem i wersją promptu, a „Najnowsza ocena” zostaje oceną AI", async () => {
+    const { flat } = await read(withJudge());
+
+    for (const fragment of [
+      "Najnowsza ocena (AI)",
+      "Ocena sędziego (AI)",
+      "Ocena sędziego (AI): anthropic / claude-haiku-5-5",
+      "wersja promptu: judge-v1",
+    ]) {
+      expect(flat, fragment).toContain(fragment);
+    }
+  });
+
+  it("bez ocen sędziego nie ma sekcji sędziego", async () => {
+    expect((await read()).flat).not.toContain("Ocena sędziego (AI)");
+  });
+});

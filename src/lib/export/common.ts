@@ -16,6 +16,8 @@ export type EvaluationRowData = { criterion: EvaluationCriterion; label: string;
 
 export type EvaluationExport = {
   isAi: boolean;
+  /** Ocena niezależnego agenta (sędziego): w raporcie osobna sekcja „Ocena sędziego (AI)”. */
+  isJudge: boolean;
   /** Np. „Ocena AI: google / gemini-3.5-flash-lite” albo „Ocena ręczna”: zwykły tekst. */
   sourceText: string;
   promptVersion: string | null;
@@ -28,12 +30,15 @@ export type EvaluationExport = {
 
 /** Ocena gotowa do wstawienia do dokumentu: wszystkie teksty już oczyszczone (`exportText`). */
 export function toEvaluationExport(evaluation: EvaluationView, currentVersion: number): EvaluationExport {
-  const isAi = evaluation.source === "AI";
+  // Ocena sędziego to też opinia modelu językowego, więc nosi oznaczenie AI (z własną etykietą źródła).
+  const isAi = evaluation.source !== "MANUAL";
+  const label = evaluation.source === "JUDGE" ? "Ocena sędziego (AI)" : "Ocena AI";
   const source = isAi
-    ? `Ocena AI: ${exportText(evaluation.provider) || "?"} / ${exportText(evaluation.model) || "?"}`
+    ? `${label}: ${exportText(evaluation.provider) || "?"} / ${exportText(evaluation.model) || "?"}`
     : "Ocena ręczna";
   return {
     isAi,
+    isJudge: evaluation.source === "JUDGE",
     sourceText: source,
     promptVersion: isAi ? exportText(evaluation.promptVersion) || null : null,
     createdAt: formatExportDateTime(evaluation.createdAt),

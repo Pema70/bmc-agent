@@ -1149,7 +1149,7 @@ describe("POST /api/chat: odpowiedź ucięta limitem długości (finishReason = 
         status: "SCHEMA_ERROR",
         errorCode: "TRUNCATED",
         stepCount: 1,
-        usage: { inputTokens: 4524, outputTokens: 1996 },
+        usage: { inputTokens: 4524, outputTokens: 1996, reasoningTokens: 1996 },
       }),
     );
     expect(mocks.logLlmCall).not.toHaveBeenCalledWith(expect.objectContaining({ status: "OK" }));
@@ -1253,5 +1253,31 @@ describe("POST /api/chat: ucięta odpowiedź zapisana przez prawdziwy saveChatMe
     expect(parts).toContainEqual(expect.objectContaining({ type: "text", text: expect.stringContaining("ucięta") }));
     expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ status: "SCHEMA_ERROR", errorCode: "TRUNCATED" }));
     expect(mocks.logLlmCall).not.toHaveBeenCalledWith(expect.objectContaining({ errorCode: "SAVE_FAILED" }));
+  });
+});
+
+describe("POST /api/chat: tokeny myślenia (reasoningTokens)", () => {
+  it("zapisuje w logu tokeny myślenia z użycia modelu jako część outputTokens", async () => {
+    useModel(
+      sequenceModel([
+        { type: "text-start", id: "t1" },
+        { type: "text-delta", id: "t1", delta: "Odpowiedź." },
+        { type: "text-end", id: "t1" },
+        {
+          type: "finish",
+          finishReason: { unified: "stop", raw: undefined },
+          usage: {
+            inputTokens: { total: 4375, noCache: 4375, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: 2498, text: 98, reasoning: 2400 },
+          },
+        },
+      ]),
+    );
+
+    await finish(await POST(request(validBody)));
+
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "OK", usage: { inputTokens: 4375, outputTokens: 2498, reasoningTokens: 2400 } }),
+    );
   });
 });

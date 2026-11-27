@@ -116,3 +116,48 @@ describe("pairRoundEvaluations", () => {
     expect(pairRoundEvaluations([], evaluations, [])).toEqual([]);
   });
 });
+
+describe("pairRoundEvaluations: źródło oceny „po”", () => {
+  const withSource = (id: string, createdAt: string, source: "AI" | "MANUAL" | "JUDGE"): EvaluationListItem => {
+    const item = evaluation(id, createdAt);
+    return item.ok ? { ok: true, evaluation: { ...item.evaluation, source } } : item;
+  };
+
+  it("ocena sędziego po rundzie nie jest „po” dla oceny AI „przed”: bierze pierwszą ocenę AI", () => {
+    const [pair] = pairRoundEvaluations(
+      [round("r1", 1, "e1")],
+      [
+        withSource("e3", "2026-11-22T10:00:00Z", "AI"),
+        withSource("j1", "2026-11-21T10:00:00Z", "JUDGE"),
+        withSource("e1", "2026-11-20T08:00:00Z", "AI"),
+      ],
+      [resolved("r1", "2026-11-20T12:00:00Z")],
+    );
+
+    expect(pair.ok && pair.after?.id).toBe("e3");
+  });
+
+  it("gdy po rundzie jest tylko ocena innego oceniającego, „po” to brak (NONE), a nie porównanie z innym źródłem", () => {
+    const [pair] = pairRoundEvaluations(
+      [round("r1", 1, "e1")],
+      [withSource("j1", "2026-11-21T10:00:00Z", "JUDGE"), withSource("e1", "2026-11-20T08:00:00Z", "AI")],
+      [resolved("r1", "2026-11-20T12:00:00Z")],
+    );
+
+    expect(pair).toMatchObject({ ok: true, afterStatus: "NONE", after: null });
+  });
+
+  it("runda zbudowana na ocenie sędziego porównuje się z następną oceną sędziego", () => {
+    const [pair] = pairRoundEvaluations(
+      [round("r1", 1, "j1")],
+      [
+        withSource("e2", "2026-11-21T09:00:00Z", "AI"),
+        withSource("j2", "2026-11-21T10:00:00Z", "JUDGE"),
+        withSource("j1", "2026-11-20T08:00:00Z", "JUDGE"),
+      ],
+      [resolved("r1", "2026-11-20T12:00:00Z")],
+    );
+
+    expect(pair.ok && pair.after?.id).toBe("j2");
+  });
+});

@@ -6,16 +6,20 @@ export function formatEvaluationDate(date: Date): string {
   return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
 }
 
-/** Źródło oceny jako zwykły tekst: model i dostawca dla oceny AI, "ręczna" dla oceny ręcznej. */
+/** Źródło oceny jako zwykły tekst: model i dostawca dla oceny AI i sędziego, "ręczna" dla oceny ręcznej. */
 export function formatEvaluationSource(evaluation: Pick<EvaluationView, "source" | "provider" | "model">): string {
   if (evaluation.source === "MANUAL") {
     return "Ocena ręczna";
   }
-  return `Ocena AI: ${evaluation.provider ?? "?"} / ${evaluation.model ?? "?"}`;
+  const label = evaluation.source === "JUDGE" ? "Ocena sędziego (AI)" : "Ocena AI";
+  return `${label}: ${evaluation.provider ?? "?"} / ${evaluation.model ?? "?"}`;
 }
 
-/** Krótka etykieta źródła do legendy wykresu: „AI”, „ręczna” (10d doda „sędzia”). */
+/** Krótka etykieta źródła do legendy wykresu: „AI”, „ręczna”, „sędzia”. */
 export function formatEvaluationSourceShort(evaluation: Pick<EvaluationView, "source">): string {
+  if (evaluation.source === "JUDGE") {
+    return "sędzia";
+  }
   return evaluation.source === "MANUAL" ? "ręczna" : "AI";
 }
 

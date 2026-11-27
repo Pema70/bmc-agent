@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildEvaluateSystemPrompt } from "@/lib/ai/prompts/evaluate";
-import { CRITERION_RUBRIC, RUBRIC_RISK_REMINDER } from "@/lib/evaluation/rubric";
+import { buildJudgeSystemPrompt } from "@/lib/ai/prompts/judge";
+import { CRITERION_RUBRIC, RUBRIC_RISK_REMINDER, buildCriteriaLines } from "@/lib/evaluation/rubric";
 import { EVALUATION_CRITERIA } from "@/lib/schemas/evaluation";
 
 describe("CRITERION_RUBRIC", () => {
@@ -20,5 +21,14 @@ describe("CRITERION_RUBRIC", () => {
 
   it("przypomnienie o orientacji ryzyka jest w prompcie", () => {
     expect(prompt).toContain(RUBRIC_RISK_REMINDER);
+  });
+
+  it("wiersze kryteriów dla sędziego występują dosłownie w prompcie oceny AI i w prompcie sędziego (jedna rubryka)", () => {
+    const lines = buildCriteriaLines();
+    expect(lines).toHaveLength(EVALUATION_CRITERIA.length);
+    for (const line of lines) {
+      expect(prompt, line).toContain(line);
+      expect(buildJudgeSystemPrompt(), line).toContain(line);
+    }
   });
 });

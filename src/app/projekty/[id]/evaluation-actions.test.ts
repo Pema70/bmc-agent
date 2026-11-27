@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth/permissions", () => ({ requireProjectRole: mocks.requireProjectRole }));
 vi.mock("@/lib/db/variants", () => ({ getVariantProjectId: mocks.getVariantProjectId }));
 vi.mock("@/lib/ai/evaluate", () => ({ runEvaluation: mocks.runEvaluation }));
+vi.mock("@/lib/ai/judge", () => ({ runJudge: vi.fn() }));
 vi.mock("@/lib/db/evaluations", () => ({ getEvaluation: mocks.getEvaluation }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 

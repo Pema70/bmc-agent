@@ -21,6 +21,7 @@ import { VariantActions } from "@/components/variants/variant-actions";
 import { VariantSwitcher } from "@/components/variants/variant-switcher";
 import { hasRole, requireProjectRole } from "@/lib/auth/permissions";
 import { loadAiLimits } from "@/lib/ai/config";
+import { isJudgeUiEnabled } from "@/lib/ai/judge-config";
 import { loadAttachmentLimits } from "@/lib/attachments/config";
 import { listAttachmentsForProject } from "@/lib/db/attachments";
 import { listChatMessages } from "@/lib/db/chat";
@@ -199,6 +200,7 @@ export default async function ProjectPage({
               projectId={access.projectId}
               variantId={variant.id}
               canEvaluate={canEditCanvas}
+              judgeEnabled={isJudgeUiEnabled()}
               currentVersion={variant.version}
               initialItems={evaluations}
             />

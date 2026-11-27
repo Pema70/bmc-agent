@@ -6,6 +6,7 @@ vi.mock("@/lib/db/client", () => ({ prisma: {} }));
 vi.mock("@/app/projekty/[id]/evaluation-actions", () => ({
   evaluateModelAction: vi.fn(),
   createManualEvaluationAction: vi.fn(),
+  judgeModelAction: vi.fn(),
 }));
 
 import { EvaluationPanel } from "@/components/evaluation/evaluation-panel";
@@ -142,5 +143,59 @@ describe("EvaluationPanel", () => {
 
     expect(markup).toContain("border-ai-border");
     expect(markup).toContain("prompt: evaluate-v1");
+  });
+});
+
+describe("EvaluationPanel: sędzia (krok 10d)", () => {
+  const judge = view({
+    id: "j1",
+    source: "JUDGE",
+    trigger: "UI",
+    provider: "anthropic",
+    model: "claude-haiku-5-5",
+    promptVersion: "judge-v1",
+  });
+  const render = (props: { canEvaluate: boolean; judgeEnabled?: boolean }, initialItems: EvaluationListItem[] = [{ ok: true, evaluation: view() }]) =>
+    renderToStaticMarkup(
+      <EvaluationPanel
+        projectId="p1"
+        variantId="v1"
+        currentVersion={2}
+        initialItems={initialItems}
+        canEvaluate={props.canEvaluate}
+        judgeEnabled={props.judgeEnabled}
+      />,
+    );
+
+  it("przycisk „Oceń sędzią (AI)” jest ukryty bez flagi, a widoczny dla EDITOR przy włączonym sędzim", () => {
+    expect(render({ canEvaluate: true })).not.toContain("Oceń sędzią");
+    expect(render({ canEvaluate: true, judgeEnabled: false })).not.toContain("Oceń sędzią");
+    expect(render({ canEvaluate: true, judgeEnabled: true })).toContain("Oceń sędzią (AI)");
+  });
+
+  it("VIEWER nie widzi przycisku sędziego nawet przy włączonej fladze", () => {
+    expect(render({ canEvaluate: false, judgeEnabled: true })).not.toContain("Oceń sędzią");
+  });
+
+  it("ocena sędziego: plakietka „Ocena sędziego (AI)” w kolorze AI, model, wersja promptu i etykieta w historii", () => {
+    const markup = render({ canEvaluate: false, judgeEnabled: true }, [{ ok: true, evaluation: judge }]);
+
+    expect(markup).toContain("Ocena sędziego (AI)");
+    expect(markup).toContain("border-ai-border");
+    expect(markup).toContain("anthropic / claude-haiku-5-5");
+    expect(markup).toContain("prompt: judge-v1");
+    expect(markup).not.toContain(">Ocena ręczna<");
+  });
+
+  it("legenda radaru oznacza ocenę sędziego etykietą „sędzia” (trzy źródła na jednym wykresie)", () => {
+    const manual = view({ id: "m1", source: "MANUAL", trigger: null, provider: null, model: null, promptVersion: null });
+    const markup = render({ canEvaluate: false, judgeEnabled: true }, [
+      { ok: true, evaluation: judge },
+      { ok: true, evaluation: view() },
+      { ok: true, evaluation: manual },
+    ]);
+
+    expect(markup).toContain("sędzia");
+    expect(markup).toContain("Nałóż drugą ocenę");
   });
 });

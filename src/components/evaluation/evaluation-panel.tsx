@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { evaluateModelAction } from "@/app/projekty/[id]/evaluation-actions";
+import { evaluateModelAction, judgeModelAction } from "@/app/projekty/[id]/evaluation-actions";
 import { DIRTY_MESSAGE, useOptionalVariantWorkspace } from "@/components/bmc/variant-workspace";
 import type { EvaluationListItem } from "@/lib/db/evaluations";
 import { EvaluationTable } from "@/components/evaluation/evaluation-table";
@@ -22,13 +22,22 @@ type Props = {
   projectId: string;
   variantId: string;
   canEvaluate: boolean;
+  // Przycisk „Oceń sędzią”: tylko przy włączonej fladze i skonfigurowanym sędzim (liczone na serwerze, nie w przeglądarce).
+  judgeEnabled?: boolean;
   // Wersja wariantu z serwera w chwili renderu; z edytora (EDITOR+) bierzemy bieżącą.
   currentVersion: number;
   initialItems: EvaluationListItem[];
 };
 
 // Treści z bazy (model, wersja promptu, uzasadnienia, daty) są renderowane wyłącznie jako węzły tekstowe React.
-export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVersion, initialItems }: Props) {
+export function EvaluationPanel({
+  projectId,
+  variantId,
+  canEvaluate,
+  judgeEnabled = false,
+  currentVersion,
+  initialItems,
+}: Props) {
   const workspace = useOptionalVariantWorkspace();
   const dirty = workspace?.dirty ?? false;
   const version = workspace?.version ?? currentVersion;
@@ -40,6 +49,7 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
   // Formularz oceny ręcznej: dopóki jest otwarty, panel nie pokazuje żadnych wyników ocen (ślepa próba).
   const [formOpen, setFormOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingKind, setPendingKind] = useState<"model" | "judge">("model");
   const [pending, startTransition] = useTransition();
 
   const selected = items.find((item) => item.ok && item.evaluation.id === selectedId);
@@ -68,14 +78,15 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
     setFormOpen(false);
   }
 
-  function evaluate() {
+  function evaluate(kind: "model" | "judge") {
     if (dirty || pending) {
       return;
     }
     setError(null);
+    setPendingKind(kind);
     startTransition(async () => {
       try {
-        const result = await evaluateModelAction(projectId, variantId);
+        const result = kind === "judge" ? await judgeModelAction(projectId, variantId) : await evaluateModelAction(projectId, variantId);
         if (result.ok) {
           setItems((current) => [{ ok: true, evaluation: result.evaluation }, ...current]);
           setSelectedId(result.evaluation.id);
@@ -97,6 +108,10 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
         </h2>
         {formOpen ? null : evaluation?.source === "MANUAL" ? (
           <span className="rounded-full border border-border px-2 py-0.5 text-xs font-bold">Ocena ręczna</span>
+        ) : evaluation?.source === "JUDGE" ? (
+          <span className="rounded-full border border-ai-border bg-ai-bg px-2 py-0.5 text-xs font-bold text-ai-fg">
+            Ocena sędziego (AI)
+          </span>
         ) : (
           <span className="rounded-full border border-ai-border bg-ai-bg px-2 py-0.5 text-xs font-bold text-ai-fg">
             Ocena AI
@@ -106,8 +121,11 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
 
       <p className="text-sm text-muted">
         Ocena AI to subiektywna opinia modelu językowego na podstawie wpisów w płótnie, a nie weryfikacja biznesowa. Model
-        nie sprawdza rynku ani danych liczbowych. Ocena ręczna to Twoja własna ocena według tej samej rubryki. Obie dotyczą
-        zapisanego stanu wariantu, nie niezapisanych zmian w edytorze.
+        nie sprawdza rynku ani danych liczbowych. Ocena ręczna to Twoja własna ocena według tej samej rubryki.
+        {judgeEnabled
+          ? " Ocena sędziego pochodzi od osobnego modelu z innej rodziny, który widzi wyłącznie wpisy w dziewięciu blokach."
+          : ""}{" "}
+        Wszystkie dotyczą zapisanego stanu wariantu, nie niezapisanych zmian w edytorze.
       </p>
 
       {formOpen ? (
@@ -124,12 +142,22 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={evaluate}
+              onClick={() => evaluate("model")}
               disabled={pending || dirty}
               className="rounded-lg bg-cta px-4 py-2 text-sm font-bold hover:bg-tint disabled:opacity-50"
             >
-              {pending ? "Oceniam…" : "Oceń model"}
+              {pending && pendingKind === "model" ? "Oceniam…" : "Oceń model"}
             </button>
+            {judgeEnabled ? (
+              <button
+                type="button"
+                onClick={() => evaluate("judge")}
+                disabled={pending || dirty}
+                className="rounded-lg border border-ai-border bg-ai-bg px-4 py-2 text-sm font-bold text-ai-fg hover:bg-tint disabled:opacity-50"
+              >
+                {pending && pendingKind === "judge" ? "Sędzia ocenia…" : "Oceń sędzią (AI)"}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setFormOpen(true)}
@@ -152,7 +180,7 @@ export function EvaluationPanel({ projectId, variantId, canEvaluate, currentVers
         <div className="flex flex-col gap-3">
           <p className="text-sm text-muted">
             {formatEvaluationSource(evaluation)}
-            {evaluation.source === "AI" ? ` · prompt: ${evaluation.promptVersion ?? "brak"}` : ""} ·{" "}
+            {evaluation.source !== "MANUAL" ? ` · prompt: ${evaluation.promptVersion ?? "brak"}` : ""} ·{" "}
             {formatEvaluationDate(evaluation.createdAt)} · wersja modelu: {evaluation.variantVersion}
           </p>
           {isEvaluationStale(evaluation.variantVersion, version) ? (

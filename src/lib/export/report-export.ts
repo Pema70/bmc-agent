@@ -96,7 +96,10 @@ export type ReportExportData = {
   attachments: ReportAttachmentRow[];
   sourceRows: ReportSourceRow[];
   sourceSummary: string;
+  /** Najnowsza ocena AI (evaluate_bmc) albo ręczna; oceny sędziego mają osobne pole. */
   latestEvaluation: EvaluationExport | null;
+  /** Najnowsza ocena sędziego (niezależnego agenta), jeśli jest. */
+  judgeEvaluation: EvaluationExport | null;
   evaluationHistory: ReportEvaluationHistoryRow[];
   evaluationNotes: string[];
   rounds: ReportRound[];
@@ -307,7 +310,8 @@ export function buildReportExport(data: ReportData): ReportExportData {
     attachments,
     sourceRows,
     sourceSummary,
-    latestEvaluation: evaluationExports[0] ?? null,
+    latestEvaluation: evaluationExports.find((evaluation) => !evaluation.isJudge) ?? null,
+    judgeEvaluation: evaluationExports.find((evaluation) => evaluation.isJudge) ?? null,
     evaluationHistory,
     evaluationNotes,
     rounds,

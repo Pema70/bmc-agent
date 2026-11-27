@@ -194,8 +194,23 @@ export function ReportDocument({ data }: { data: ReportExportData }) {
             </View>
           </View>
         ) : (
-          <Empty>Ten wariant nie ma czytelnej oceny.</Empty>
+          <Empty>{data.judgeEvaluation ? "Ten wariant nie ma oceny AI (evaluate_bmc) ani ręcznej." : "Ten wariant nie ma czytelnej oceny."}</Empty>
         )}
+        {data.judgeEvaluation ? (
+          <View>
+            <Sub>Ocena sędziego (AI)</Sub>
+            <Text style={styles.small}>
+              {`${data.judgeEvaluation.sourceText}${data.judgeEvaluation.promptVersion ? `, wersja promptu: ${data.judgeEvaluation.promptVersion}` : ""}. Osobny model z innej rodziny, który widział wyłącznie dziewięć bloków modelu. Data: ${data.judgeEvaluation.createdAt}. Dotyczy wersji modelu: ${data.judgeEvaluation.evaluatedVersion}.`}
+            </Text>
+            {staleNote(data.judgeEvaluation, data.version) ? (
+              <Text style={base.notice}>{staleNote(data.judgeEvaluation, data.version)}</Text>
+            ) : null}
+            <Table
+              columns={[{ header: "Kryterium", width: 110 }, { header: "Ocena", width: 40 }, { header: "Uzasadnienie (AI)" }]}
+              rows={data.judgeEvaluation.rows.map((row) => [row.label, `${row.score}/${SCORE_MAX}`, row.justification])}
+            />
+          </View>
+        ) : null}
         {data.evaluationHistory.length > 1 ? (
           <View>
             <Sub>Historia ocen</Sub>

@@ -232,3 +232,58 @@ describe("createManualEvaluation", () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 });
+
+describe("ocena sędziego (JUDGE)", () => {
+  it("parser przyjmuje JUDGE z modelem i wersją promptu oraz trigger SCRIPT", () => {
+    const parsed = parseEvaluationRow(
+      row({ source: "JUDGE", trigger: "SCRIPT", provider: "anthropic", model: "claude-haiku-5-5", promptVersion: "judge-v1" }),
+    );
+    expect(parsed).toMatchObject({
+      ok: true,
+      evaluation: { source: "JUDGE", trigger: "SCRIPT", model: "claude-haiku-5-5", promptVersion: "judge-v1" },
+    });
+  });
+
+  it("parser odrzuca ocenę sędziego bez dostawcy, modelu lub wersji promptu", () => {
+    for (const missing of [{ provider: null }, { model: null }, { promptVersion: null }]) {
+      const parsed = parseEvaluationRow(row({ source: "JUDGE", trigger: "UI", ...missing }));
+      expect(parsed).toMatchObject({ ok: false, error: "Ocena sędziego bez modelu lub wersji promptu." });
+    }
+  });
+
+  it("parser odrzuca nieznane źródło i nieznany wyzwalacz", () => {
+    expect(parseEvaluationRow(row({ source: "ROBOT" }))).toMatchObject({ ok: false });
+    expect(parseEvaluationRow(row({ trigger: "CRON" }))).toMatchObject({ ok: false });
+  });
+
+  it("createEvaluation zapisuje source JUDGE i trigger SCRIPT z modelem sędziego i powiązaniem z logiem", async () => {
+    mocks.create.mockResolvedValue(
+      row({ id: "j1", source: "JUDGE", trigger: "SCRIPT", provider: "anthropic", model: "claude-haiku-5-5", promptVersion: "judge-v1" }),
+    );
+
+    const evaluation = await createEvaluation({
+      projectId: "p1",
+      variantId: "v1",
+      variantVersion: 3,
+      stateSnapshot: emptyBmcState(),
+      result,
+      source: "JUDGE",
+      trigger: "SCRIPT",
+      provider: "anthropic",
+      model: "claude-haiku-5-5",
+      promptVersion: "judge-v1",
+      llmCallLogId: "log-9",
+      createdById: "u1",
+    });
+
+    expect(evaluation).toMatchObject({ id: "j1", source: "JUDGE" });
+    expect(mocks.create.mock.calls[0][0].data).toMatchObject({
+      source: "JUDGE",
+      trigger: "SCRIPT",
+      provider: "anthropic",
+      model: "claude-haiku-5-5",
+      promptVersion: "judge-v1",
+      llmCallLogId: "log-9",
+    });
+  });
+});

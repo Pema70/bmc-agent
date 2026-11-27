@@ -54,6 +54,7 @@ describe("logLlmCall", () => {
         durationMs: 1235,
         inputTokens: 1000,
         outputTokens: 500,
+        reasoningTokens: null,
         costUsd: 0.002625,
         stepCount: 2,
         status: "OK",
@@ -85,5 +86,37 @@ describe("logLlmCall", () => {
     await expect(logLlmCall(base)).resolves.toBeNull();
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+});
+
+describe("logLlmCall: reasoningTokens", () => {
+  const base = {
+    operation: "chat",
+    provider: "google" as const,
+    modelId: "gemini-3.8-flash",
+    promptVersion: "v1",
+    durationMs: 10,
+    status: "OK" as const,
+  };
+
+  it("zapisuje tokeny myślenia jako część wyjścia, a koszt liczy z całego outputTokens", async () => {
+    create.mockResolvedValue({ id: "l1" });
+
+    await logLlmCall({ ...base, usage: { inputTokens: 4375, outputTokens: 2498, reasoningTokens: 2400 } });
+
+    const data = create.mock.calls[create.mock.calls.length - 1][0].data;
+    expect(data.reasoningTokens).toBe(2400);
+    expect(data.outputTokens).toBe(2498);
+    expect(data.costUsd).toBe(0.012649);
+  });
+
+  it("brak informacji od dostawcy zapisuje NULL (nie 0)", async () => {
+    create.mockResolvedValue({ id: "l1" });
+
+    await logLlmCall({ ...base, usage: { inputTokens: 10, outputTokens: 5 } });
+    expect(create.mock.calls[create.mock.calls.length - 1][0].data.reasoningTokens).toBeNull();
+
+    await logLlmCall({ ...base, usage: { inputTokens: 10, outputTokens: 5, reasoningTokens: 0 } });
+    expect(create.mock.calls[create.mock.calls.length - 1][0].data.reasoningTokens).toBe(0);
   });
 });

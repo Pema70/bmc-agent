@@ -2,7 +2,8 @@ import { prisma } from "@/lib/db/client";
 import { MODEL_PRICING, type LlmProvider } from "@/lib/ai/models";
 import type { LlmCallStatus } from "@/generated/prisma/client";
 
-export type TokenUsage = { inputTokens?: number | null; outputTokens?: number | null };
+/** `reasoningTokens` to część `outputTokens` (tokeny „thinking”); undefined/null, gdy dostawca ich nie podaje. */
+export type TokenUsage = { inputTokens?: number | null; outputTokens?: number | null; reasoningTokens?: number | null };
 
 /** Koszt w USD albo null, gdy model nie ma ceny w MODEL_PRICING lub brak informacji o tokenach. */
 export function computeCostUsd(provider: LlmProvider, modelId: string, usage: TokenUsage): number | null {
@@ -48,6 +49,7 @@ export async function logLlmCall(record: LlmCallRecord): Promise<string | null> 
         durationMs: Math.max(0, Math.round(record.durationMs)),
         inputTokens: usage.inputTokens ?? null,
         outputTokens: usage.outputTokens ?? null,
+        reasoningTokens: usage.reasoningTokens ?? null,
         costUsd: computeCostUsd(record.provider, record.modelId, usage),
         stepCount: record.stepCount ?? null,
         status: record.status,
