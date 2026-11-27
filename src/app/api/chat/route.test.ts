@@ -1107,3 +1107,151 @@ describe("POST /api/chat: zapis odpowiedzi z read_attachment przez prawdziwy sav
     expect(mocks.logLlmCall).not.toHaveBeenCalledWith(expect.objectContaining({ errorCode: "SAVE_FAILED" }));
   });
 });
+
+// Tura ucięta limitem tokenów wyjścia (finishReason = length). Dane z próby `gemini-3.8-flash` (plan kroku 10, punkt 16):
+// trzy tury z outputTokens = 1996 przy limicie 2000, bez tekstu, a log miał status OK.
+describe("POST /api/chat: odpowiedź ucięta limitem długości (finishReason = length)", () => {
+  const truncatedUsage = {
+    inputTokens: { total: 4524, noCache: 4524, cacheRead: undefined, cacheWrite: undefined },
+    outputTokens: { total: 1996, text: 0, reasoning: 1996 },
+  };
+  const lengthFinish = {
+    type: "finish" as const,
+    finishReason: { unified: "length" as const, raw: "MAX_TOKENS" },
+    usage: truncatedUsage,
+  };
+  const proposalInput = {
+    blockKey: "channels",
+    operation: "add",
+    before: null,
+    after: "Sprzedaż w social media",
+    rationale: "Klienci są na Instagramie.",
+  };
+  const NOTICE = "ucięta";
+
+  function assistantMessage() {
+    return mocks.saveChatMessage.mock.calls.map((call) => call[0]).find((m) => m.role === "assistant");
+  }
+  function textOf(parts: { type: string; text?: string }[]): string {
+    return parts.filter((part) => part.type === "text").map((part) => part.text).join("\n");
+  }
+
+  it("bez tekstu: log SCHEMA_ERROR / TRUNCATED (nie OK), znacznik w strumieniu i w zapisanej odpowiedzi", async () => {
+    useModel(sequenceModel([lengthFinish]));
+
+    const text = await finish(await POST(request(validBody)));
+
+    expect(text).toContain(NOTICE);
+    expect(mocks.logLlmCall).toHaveBeenCalledTimes(1);
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: "chat",
+        status: "SCHEMA_ERROR",
+        errorCode: "TRUNCATED",
+        stepCount: 1,
+        usage: { inputTokens: 4524, outputTokens: 1996 },
+      }),
+    );
+    expect(mocks.logLlmCall).not.toHaveBeenCalledWith(expect.objectContaining({ status: "OK" }));
+    // Wiadomość użytkownika ma odpowiedź (znacznik), więc nie zostaje „osierocona” jak po przerwaniu tury.
+    expect(mocks.saveChatMessage.mock.calls.map((call) => call[0].role)).toEqual(["user", "assistant"]);
+    expect(textOf(assistantMessage().parts)).toContain(NOTICE);
+  });
+
+  it("z częściowym tekstem: zachowuje tekst i dopisuje znacznik, log TRUNCATED", async () => {
+    useModel(
+      sequenceModel([
+        { type: "text-start", id: "t1" },
+        { type: "text-delta", id: "t1", delta: "Zaczynam odpowiedź i urywam w pół" },
+        { type: "text-end", id: "t1" },
+        lengthFinish,
+      ]),
+    );
+
+    const text = await finish(await POST(request(validBody)));
+
+    expect(text).toContain("Zaczynam odpowiedź i urywam w pół");
+    expect(text).toContain(NOTICE);
+    const saved = textOf(assistantMessage().parts);
+    expect(saved).toContain("Zaczynam odpowiedź i urywam w pół");
+    expect(saved).toContain(NOTICE);
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ status: "SCHEMA_ERROR", errorCode: "TRUNCATED" }));
+  });
+
+  it("ucięte w trakcie argumentów narzędzia: nieukończone wywołanie nie jest zapisywane, znacznik jest", async () => {
+    useModel(
+      sequenceModel([
+        { type: "tool-input-start", id: "call-1", toolName: "propose_block_change" },
+        { type: "tool-input-delta", id: "call-1", delta: '{"blockKey":"chan' },
+        lengthFinish,
+      ]),
+    );
+
+    await finish(await POST(request(validBody)));
+
+    const parts = assistantMessage().parts as { type: string; state?: string; text?: string }[];
+    expect(parts.some((part) => part.type.startsWith("tool-"))).toBe(false);
+    expect(textOf(parts)).toContain(NOTICE);
+    expect(mocks.createProposal).not.toHaveBeenCalled();
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ status: "SCHEMA_ERROR", errorCode: "TRUNCATED" }));
+  });
+
+  it("ucięty drugi krok: ukończone narzędzie z pierwszego kroku zostaje, znacznik na końcu, stepCount 2", async () => {
+    mocks.createProposal.mockResolvedValue({
+      ok: true,
+      proposal: { id: "pr-1", variantId: "v1", ...proposalInput, status: "PENDING", baseVersion: 3, createdAt: new Date("2026-11-11T10:00:00Z") },
+    });
+    useModel(sequenceModel(toolCallChunks("propose_block_change", proposalInput), [lengthFinish]));
+
+    await finish(await POST(request(validBody)));
+
+    const parts = assistantMessage().parts as { type: string; state?: string; text?: string }[];
+    expect(parts).toContainEqual(expect.objectContaining({ type: "tool-propose_block_change", state: "output-available" }));
+    expect(textOf(parts)).toContain(NOTICE);
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "SCHEMA_ERROR", errorCode: "TRUNCATED", stepCount: 2 }),
+    );
+  });
+
+  it("zwykłe zakończenie (stop) nie dostaje znacznika i jest logowane jako OK", async () => {
+    useModel(textModel("Pełna odpowiedź."));
+
+    const text = await finish(await POST(request(validBody)));
+
+    expect(text).not.toContain(NOTICE);
+    expect(textOf(assistantMessage().parts)).toBe("Pełna odpowiedź.");
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ status: "OK" }));
+  });
+
+  it("znacznik nie zawiera wewnętrznych szczegółów (modelu, kluczy, kodów dostawcy)", async () => {
+    useModel(sequenceModel([lengthFinish]));
+
+    const text = await finish(await POST(request(validBody)));
+
+    expect(text).not.toMatch(/MAX_TOKENS|gemini|API_KEY/i);
+  });
+});
+
+describe("POST /api/chat: ucięta odpowiedź zapisana przez prawdziwy saveChatMessage", () => {
+  beforeEach(async () => {
+    const actual = await vi.importActual<typeof import("@/lib/db/chat")>("@/lib/db/chat");
+    mocks.chatCreate.mockResolvedValue({});
+    mocks.saveChatMessage.mockImplementation(actual.saveChatMessage);
+  });
+
+  it("zapisuje znacznik jako wiadomość asystenta (bez SAVE_FAILED), więc wiadomość użytkownika ma odpowiedź", async () => {
+    useModel(
+      sequenceModel([
+        { type: "finish", finishReason: { unified: "length", raw: "MAX_TOKENS" }, usage },
+      ]),
+    );
+
+    await finish(await POST(request(validBody)));
+
+    expect(mocks.chatCreate.mock.calls.map((call) => call[0].data.role)).toEqual(["USER", "ASSISTANT"]);
+    const parts = mocks.chatCreate.mock.calls[1][0].data.parts as { type: string; text?: string }[];
+    expect(parts).toContainEqual(expect.objectContaining({ type: "text", text: expect.stringContaining("ucięta") }));
+    expect(mocks.logLlmCall).toHaveBeenCalledWith(expect.objectContaining({ status: "SCHEMA_ERROR", errorCode: "TRUNCATED" }));
+    expect(mocks.logLlmCall).not.toHaveBeenCalledWith(expect.objectContaining({ errorCode: "SAVE_FAILED" }));
+  });
+});
