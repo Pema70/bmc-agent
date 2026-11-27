@@ -1,37 +1,9 @@
-import {
-  convertToModelMessages,
-  createUIMessageStreamResponse,
-  hasToolCall,
-  isStepCount,
-  safeValidateUIMessages,
-  streamText,
-  toUIMessageStream,
-  type UIMessageStreamOutcome,
-} from "ai";
+import { createUIMessageStreamResponse } from "ai";
 import { z } from "zod";
+import { prepareChatTurn, runChatTurn } from "@/lib/ai/chat-agent";
 import { loadAiLimits } from "@/lib/ai/config";
-import { loadAttachmentLimits } from "@/lib/attachments/config";
-import { classifyLlmError, toUserFacingError } from "@/lib/ai/errors";
-import { checkUserLimits } from "@/lib/ai/limits";
-import { logLlmCall, type TokenUsage } from "@/lib/ai/log";
-import { getChatModel } from "@/lib/ai/models";
-import { PROMPT_VERSION, buildSystemPrompt } from "@/lib/ai/prompts/system";
-import { createChatTools } from "@/lib/ai/tools";
-import {
-  TRUNCATION_ERROR_CODE,
-  TRUNCATION_NOTICE,
-  dropIncompleteToolParts,
-  withTruncationNotice,
-} from "@/lib/ai/truncation";
 import { getProjectAccess } from "@/lib/auth/permissions";
-import { listAttachmentsForProject } from "@/lib/db/attachments";
-import { listChatMessages, newChatMessageId, saveChatMessage } from "@/lib/db/chat";
-import { getProject } from "@/lib/db/projects";
-import { getVariantForProject, getVariantMeta } from "@/lib/db/variants";
-import { attachmentLabel } from "@/lib/schemas/attachment";
-import { chatRequestSchema, chatValidationTools, type ChatUIMessage } from "@/lib/schemas/chat";
-
-const MAX_RETRIES = 2;
+import { chatRequestSchema } from "@/lib/schemas/chat";
 
 function jsonError(status: number, error: string, message: string, headers?: Record<string, string>): Response {
   return Response.json({ error, message }, { status, headers });
@@ -82,185 +54,21 @@ export async function POST(req: Request): Promise<Response> {
     return jsonError(400, "VALIDATION", "Nieprawidłowe żądanie.");
   }
 
-  // 3. Wariant musi należeć do projektu, do którego sprawdziliśmy uprawnienia.
-  const variant = await getVariantForProject(projectId, request.variantId);
-  if (!variant) {
-    return jsonError(404, "NOT_FOUND", "Nie znaleziono tego wariantu w projekcie.");
-  }
-
-  // 3b. Czat działa tylko na wariancie głównym (D2): jeden wątek na projekt nie ma variantId, a propozycje i narzędzia
-  // dotyczą wariantu z żądania. Sprawdzenie przed limitami, żeby odrzucone żądanie niczego nie zużywało.
-  const meta = await getVariantMeta(projectId, variant.id);
-  if (!meta) {
-    return jsonError(404, "NOT_FOUND", "Nie znaleziono tego wariantu w projekcie.");
-  }
-  if (!meta.isMain) {
-    return jsonError(409, "VARIANT_NOT_MAIN", "Czat działa na wariancie głównym.");
-  }
-
-  // 4. Limity użytkownika.
-  const limitCheck = await checkUserLimits(userId, new Date(), limits);
-  if (!limitCheck.ok) {
-    return jsonError(429, "LIMIT", limitCheck.message, { "Retry-After": String(limitCheck.retryAfterSec) });
-  }
-
-  // Konfiguracja modelu przed zapisem wiadomości, żeby błąd konfiguracji nie zostawiał osieroconej wiadomości.
-  let resolved: ReturnType<typeof getChatModel>;
-  try {
-    resolved = getChatModel("chat");
-  } catch (error) {
-    console.error("[chat] Błędna konfiguracja modelu:", error instanceof Error ? error.message : "nieznany błąd");
-    return jsonError(503, "CONFIG", "Agent jest źle skonfigurowany (model lub klucz API). Sprawdź konfigurację serwera.");
-  }
-
-  // 5. Historia (zawsze po projectId) i dane projektu.
-  const project = await getProject(projectId);
-  if (!project) {
-    return jsonError(404, "NOT_FOUND", "Nie znaleziono projektu.");
-  }
-  const history = await listChatMessages(projectId, limits.historyLimit);
-  // Lista załączników (bez treści) do kontekstu; etykieta Z{n}, nie id z bazy. Odczyt zawsze po projectId z uprawnień.
-  let attachmentLimits: ReturnType<typeof loadAttachmentLimits>;
-  try {
-    attachmentLimits = loadAttachmentLimits();
-  } catch (error) {
-    console.error("[chat] Błędna konfiguracja załączników:", error instanceof Error ? error.message : "nieznany błąd");
-    return jsonError(500, "CONFIG", "Agent jest źle skonfigurowany. Sprawdź konfigurację serwera.");
-  }
-  const attachmentList = (await listAttachmentsForProject(projectId)).map((item) => ({
-    label: attachmentLabel(item.ordinal),
-    name: item.fileName,
-    kind: item.kind,
-    textChars: item.textChars,
-    truncated: item.truncated,
-  }));
-
-  // 6. Zapis wiadomości użytkownika z id nadanym przez serwer.
-  const userMessageId = newChatMessageId();
-  const userMessage: ChatUIMessage = {
-    id: userMessageId,
-    role: "user",
-    parts: [{ type: "text", text: request.message }],
-  };
-  await saveChatMessage({
-    id: userMessageId,
+  // 3 do 6. Wariant, wariant główny, limity użytkownika, model, projekt, historia, załączniki, zapis wiadomości.
+  const prepared = await prepareChatTurn({
     projectId,
     userId,
-    role: "user",
-    parts: userMessage.parts,
+    variantId: request.variantId,
+    message: request.message,
+    limits,
   });
-
-  const messages = [...history, userMessage];
-  const assistantId = newChatMessageId();
-  const startedAt = Date.now();
-
-  // 7. Wywołanie modelu. Narzędzie propozycji dostaje kontekst wyłącznie z serwera.
-  const chatTools = createChatTools({
-    projectId,
-    variantId: variant.id,
-    userId,
-    version: variant.version,
-    state: variant.state,
-    maxPending: limits.maxPendingProposals,
-    readMaxChars: attachmentLimits.readMaxChars,
-  });
-  const result = streamText({
-    model: resolved.model,
-    system: buildSystemPrompt(project, variant.state, attachmentList),
-    messages: await convertToModelMessages(messages, { tools: chatTools }),
-    tools: chatTools,
-    stopWhen: [isStepCount(limits.maxSteps), hasToolCall("ask_clarification")],
-    maxOutputTokens: limits.maxOutputTokens,
-    maxRetries: MAX_RETRIES,
-    abortSignal: req.signal,
-  });
-
-  async function readUsage(): Promise<{ usage?: TokenUsage; stepCount?: number }> {
-    try {
-      const [usage, steps] = await Promise.all([result.usage, result.steps]);
-      return {
-        usage: {
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          reasoningTokens: usage.outputTokenDetails?.reasoningTokens,
-        },
-        stepCount: steps.length,
-      };
-    } catch {
-      return {};
-    }
+  if (!prepared.ok) {
+    return jsonError(prepared.status, prepared.error, prepared.message, prepared.headers);
   }
 
-  // 8. Zapis odpowiedzi (po walidacji) i log wywołania.
-  async function onEnd(outcome: UIMessageStreamOutcome, responseMessage: ChatUIMessage): Promise<void> {
-    const base = {
-      projectId,
-      userId,
-      operation: "chat",
-      provider: resolved.provider,
-      modelId: resolved.modelId,
-      promptVersion: PROMPT_VERSION,
-      durationMs: Date.now() - startedAt,
-    };
-    const usage = await readUsage();
-
-    if (outcome.status === "failed") {
-      const classified = classifyLlmError(outcome.error);
-      await logLlmCall({ ...base, ...usage, status: classified.status, errorCode: classified.errorCode });
-      return;
-    }
-    if (outcome.status !== "completed") {
-      await logLlmCall({ ...base, ...usage, status: "ERROR", errorCode: "ABORTED" });
-      return;
-    }
-
-    // Tura ucięta limitem długości: odpowiedź (ze znacznikiem) i tak zapisujemy, żeby wiadomość użytkownika nie została
-    // bez odpowiedzi (agent odpowiadałby na nią drugi raz). Nieukończone wywołania narzędzi nie trafiają do historii.
-    const truncated = truncation.wasTruncated();
-    let parts = truncated ? dropIncompleteToolParts(responseMessage.parts) : responseMessage.parts;
-    const validated = await safeValidateUIMessages<ChatUIMessage>({
-      messages: [{ ...responseMessage, parts }],
-      tools: chatValidationTools,
-    });
-    if (!validated.success) {
-      if (!truncated) {
-        console.error("[chat] Odpowiedź modelu niezgodna ze schematem, nie zapisano.");
-        await logLlmCall({ ...base, ...usage, status: "SCHEMA_ERROR", errorCode: "INVALID_RESPONSE" });
-        return;
-      }
-      console.error("[chat] Ucięta odpowiedź niezgodna ze schematem, zapisano sam znacznik.");
-      parts = [{ type: "text", text: TRUNCATION_NOTICE }];
-    }
-
-    try {
-      await saveChatMessage({ id: assistantId, projectId, userId: null, role: "assistant", parts });
-      await logLlmCall(
-        truncated
-          ? { ...base, ...usage, status: "SCHEMA_ERROR", errorCode: TRUNCATION_ERROR_CODE }
-          : { ...base, ...usage, status: "OK" },
-      );
-    } catch (error) {
-      console.error("[chat] Nie udało się zapisać odpowiedzi:", error instanceof Error ? error.message : "nieznany błąd");
-      await logLlmCall({ ...base, ...usage, status: "ERROR", errorCode: "SAVE_FAILED" });
-    }
-  }
-
-  const truncation = withTruncationNotice(result.stream, `${assistantId}-truncated`);
-  const stream = toUIMessageStream({
-    stream: truncation.stream,
-    tools: chatTools,
-    originalMessages: messages,
-    generateMessageId: () => assistantId,
-    sendReasoning: false,
-    onError: (error) => {
-      console.error("[chat] Błąd wywołania modelu:", classifyLlmError(error).errorCode);
-      return toUserFacingError(error);
-    },
-    onEnd: ({ outcome, responseMessage }) => onEnd(outcome, responseMessage),
-  });
-
-  // Bez await: odpłyń strumień także po rozłączeniu klienta, żeby odpowiedź została zapisana.
-  void result.consumeStream({ onError: () => {} });
+  // 7 i 8. Wywołanie modelu, zapis odpowiedzi i log (w `runChatTurn`). Trasa odsyła tylko strumień; `finished` jest dla
+  // skryptów, które czekają na koniec zapisu.
+  const { stream } = await runChatTurn(prepared.turn, { signal: req.signal });
 
   return createUIMessageStreamResponse({ stream });
 }

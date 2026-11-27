@@ -236,7 +236,7 @@ describe("runGenerateQuestions: kontrole przed modelem (model nie jest wołany, 
     expect(mocks.checkUserLimits).not.toHaveBeenCalled();
   });
 
-  it("brak oceny AI: STALE_EVALUATION z komunikatem „Najpierw oceń model przyciskiem „Oceń model”” (polski, bez błędu technicznego)", async () => {
+  it("brak oceny AI: STALE_EVALUATION z komunikatem „Najpierw oceń model przyciskiem »Oceń model«” (polski, bez błędu technicznego)", async () => {
     const model = setModel(generateModel("{}"));
     mocks.evaluation.findMany.mockResolvedValue([]);
 
