@@ -463,6 +463,8 @@ model EvalRun {
   maxOutputTokensLong Int
   costLimitUsd        Decimal          @db.Decimal(12, 6)
   turnLimit           Int
+  turnCount           Int? // liczba tur czatu w przebiegu (BUILD: 6 + kontynuacje); null do końca przebiegu
+  endReason           String? // SCRIPT_DONE | ALL_BLOCKS | NO_NEW_PROPOSALS | CONTINUATION_LIMIT (walidacja Zod w kodzie); null do końca przebiegu
   projectId           String?
   status              EvalRunStatus
   errorCode           String?
