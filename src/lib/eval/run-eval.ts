@@ -9,16 +9,20 @@ import type { EvalConfig } from "@/lib/eval/args";
 import { RunBudget, type CostReading } from "@/lib/eval/budget";
 import {
   ALL_CASES,
+  BUILD_CONTINUATION_MESSAGE,
+  BUILD_EMPTY_TURNS_TO_STOP,
+  BUILD_MAX_CONTINUATIONS,
   casesChecksum,
   checkCasesFrozen,
   type BuildCase,
   type ChatCase,
   type EvalCaseDefinition,
+  type EvalEndReason,
 } from "@/lib/eval/cases";
 import { estimateRun } from "@/lib/eval/estimate";
 import { EVAL_PROJECT_DESCRIPTION, buildEvalProjectName } from "@/lib/eval/naming";
 import { applyScriptLimitOverrides } from "@/lib/eval/script-limits";
-import { emptyBmcState, type BmcState } from "@/lib/schemas/bmc";
+import { BLOCK_KEYS, emptyBmcState, type BmcState } from "@/lib/schemas/bmc";
 import { SEED_COMPANIES } from "@/lib/seed/companies";
 import { buildEntryOrigins } from "@/lib/seed/run-seed";
 
@@ -69,9 +73,12 @@ export interface EvalDb {
     entryOrigins: unknown[];
   }): Promise<{ projectId: string; variantId: string }>;
   createRun(data: NewRunData): Promise<{ id: string }>;
-  finishRun(id: string, result: { status: FinalRunStatus; errorCode?: string | null }): Promise<void>;
+  finishRun(
+    id: string,
+    result: { status: FinalRunStatus; errorCode?: string | null; turnCount?: number | null; endReason?: EvalEndReason | null },
+  ): Promise<void>;
   readCost(projectIds: readonly string[]): Promise<CostReading>;
-  getMainVariant(projectId: string): Promise<{ id: string; version: number } | null>;
+  getMainVariant(projectId: string): Promise<{ id: string; version: number; state: BmcState } | null>;
   /** Identyfikatory propozycji `PENDING` wariantu, od najstarszej. */
   listPendingProposalIds(projectId: string, variantId: string): Promise<string[]>;
 }
@@ -201,6 +208,15 @@ async function drain(stream: ReadableStream): Promise<void> {
   } catch {
     // Strumień z błędem też jest „odczytany do końca”; wynik opisuje `finished`.
   }
+}
+
+function formatRange(min: number, max: number, label: string): string {
+  return min === max ? `${label} ${min}` : `${label} ${min} do ${max}`;
+}
+
+function formatCostRange(min: number | null, max: number | null): string {
+  if (min === null || max === null) return "nieznany (brak ceny)";
+  return min.toFixed(4) === max.toFixed(4) ? `${min.toFixed(4)} USD` : `${min.toFixed(4)} do ${max.toFixed(4)} USD`;
 }
 
 function formatReasons(reasons: Record<string, number>): string {
@@ -351,9 +367,19 @@ export async function runEval(config: EvalConfig, deps: EvalDeps): Promise<EvalS
           getStop: () => state.stop,
         });
       }
-      await db.finishRun(run.id, { status: result.status, errorCode: result.errorCode ?? null });
+      await db.finishRun(run.id, {
+        status: result.status,
+        errorCode: result.errorCode ?? null,
+        turnCount: result.turnCount ?? null,
+        endReason: result.endReason ?? null,
+      });
       summary.counts[result.status] += 1;
       log(`  ${def.id}: ${result.status}${result.errorCode ? ` (${result.errorCode})` : ""}`);
+      if (def.kind === "BUILD" && result.turnCount !== undefined) {
+        log(
+          `    tury: ${result.turnCount} (${def.messages.length} ze skryptu + ${Math.max(0, result.turnCount - def.messages.length)} kontynuacji), powód zakończenia: ${result.endReason ?? "brak (przerwany)"}, wypełnione bloki: ${result.blocksFilled ?? "?"}/${BLOCK_KEYS.length}`,
+        );
+      }
       if (proposals.accepted + proposals.notAccepted > 0) {
         log(`    propozycje: zaakceptowano ${proposals.accepted}, niezaakceptowano ${proposals.notAccepted}${formatReasons(proposals.reasons)}`);
         summary.proposalsAccepted += proposals.accepted;
@@ -376,7 +402,15 @@ export async function runEval(config: EvalConfig, deps: EvalDeps): Promise<EvalS
   return finishSummary();
 }
 
-type CaseResult = { status: FinalRunStatus; errorCode?: string; fatal?: string };
+type CaseResult = {
+  status: FinalRunStatus;
+  errorCode?: string;
+  fatal?: string;
+  turnCount?: number;
+  endReason?: EvalEndReason;
+  /** Tylko do wypisu (BUILD): niepuste bloki po przebiegu; z bazy odtwarza to stan wariantu. */
+  blocksFilled?: number;
+};
 
 /** Liczniki propozycji agenta w jednym przypadku: odtwarzalne też z tabeli `Proposal` po `projectId` (patrz README). */
 type ProposalCounters = { accepted: number; notAccepted: number; reasons: Record<string, number> };
@@ -461,11 +495,13 @@ function mapOperationFailure(result: OperationResult): CaseResult | null {
   return { status: "INVALID", errorCode: `OP_${result.error}` };
 }
 
-async function acceptAllPending(ctx: CaseContext): Promise<void> {
+/** Akceptuje wszystkie oczekujące propozycje i zwraca, ile ich było (nowe propozycje zapisane w tej turze). */
+async function acceptAllPending(ctx: CaseContext): Promise<number> {
   const { db } = ctx.deps;
-  for (const proposalId of await db.listPendingProposalIds(ctx.projectId, ctx.variantId)) {
+  const pending = await db.listPendingProposalIds(ctx.projectId, ctx.variantId);
+  for (const proposalId of pending) {
     const variant = await db.getMainVariant(ctx.projectId);
-    if (!variant) return;
+    if (!variant) return pending.length;
     const result = await ctx.deps.acceptProposal({
       projectId: ctx.projectId,
       variantId: ctx.variantId,
@@ -482,6 +518,14 @@ async function acceptAllPending(ctx: CaseContext): Promise<void> {
       ctx.deps.log(`  Nie udało się zaakceptować propozycji (${reason}); liczona jako niezaakceptowana.`);
     }
   }
+  return pending.length;
+}
+
+/** Liczba niepustych bloków w stanie wariantu głównego (po akceptacji propozycji). */
+async function countFilledBlocks(ctx: CaseContext): Promise<number> {
+  const variant = await ctx.deps.db.getMainVariant(ctx.projectId);
+  if (!variant) return 0;
+  return BLOCK_KEYS.filter((key) => variant.state[key].length > 0).length;
 }
 
 /** Po operacji lub turze: sprawdza koszt (i turę). Zwraca wynik STOPPED, jeśli jest jeszcze praca do wykonania. */
@@ -521,25 +565,49 @@ async function executeCase(def: EvalCaseDefinition, ctx: CaseContext): Promise<C
 }
 
 async function executeBuild(def: BuildCase, ctx: CaseContext): Promise<CaseResult> {
-  for (const [index, message] of def.messages.entries()) {
+  const scripted = def.messages.length;
+  let turnCount = 0;
+  let emptyStreak = 0;
+  let blocksFilled = 0;
+  let endReason: EvalEndReason | null = null;
+
+  // Stałe wiadomości, potem stała kontynuacja. Od tury szóstej (ostatniej ze skryptu) po każdej turze sprawdzamy w tej kolejności:
+  // ALL_BLOCKS, NO_NEW_PROPOSALS (dwie kolejne tury bez nowych propozycji, liczone od tury szóstej), CONTINUATION_LIMIT.
+  for (let index = 0; endReason === null; index += 1) {
     if (ctx.deps.signal?.aborted) {
       const info = { code: "USER_ABORT", message: "Przerwano na żądanie użytkownika (Ctrl+C)." };
       ctx.setStop(info);
-      return stopped(info);
+      return { ...stopped(info), turnCount, blocksFilled };
     }
-    const failure = await chatTurn(ctx, message);
-    if (failure) return failure;
-    await acceptAllPending(ctx);
-    const hasMore = index < def.messages.length - 1 || ctx.config.judge;
+    turnCount += 1;
+    const failure = await chatTurn(ctx, index < scripted ? def.messages[index] : BUILD_CONTINUATION_MESSAGE);
+    if (failure) return { ...failure, turnCount, blocksFilled };
+    // Nowe propozycje to tylko zapisane (PENDING), nie odrzucone przez serwer.
+    const found = await acceptAllPending(ctx);
+    blocksFilled = await countFilledBlocks(ctx);
+
+    if (index >= scripted - 1) {
+      emptyStreak = found === 0 ? emptyStreak + 1 : 0;
+      const continuationsSent = index - (scripted - 1);
+      if (blocksFilled === BLOCK_KEYS.length) endReason = "ALL_BLOCKS";
+      else if (emptyStreak >= BUILD_EMPTY_TURNS_TO_STOP) endReason = "NO_NEW_PROPOSALS";
+      else if (continuationsSent >= BUILD_MAX_CONTINUATIONS) endReason = "CONTINUATION_LIMIT";
+    }
+
+    const hasMore = endReason === null || ctx.config.judge;
     const budgetStop = await checkBudget(ctx, true, hasMore);
-    if (budgetStop) return budgetStop;
+    if (budgetStop) return { ...budgetStop, turnCount, blocksFilled };
     if (ctx.getStop()) break;
+  }
+  if (endReason === null) {
+    // Seria zatrzymana (bezpiecznik albo Ctrl+C) po turze, więc przebieg nie ma powodu zakończenia.
+    return { status: "STOPPED", errorCode: ctx.getStop()?.code, turnCount, blocksFilled };
   }
   if (ctx.config.judge && !ctx.getStop()) {
     const failure = await runJudgeRounds(ctx);
-    if (failure) return failure;
+    if (failure) return { ...failure, turnCount, endReason, blocksFilled };
   }
-  return { status: "OK" };
+  return { status: "OK", turnCount, endReason, blocksFilled };
 }
 
 async function executeEval(ctx: CaseContext): Promise<CaseResult> {
@@ -551,34 +619,36 @@ async function executeEval(ctx: CaseContext): Promise<CaseResult> {
     abortSignal: ctx.deps.signal,
   });
   const failure = mapOperationFailure(evaluation);
-  if (failure) return failure;
+  if (failure) return { ...failure, turnCount: 0 };
   const budgetStop = await checkBudget(ctx, false, ctx.config.judge);
-  if (budgetStop) return budgetStop;
+  if (budgetStop) return { ...budgetStop, turnCount: 0 };
   if (ctx.config.judge && !ctx.getStop()) {
     const judgeFailure = await runJudgeRounds(ctx);
-    if (judgeFailure) return judgeFailure;
+    if (judgeFailure) return { ...judgeFailure, turnCount: 0 };
   }
-  return { status: "OK" };
+  return { status: "OK", turnCount: 0, endReason: "SCRIPT_DONE" };
 }
 
 async function executeChat(def: ChatCase, ctx: CaseContext): Promise<CaseResult> {
+  let turnCount = 0;
   for (const [index, turn] of def.turns.entries()) {
     if (ctx.deps.signal?.aborted) {
       const info = { code: "USER_ABORT", message: "Przerwano na żądanie użytkownika (Ctrl+C)." };
       ctx.setStop(info);
-      return stopped(info);
+      return { ...stopped(info), turnCount };
     }
     const hasMore = index < def.turns.length - 1;
     if (turn.type === "message") {
       // Scenariusze CHAT nie zatwierdzają propozycji (nie zmieniają stanu modelu), jak w PR „P”.
+      turnCount += 1;
       const failure = await chatTurn(ctx, turn.text);
-      if (failure) return failure;
+      if (failure) return { ...failure, turnCount };
       const budgetStop = await checkBudget(ctx, true, hasMore);
-      if (budgetStop) return budgetStop;
+      if (budgetStop) return { ...budgetStop, turnCount };
     } else {
       const pending = await ctx.deps.db.listPendingProposalIds(ctx.projectId, ctx.variantId);
       const proposalId = pending[pending.length - 1];
-      if (!proposalId) return { status: "FAILED", errorCode: "NO_PROPOSAL_FOR_IMPACT" };
+      if (!proposalId) return { status: "FAILED", errorCode: "NO_PROPOSAL_FOR_IMPACT", turnCount };
       // Odpowiednik kliknięcia „Analizuj wpływ” w interfejsie (S4); analizy agent nie widzi.
       const impact = await ctx.deps.runImpact({
         projectId: ctx.projectId,
@@ -589,13 +659,13 @@ async function executeChat(def: ChatCase, ctx: CaseContext): Promise<CaseResult>
         abortSignal: ctx.deps.signal,
       });
       const failure = mapOperationFailure(impact);
-      if (failure) return failure;
+      if (failure) return { ...failure, turnCount };
       const budgetStop = await checkBudget(ctx, false, hasMore);
-      if (budgetStop) return budgetStop;
+      if (budgetStop) return { ...budgetStop, turnCount };
     }
     if (ctx.getStop()) break;
   }
-  return { status: "OK" };
+  return { status: "OK", turnCount, endReason: "SCRIPT_DONE" };
 }
 
 async function dryRun(
@@ -635,9 +705,7 @@ async function dryRun(
     log(`Limity wyjścia: ${limits.maxOutputTokens} (czat), ${limits.maxOutputTokensLong} (długie); kroków na turę: ${limits.maxSteps}`);
     log(`Powtórzenia: ${config.repetitions}; przypadki: ${config.caseIds.join(", ")}`);
 
-    let totalTurns = 0;
-    let totalCalls = 0;
-    let totalCost: number | null = 0;
+    const total = { turnsMin: 0, turnsMax: 0, callsMin: 0, callsMax: 0, costMin: 0 as number | null, costMax: 0 as number | null };
     for (const unit of units) {
       if (isUnitDone(unit, existing, config.retryInvalid)) {
         summary.skipped += unit.cases.length;
@@ -645,25 +713,37 @@ async function dryRun(
         continue;
       }
       const retry = unit.cases.some((def) => latestRun(existing, def.id, unit.model, unit.repetition));
-      let turns = 0;
-      let calls = 0;
-      let cost: number | null = 0;
+      // Zakres: najkrócej (bez kontynuacji BUILD) i najdłużej (wszystkie kontynuacje).
+      const unitMin = { turns: 0, calls: 0, cost: 0 as number | null };
+      const unitMax = { turns: 0, calls: 0, cost: 0 as number | null };
       for (const def of unit.cases) {
-        const estimate = estimateRun(def, unit.model, { judge: config.judge, judgeModel });
-        turns += estimate.turns;
-        calls += estimate.calls;
-        cost = cost === null || estimate.costUsd === null ? null : cost + estimate.costUsd;
+        for (const [bucket, continuations] of [[unitMin, 0], [unitMax, def.kind === "BUILD" ? BUILD_MAX_CONTINUATIONS : 0]] as const) {
+          const estimate = estimateRun(def, unit.model, { judge: config.judge, judgeModel, continuations });
+          bucket.turns += estimate.turns;
+          bucket.calls += estimate.calls;
+          bucket.cost = bucket.cost === null || estimate.costUsd === null ? null : bucket.cost + estimate.costUsd;
+        }
       }
-      totalTurns += turns;
-      totalCalls += calls;
-      totalCost = totalCost === null || cost === null ? null : totalCost + cost;
-      log(`  ${describeUnit(unit)}${retry ? " (powtórka kolejnej próby)" : ""}: tury ${turns}, wywołań ok. ${calls}, koszt ok. ${cost === null ? "nieznany (brak ceny)" : `${cost.toFixed(4)} USD`}`);
+      total.turnsMin += unitMin.turns;
+      total.turnsMax += unitMax.turns;
+      total.callsMin += unitMin.calls;
+      total.callsMax += unitMax.calls;
+      total.costMin = total.costMin === null || unitMin.cost === null ? null : total.costMin + unitMin.cost;
+      total.costMax = total.costMax === null || unitMax.cost === null ? null : total.costMax + unitMax.cost;
+      log(
+        `  ${describeUnit(unit)}${retry ? " (powtórka kolejnej próby)" : ""}: ${formatRange(unitMin.turns, unitMax.turns, "tury")}, ${formatRange(unitMin.calls, unitMax.calls, "wywołań ok.")}, koszt ok. ${formatCostRange(unitMin.cost, unitMax.cost)}`,
+      );
     }
-    log(`Razem: tury ${totalTurns}, wywołań ok. ${totalCalls}, szacowany koszt ${totalCost === null ? "nieznany" : `${totalCost.toFixed(4)} USD`} (szacunek niezmierzony, rozrzut ±50%).`);
+    log(
+      `Razem: ${formatRange(total.turnsMin, total.turnsMax, "tury")}, ${formatRange(total.callsMin, total.callsMax, "wywołań ok.")}, szacowany koszt ${formatCostRange(total.costMin, total.costMax)} (szacunek niezmierzony, rozrzut ±50%; górna granica zakłada wszystkie kontynuacje BUILD).`,
+    );
+    if (config.maxTurns !== undefined && config.maxTurns < total.turnsMax) {
+      log(`OSTRZEŻENIE: --max-tur ${config.maxTurns} jest mniejszy niż najdłuższy możliwy przebieg (${total.turnsMax} tur): przebieg może zostać przerwany (TURN_LIMIT).`);
+    }
     if (config.maxCostUsd !== undefined || config.maxTurns !== undefined) {
       log(`Bezpieczniki (tylko informacyjnie na sucho): --max-koszt-usd ${config.maxCostUsd ?? "-"}, --max-tur ${config.maxTurns ?? "-"}.`);
     }
-    summary.turns = totalTurns;
+    summary.turns = total.turnsMin;
     return summary;
   }
 }

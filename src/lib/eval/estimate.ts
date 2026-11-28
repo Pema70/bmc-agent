@@ -28,7 +28,11 @@ function tokensCost(key: string, inputTokens: number, outputTokens: number): num
  * Szacunek jednego przebiegu przypadku: liczba tur czatu, liczba wywołań modelu i koszt w USD (null, gdy cennik nie zna
  * modelu generującego albo sędziego). Sędzia: 3 sądy na gotowy model (BUILD i EVAL), jeśli `judge`.
  */
-export function estimateRun(definition: EvalCaseDefinition, model: string, options: { judge: boolean; judgeModel?: string }): RunEstimate {
+export function estimateRun(
+  definition: EvalCaseDefinition,
+  model: string,
+  options: { judge: boolean; judgeModel?: string; /** Kontynuacje BUILD wliczone do szacunku (0 = najkrótszy, `BUILD_MAX_CONTINUATIONS` = najdłuższy przebieg). */ continuations?: number },
+): RunEstimate {
   const a = ESTIMATE_ASSUMPTIONS;
   const chatKey = `google/${model}`;
   let turns = 0;
@@ -40,7 +44,7 @@ export function estimateRun(definition: EvalCaseDefinition, model: string, optio
   };
 
   if (definition.kind === "BUILD") {
-    turns = definition.messages.length;
+    turns = definition.messages.length + (options.continuations ?? 0);
   } else if (definition.kind === "CHAT") {
     turns = definition.turns.filter((t) => t.type === "message").length;
   }

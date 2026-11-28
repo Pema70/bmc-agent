@@ -2,6 +2,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/client";
 import { MAIN_VARIANT_NAME } from "@/lib/db/variants";
 import type { CostReading } from "@/lib/eval/budget";
+import { EvalEndReason } from "@/lib/eval/cases";
+import { BmcState } from "@/lib/schemas/bmc";
 import type { EvalDb, ExistingRun, NewRunData } from "@/lib/eval/run-eval";
 
 /**
@@ -67,7 +69,14 @@ export function createEvalDb(client: typeof prisma = prisma): EvalDb {
     async finishRun(id, result) {
       await client.evalRun.update({
         where: { id },
-        data: { status: result.status, errorCode: result.errorCode ?? null, finishedAt: new Date() },
+        data: {
+          status: result.status,
+          errorCode: result.errorCode ?? null,
+          turnCount: result.turnCount ?? null,
+          // Walidacja Zod: kolumna jest tekstem, więc wartość spoza listy nie trafi do bazy.
+          endReason: EvalEndReason.nullish().parse(result.endReason) ?? null,
+          finishedAt: new Date(),
+        },
       });
     },
 
@@ -83,7 +92,16 @@ export function createEvalDb(client: typeof prisma = prisma): EvalDb {
     },
 
     async getMainVariant(projectId) {
-      return client.bmcVariant.findFirst({ where: { projectId, isMain: true }, select: { id: true, version: true } });
+      const row = await client.bmcVariant.findFirst({
+        where: { projectId, isMain: true },
+        select: { id: true, version: true, state: true },
+      });
+      if (!row) return null;
+      const state = BmcState.safeParse(row.state);
+      if (!state.success) {
+        throw new Error(`Niepoprawny stan BMC w wariancie ${row.id}.`);
+      }
+      return { id: row.id, version: row.version, state: state.data };
     },
 
     async listPendingProposalIds(projectId, variantId) {

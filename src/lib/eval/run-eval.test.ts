@@ -12,7 +12,7 @@ vi.mock("@/lib/eval/cases", async (importOriginal) => {
 import type { ChatTurn, RunChatTurnResult, ChatTurnResult } from "@/lib/ai/chat-agent";
 import type { EvalConfig } from "@/lib/eval/args";
 import type { CostReading } from "@/lib/eval/budget";
-import { BUILD_CASES, getCase } from "@/lib/eval/cases";
+import { BUILD_CASES, BUILD_CONTINUATION_MESSAGE, getCase } from "@/lib/eval/cases";
 import {
   runEval,
   type EvalDb,
@@ -21,7 +21,7 @@ import {
   type FinalRunStatus,
   type NewRunData,
 } from "@/lib/eval/run-eval";
-import { emptyBmcState } from "@/lib/schemas/bmc";
+import { BLOCK_KEYS, emptyBmcState, type BmcState } from "@/lib/schemas/bmc";
 import { SEED_COMPANIES } from "@/lib/seed/companies";
 
 const MODEL = "gemini-3.5-flash-lite";
@@ -31,11 +31,13 @@ class FakeDb implements EvalDb {
   readonly writes: string[] = [];
   readonly projects: { name: string; description: string; state: unknown; entryOrigins: unknown[] }[] = [];
   readonly runs: NewRunData[] = [];
-  readonly finished: { id: string; status: FinalRunStatus; errorCode: string | null }[] = [];
+  readonly finished: { id: string; status: FinalRunStatus; errorCode: string | null; turnCount: number | null; endReason: string | null }[] = [];
   existing: ExistingRun[] = [];
   pending: string[] = [];
   costFn: () => CostReading = () => ({ totalUsd: 0, unknownCalls: 0 });
   stale = 0;
+  // Liczba niepustych bloków w stanie wariantu głównego (domyślnie komplet, więc BUILD kończy się po 6 turach: ALL_BLOCKS).
+  filled = 9;
   userId: string | null = "u1";
   private nextId = 0;
 
@@ -60,15 +62,28 @@ class FakeDb implements EvalDb {
     this.runs.push(data);
     return { id: `r${this.runs.length}` };
   }
-  async finishRun(id: string, result: { status: FinalRunStatus; errorCode?: string | null }) {
+  async finishRun(
+    id: string,
+    result: { status: FinalRunStatus; errorCode?: string | null; turnCount?: number | null; endReason?: string | null },
+  ) {
     this.writes.push("finishRun");
-    this.finished.push({ id, status: result.status, errorCode: result.errorCode ?? null });
+    this.finished.push({
+      id,
+      status: result.status,
+      errorCode: result.errorCode ?? null,
+      turnCount: result.turnCount ?? null,
+      endReason: result.endReason ?? null,
+    });
   }
   async readCost() {
     return this.costFn();
   }
   async getMainVariant() {
-    return { id: "v1", version: 3 };
+    const state: BmcState = emptyBmcState();
+    BLOCK_KEYS.slice(0, this.filled).forEach((key) => {
+      state[key] = ["wpis"];
+    });
+    return { id: "v1", version: 3, state };
   }
   async listPendingProposalIds() {
     return this.pending.splice(0);
@@ -167,7 +182,9 @@ describe("runEval: tryb na sucho", () => {
     expect(output).toContain("Limity wyjścia: 2000");
     expect(output).toContain("BUILD-01");
     expect(output).toContain("CHAT-S3+CHAT-S5");
-    expect(output).toMatch(/Razem: tury \d+, wywołań ok\. \d+, szacowany koszt [\d.]+ USD/);
+    expect(output).toMatch(/Razem: tury \d+( do \d+)?, wywołań ok\. \d+( do \d+)?, szacowany koszt [\d.]+( do [\d.]+)? USD/);
+    expect(output).toContain("BUILD-01 · gemini-3.5-flash-lite · p1: tury 6 do 14");
+    expect(output).toContain("CHAT-S3+CHAT-S5 · gemini-3.5-flash-lite · p1: tury 3,");
     expect(output).not.toContain(EMAIL);
   });
 
@@ -280,7 +297,7 @@ describe("runEval: przypadek BUILD", () => {
       maxOutputTokens: 8000, costLimitUsd: 0.5, turnLimit: 20, projectId: "p1",
     });
     expect(db.runs[0].casesChecksum).toMatch(/^[0-9a-f]{64}$/);
-    expect(db.finished).toEqual([{ id: "r1", status: "OK", errorCode: null }]);
+    expect(db.finished).toEqual([{ id: "r1", status: "OK", errorCode: null, turnCount: 6, endReason: "ALL_BLOCKS" }]);
     // Konfiguracja tylko w procesie skryptu: model, limity wyjścia i limity użytkownika.
     expect(deps.env).toMatchObject({ LLM_PROVIDER: "google", LLM_MODEL: MODEL, LLM_MAX_OUTPUT_TOKENS: "8000", CHAT_MAX_REQUESTS_PER_HOUR: "10000", CHAT_MAX_TOKENS_PER_DAY: "100000000" });
   });
@@ -342,6 +359,172 @@ describe("runEval: przypadek BUILD", () => {
     ]);
     expect(spies.sleep).toHaveBeenCalledWith(250);
     expect(spies.sleep).toHaveBeenCalledTimes(8);
+  });
+});
+
+describe("runEval: protokół kontynuacji BUILD", () => {
+  /** Skrypt scenariusza: czy tura `t` (od 1) dodaje nową propozycję PENDING i ile bloków jest wypełnionych po niej. */
+  function scenario(
+    spies: ReturnType<typeof makeDeps>["spies"],
+    db: FakeDb,
+    spec: { found: (turn: number) => boolean; filled: (turn: number) => number },
+  ) {
+    const sent: string[] = [];
+    let turn = 0;
+    spies.prepareTurn.mockImplementation(async (input) => {
+      turn += 1;
+      sent.push(input.message);
+      if (spec.found(turn)) db.pending.push(`p${turn}`);
+      db.filled = spec.filled(turn);
+      return { ok: true as const, turn: {} as ChatTurn };
+    });
+    return sent;
+  }
+
+  const continuations = (sent: string[]) => sent.slice(6);
+
+  it("po 6 wiadomościach wysyła stałą kontynuację aż do wypełnienia 9 bloków: ALL_BLOCKS", async () => {
+    const { deps, db, spies } = makeDeps();
+    const sent = scenario(spies, db, { found: () => true, filled: (t) => Math.min(t, 9) });
+
+    const summary = await runEval(config(), deps);
+
+    expect(sent).toHaveLength(9);
+    expect(sent.slice(0, 6)).toEqual(BUILD_CASES[0].messages);
+    expect(continuations(sent)).toEqual([BUILD_CONTINUATION_MESSAGE, BUILD_CONTINUATION_MESSAGE, BUILD_CONTINUATION_MESSAGE]);
+    expect(db.finished[0]).toMatchObject({ status: "OK", turnCount: 9, endReason: "ALL_BLOCKS" });
+    expect(summary.turns).toBe(9);
+  });
+
+  it("komplet 9 bloków już po turze 6: bez kontynuacji, ALL_BLOCKS", async () => {
+    const { deps, db, spies } = makeDeps();
+    const sent = scenario(spies, db, { found: () => true, filled: () => 9 });
+
+    await runEval(config(), deps);
+
+    expect(sent).toHaveLength(6);
+    expect(db.finished[0]).toMatchObject({ turnCount: 6, endReason: "ALL_BLOCKS" });
+  });
+
+  it("jedna tura bez nowych propozycji nie kończy przebiegu, dwie kolejne tak: NO_NEW_PROPOSALS", async () => {
+    const { deps, db, spies } = makeDeps();
+    // Pusta tura 6, nowa propozycja w turze 7 (licznik pustych tur się zeruje), puste tury 8 i 9.
+    const sent = scenario(spies, db, { found: (t) => ![6, 8, 9].includes(t), filled: () => 3 });
+
+    await runEval(config(), deps);
+
+    expect(sent).toHaveLength(9);
+    expect(db.finished[0]).toMatchObject({ status: "OK", turnCount: 9, endReason: "NO_NEW_PROPOSALS" });
+  });
+
+  it("dwie puste tury od szóstej kończą przebieg po turze 7", async () => {
+    const { deps, db, spies } = makeDeps();
+    const sent = scenario(spies, db, { found: (t) => t < 6, filled: () => 5 });
+
+    await runEval(config(), deps);
+
+    expect(sent).toHaveLength(7);
+    expect(sent[6]).toBe(BUILD_CONTINUATION_MESSAGE);
+    expect(db.finished[0]).toMatchObject({ turnCount: 7, endReason: "NO_NEW_PROPOSALS" });
+  });
+
+  it("puste tury przed turą szóstą nie liczą się do zatrzymania; bez końca kontynuacji: CONTINUATION_LIMIT po 8 kontynuacjach", async () => {
+    const { deps, db, spies } = makeDeps();
+    const sent = scenario(spies, db, { found: (t) => t !== 4 && t !== 5, filled: () => 6 });
+
+    await runEval(config(), deps);
+
+    expect(sent).toHaveLength(14);
+    expect(continuations(sent)).toHaveLength(8);
+    expect(db.finished[0]).toMatchObject({ status: "OK", turnCount: 14, endReason: "CONTINUATION_LIMIT" });
+  });
+
+  it("kolejność sprawdzania: ALL_BLOCKS przed NO_NEW_PROPOSALS", async () => {
+    const { deps, db, spies } = makeDeps();
+    // Po turze 7 jednocześnie komplet bloków i dwie puste tury z rzędu.
+    scenario(spies, db, { found: (t) => t < 6, filled: (t) => (t >= 7 ? 9 : 5) });
+
+    await runEval(config(), deps);
+
+    expect(db.finished[0]).toMatchObject({ turnCount: 7, endReason: "ALL_BLOCKS" });
+  });
+
+  it("kolejność sprawdzania: NO_NEW_PROPOSALS przed CONTINUATION_LIMIT (tura 14 jest drugą pustą)", async () => {
+    const { deps, db, spies } = makeDeps();
+    scenario(spies, db, { found: (t) => t < 13, filled: () => 6 });
+
+    await runEval(config(), deps);
+
+    expect(db.finished[0]).toMatchObject({ turnCount: 14, endReason: "NO_NEW_PROPOSALS" });
+  });
+
+  it("nowe propozycje to tylko zapisane (PENDING): odrzucone przez serwer nie istnieją na liście, więc tura bez zapisu jest pusta", async () => {
+    const { deps, db, spies } = makeDeps();
+    const sent = scenario(spies, db, { found: () => false, filled: () => 2 });
+
+    await runEval(config(), deps);
+
+    expect(sent).toHaveLength(7);
+    expect(spies.acceptProposal).not.toHaveBeenCalled();
+    expect(db.finished[0]).toMatchObject({ endReason: "NO_NEW_PROPOSALS" });
+  });
+
+  it("kontynuacje liczą się do --max-tur: STOPPED / TURN_LIMIT z liczbą tur i bez powodu zakończenia", async () => {
+    const { deps, db, spies } = makeDeps();
+    const sent = scenario(spies, db, { found: () => true, filled: () => 4 });
+
+    const summary = await runEval(config({ maxTurns: 8 }), deps);
+
+    expect(sent).toHaveLength(8);
+    expect(summary).toMatchObject({ outcome: "STOPPED", stopCode: "TURN_LIMIT", turns: 8 });
+    expect(db.finished[0]).toMatchObject({ status: "STOPPED", errorCode: "TURN_LIMIT", turnCount: 8, endReason: null });
+  });
+
+  it("sędzia ocenia dopiero po kontynuacjach", async () => {
+    const { deps, db, spies } = makeDeps();
+    const order: string[] = [];
+    scenario(spies, db, { found: () => true, filled: (t) => Math.min(t, 9) });
+    const base = spies.prepareTurn.getMockImplementation();
+    spies.prepareTurn.mockImplementation(async (input) => {
+      order.push("tura");
+      return (base as NonNullable<typeof base>)(input);
+    });
+    spies.runJudge.mockImplementation(async () => {
+      order.push("sedzia");
+      return { ok: true as const, evaluation: {} as never };
+    });
+
+    await runEval(config({ judge: true }), deps);
+
+    expect(order).toEqual([...Array<string>(9).fill("tura"), "sedzia", "sedzia", "sedzia"]);
+  });
+
+  it("w wypisie: liczba tur ze skryptu i kontynuacji, powód zakończenia i wypełnione bloki", async () => {
+    const { deps, db, logs, spies } = makeDeps();
+    scenario(spies, db, { found: () => true, filled: (t) => Math.min(t, 9) });
+
+    await runEval(config(), deps);
+
+    expect(logs.join("\n")).toContain("tury: 9 (6 ze skryptu + 3 kontynuacji), powód zakończenia: ALL_BLOCKS, wypełnione bloki: 9/9");
+  });
+
+  it("CHAT i EVAL: SCRIPT_DONE i liczba tur (CHAT-S1: 5, EVAL: 0); bez kontynuacji", async () => {
+    const { deps, db, spies } = makeDeps();
+
+    await runEval(config({ caseIds: ["CHAT-S1", "EVAL-01"] }), deps);
+
+    expect(db.finished[0]).toMatchObject({ status: "OK", turnCount: 5, endReason: "SCRIPT_DONE" });
+    expect(db.finished[1]).toMatchObject({ status: "OK", turnCount: 0, endReason: "SCRIPT_DONE" });
+    expect(spies.prepareTurn).toHaveBeenCalledTimes(5);
+    expect(spies.prepareTurn).not.toHaveBeenCalledWith(expect.objectContaining({ message: BUILD_CONTINUATION_MESSAGE }));
+  });
+
+  it("tryb na sucho ostrzega, gdy --max-tur jest mniejszy niż najdłuższy możliwy przebieg (14 tur dla BUILD)", async () => {
+    const { deps, logs } = makeDeps();
+
+    await runEval(config({ execute: false, maxTurns: 8 }), deps);
+
+    expect(logs.join("\n")).toContain("OSTRZEŻENIE: --max-tur 8 jest mniejszy niż najdłuższy możliwy przebieg (14 tur)");
   });
 });
 

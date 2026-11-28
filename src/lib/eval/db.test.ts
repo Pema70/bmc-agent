@@ -86,6 +86,40 @@ describe("createEvalDb", () => {
     expect(mocks.evalRunCreate.mock.calls[0][0].data).toMatchObject({ status: "RUNNING", architecture: "SINGLE", attempt: 1 });
   });
 
+  it("finishRun zapisuje turnCount i endReason (walidacja Zod: powód spoza listy nie trafia do bazy)", async () => {
+    mocks.evalRunUpdate.mockResolvedValue({});
+    const db = createEvalDb();
+
+    await db.finishRun("r1", { status: "OK", turnCount: 9, endReason: "ALL_BLOCKS" });
+    expect(mocks.evalRunUpdate).toHaveBeenCalledWith({
+      where: { id: "r1" },
+      data: expect.objectContaining({ status: "OK", errorCode: null, turnCount: 9, endReason: "ALL_BLOCKS" }),
+    });
+
+    await db.finishRun("r2", { status: "STOPPED", errorCode: "TURN_LIMIT" });
+    expect(mocks.evalRunUpdate).toHaveBeenLastCalledWith({
+      where: { id: "r2" },
+      data: expect.objectContaining({ turnCount: null, endReason: null }),
+    });
+
+    mocks.evalRunUpdate.mockClear();
+    await expect(db.finishRun("r3", { status: "OK", endReason: "COS_INNEGO" as never })).rejects.toThrow();
+    expect(mocks.evalRunUpdate).not.toHaveBeenCalled();
+  });
+
+  it("getMainVariant zwraca stan wariantu (do liczenia wypełnionych bloków), a uszkodzony stan to jawny błąd", async () => {
+    mocks.variantFindFirst.mockResolvedValueOnce({ id: "v1", version: 4, state: { ...emptyBmcState(), channels: ["Sklep"] } });
+    const variant = await createEvalDb().getMainVariant("p1");
+    expect(variant).toMatchObject({ id: "v1", version: 4 });
+    expect(variant?.state.channels).toEqual(["Sklep"]);
+
+    mocks.variantFindFirst.mockResolvedValueOnce({ id: "v2", version: 1, state: { bzdura: true } });
+    await expect(createEvalDb().getMainVariant("p1")).rejects.toThrow("Niepoprawny stan BMC");
+
+    mocks.variantFindFirst.mockResolvedValueOnce(null);
+    expect(await createEvalDb().getMainVariant("p1")).toBeNull();
+  });
+
   it("listPendingProposalIds: tylko PENDING z wariantu projektu, od najstarszej", async () => {
     mocks.proposalFindMany.mockResolvedValue([{ id: "a" }, { id: "b" }]);
 

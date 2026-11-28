@@ -48,6 +48,16 @@ describe("estimateRun", () => {
     expect(withJudge.costUsd).toBeGreaterThan(plain.costUsd ?? 0);
   });
 
+  it("BUILD: kontynuacje wydłużają szacunek o kolejne tury (zakres 6 do 14 tur)", () => {
+    const build = getCase("BUILD-01");
+    if (!build) throw new Error("brak przypadku");
+    const shortest = estimateRun(build, "gemini-3.5-flash-lite", { judge: false });
+    const longest = estimateRun(build, "gemini-3.5-flash-lite", { judge: false, continuations: 8 });
+    expect(shortest.turns).toBe(6);
+    expect(longest.turns).toBe(14);
+    expect((longest.costUsd ?? 0) / (shortest.costUsd ?? 1)).toBeCloseTo(14 / 6, 5);
+  });
+
   it("nieznany model albo sędzia bez ceny daje koszt null (nie zgadujemy)", () => {
     const build = getCase("BUILD-01");
     if (!build) throw new Error("brak przypadku");

@@ -11,6 +11,20 @@ import { SEED_COMPANIES } from "@/lib/seed/companies";
 export const SeedKey = z.enum(["netflix", "airbnb", "spotify", "blockbuster", "quibi", "juicero", "kawiarnia-ziarno"]);
 export type SeedKey = z.infer<typeof SeedKey>;
 
+/**
+ * Protokół kontynuacji BUILD (plan 10f, punkt 22). Agent `chat-v6` prowadzi wywiad blok po bloku, więc po stałych
+ * wiadomościach skrypt wysyła tę samą kontynuację (nie odpowiada na pytania agenta), aż do: wypełnienia 9 bloków
+ * (`ALL_BLOCKS`), dwóch kolejnych tur bez nowych propozycji zapisanych jako `PENDING` (`NO_NEW_PROPOSALS`, liczone od tury
+ * szóstej) albo wykorzystania `BUILD_MAX_CONTINUATIONS` kontynuacji (`CONTINUATION_LIMIT`). Kolejność sprawdzania jest taka.
+ */
+export const BUILD_CONTINUATION_MESSAGE = "Tak, zaproponuj kolejne wpisy na podstawie tego, co już napisałem.";
+export const BUILD_MAX_CONTINUATIONS = 8;
+export const BUILD_EMPTY_TURNS_TO_STOP = 2;
+
+/** Powód zakończenia przebiegu (kolumna `EvalRun.endReason`, tekst walidowany tym schematem). */
+export const EvalEndReason = z.enum(["SCRIPT_DONE", "ALL_BLOCKS", "NO_NEW_PROPOSALS", "CONTINUATION_LIMIT"]);
+export type EvalEndReason = z.infer<typeof EvalEndReason>;
+
 /** Ostatnia wiadomość skryptu każdego przypadku BUILD (jak ostatnia wiadomość S1 w PR „P”). */
 export const BUILD_FINAL_MESSAGE = "Zaproponuj wpisy do wszystkich bloków na podstawie tego, co napisałem.";
 
@@ -323,7 +337,7 @@ export const ALL_CASES: readonly EvalCaseDefinition[] = [...BUILD_CASES, ...EVAL
  * przypadkach albo w stanie firm z seeda użytych w EVAL i fixture'ach CHAT zmienia `casesChecksum()` i wymaga świadomej
  * decyzji właściciela, nowej serii pomiarów i wpisania tu nowej wartości. `null` oznacza zestaw niezamrożony.
  */
-export const FROZEN_CASES_CHECKSUM: string | null = "89a97464ee8579a1116791913c2241204386ea613437922d51705171928af083";
+export const FROZEN_CASES_CHECKSUM: string | null = "13cb193d098958ce1a7ab4b22e36760fda0214104f07731ea0e7c4e98e3dd831";
 
 export type CasesFreezeCheck =
   | { frozen: true }
@@ -405,6 +419,11 @@ export function casesChecksum(): string {
     build: BUILD_CASES,
     eval: EVAL_CASES,
     chat: CHAT_CASES,
+    buildProtocol: {
+      continuationMessage: BUILD_CONTINUATION_MESSAGE,
+      maxContinuations: BUILD_MAX_CONTINUATIONS,
+      emptyTurnsToStop: BUILD_EMPTY_TURNS_TO_STOP,
+    },
     seeds: [...seedKeys].sort().map(seedFor),
   };
   return createHash("sha256").update(canonicalJson(payload), "utf8").digest("hex");

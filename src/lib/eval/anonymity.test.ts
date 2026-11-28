@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { findForbiddenTokens, normalizeForMatch } from "@/lib/eval/anonymity";
-import { ALL_CASES, BUILD_CASES, forbiddenTokens } from "@/lib/eval/cases";
+import { ALL_CASES, BUILD_CASES, BUILD_CONTINUATION_MESSAGE, forbiddenTokens } from "@/lib/eval/cases";
 import { EVAL_PROJECT_DESCRIPTION, buildEvalProjectName, isValidSeriesId } from "@/lib/eval/naming";
 
 // Wszystkie zakazane tokeny wszystkich przypadków BUILD naraz: nazwa projektu i opis nie mogą zdradzać żadnej firmy.
@@ -31,6 +31,13 @@ describe("anonimizacja przypadków BUILD", () => {
       expect(own.length).toBeGreaterThan(0);
     });
   }
+});
+
+describe("anonimizacja protokołu kontynuacji", () => {
+  it("stała kontynuacja nie zawiera żadnego zakazanego tokenu ani etykiety firmy", () => {
+    expect(findForbiddenTokens(BUILD_CONTINUATION_MESSAGE, ALL_TOKENS)).toEqual([]);
+    expect(BUILD_CONTINUATION_MESSAGE).not.toMatch(/\bFirma [A-Z]\b/);
+  });
 });
 
 describe("anonimizacja projektów pomiarowych (nazwa i opis widoczne dla czatu i evaluate-v1)", () => {

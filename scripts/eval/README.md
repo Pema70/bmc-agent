@@ -16,8 +16,10 @@ zostałyby pominięte lub powtórzone. Nie woła modelu i nie zapisuje do bazy (
 Prawdziwy przebieg wymaga `--wykonaj` oraz jawnych bezpieczników (bez wartości domyślnych):
 
 ```powershell
-npm run eval -- --serie PILOT-1 --przypadki BUILD-01 --modele gemini-3.5-flash-lite --wykonaj --max-koszt-usd 0.10 --max-tur 8
+npm run eval -- --serie PILOT-1 --przypadki BUILD-01 --modele gemini-3.5-flash-lite --wykonaj --max-koszt-usd 0.15 --max-tur 15
 ```
+
+Przypadek `BUILD` trwa od 6 do 14 tur (6 stałych wiadomości i do 8 kontynuacji), więc `--max-tur` dla pojedynczego BUILD ustaw na co najmniej 15, a tryb na sucho ostrzeże, gdy limit jest za niski.
 
 Zmienne środowiskowe trafiają do procesu przez `node --env-file=.env` w skrypcie `eval` z `package.json`; sam skrypt niczego nie czyta z
 pliku. Bez `npm`: `node --env-file=.env scripts/eval/run.mjs <argumenty>`. Sprawdzenie, że importy działają poza Next.js (bez `.env`,
@@ -39,7 +41,7 @@ pomiarowe) oraz, z `--sedzia`, `JUDGE_PROVIDER`, `JUDGE_MODEL` i `ANTHROPIC_API_
 | `--przerwa-ms N` | przerwa między przebiegami |
 | `--powtorz-niewazne` | powtarza przebiegi `INVALID` jako kolejną próbę |
 | `--wykonaj` | prawdziwy przebieg (wymaga `--max-koszt-usd` i `--max-tur`) |
-| `--max-koszt-usd X`, `--max-tur N` | bezpieczniki bieżącego uruchomienia |
+| `--max-koszt-usd X`, `--max-tur N` | bezpieczniki bieżącego uruchomienia (kontynuacje BUILD liczą się do `--max-tur`) |
 
 Nie ma `providerOptions` ani ustawień „thinking” (decyzja zapada w 10g).
 

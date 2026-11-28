@@ -4,7 +4,11 @@ import { SEED_COMPANIES } from "@/lib/seed/companies";
 import {
   ALL_CASES,
   BUILD_CASES,
+  BUILD_CONTINUATION_MESSAGE,
+  BUILD_EMPTY_TURNS_TO_STOP,
   BUILD_FINAL_MESSAGE,
+  BUILD_MAX_CONTINUATIONS,
+  EvalEndReason,
   CHAT_CASES,
   EVAL_CASES,
   MINIMAL_BUILD_CASE_IDS,
@@ -70,6 +74,14 @@ describe("zestaw przypadków ewaluacji", () => {
     }
     expect(casesChecksum()).toBe(before);
     expect(casesChecksum()).toBe(FROZEN_CASES_CHECKSUM);
+  });
+
+  it("protokół kontynuacji: stała wiadomość, 8 kontynuacji, zatrzymanie po 2 pustych turach, cztery powody zakończenia", () => {
+    expect(BUILD_CONTINUATION_MESSAGE).toBe("Tak, zaproponuj kolejne wpisy na podstawie tego, co już napisałem.");
+    expect(BUILD_MAX_CONTINUATIONS).toBe(8);
+    expect(BUILD_EMPTY_TURNS_TO_STOP).toBe(2);
+    expect(EvalEndReason.options).toEqual(["SCRIPT_DONE", "ALL_BLOCKS", "NO_NEW_PROPOSALS", "CONTINUATION_LIMIT"]);
+    expect(EvalEndReason.safeParse("COS_INNEGO").success).toBe(false);
   });
 
   it("wariant minimalny BUILD: Kawiarnia Ziarno, Spotify, Quibi, Airbnb", () => {
