@@ -92,6 +92,27 @@ enum Role {
   VIEWER
 }
 
+// Przebiegi skryptu ewaluacji (krok 10, PR 10f). Tokeny, czas i koszt nie są tu kopiowane: liczone z LlmCallLog po projectId.
+enum EvalKind {
+  BUILD
+  EVAL
+  CHAT
+}
+
+// Pole gotowe dla kroku 11 (orkiestracja wielu agentów); w kroku 10 zawsze SINGLE.
+enum EvalArchitecture {
+  SINGLE
+  MULTI
+}
+
+enum EvalRunStatus {
+  RUNNING
+  OK
+  FAILED
+  INVALID
+  STOPPED
+}
+
 model User {
   id                  String               @id @default(cuid())
   email               String               @unique
@@ -129,6 +150,7 @@ model Project {
   variantComparisons  VariantComparison[]
   attachments         Attachment[]
   refinementRounds    RefinementRound[]
+  evalRuns            EvalRun[]
 }
 
 model ProjectMember {
@@ -420,4 +442,35 @@ model VariantComparison {
   createdBy     User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([projectId, createdAt])
+}
+
+// Jeden przebieg przypadku ewaluacji (jeden model, jedno powtórzenie, jedna próba). Wznowienie nie nadpisuje wiersza:
+// tworzy nowy z attempt + 1 i nowym projektem pomiarowym; stary zostaje jako historia razem ze swoim projectId.
+model EvalRun {
+  id                  String           @id @default(cuid())
+  seriesId            String
+  caseId              String
+  kind                EvalKind
+  repetition          Int
+  attempt             Int              @default(1)
+  architecture        EvalArchitecture @default(SINGLE)
+  provider            String
+  model               String
+  judgeModel          String?
+  chatPromptVersion   String
+  casesChecksum       String
+  maxOutputTokens     Int
+  maxOutputTokensLong Int
+  costLimitUsd        Decimal          @db.Decimal(12, 6)
+  turnLimit           Int
+  projectId           String?
+  status              EvalRunStatus
+  errorCode           String?
+  startedAt           DateTime         @default(now())
+  finishedAt          DateTime?
+  project             Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  @@unique([seriesId, caseId, model, repetition, architecture, attempt])
+  @@index([seriesId, caseId])
+  @@index([projectId])
 }
