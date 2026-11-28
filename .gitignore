@@ -47,6 +47,9 @@ next-env.d.ts
 # magazyn plików załączników na dev (ATTACHMENTS_DIR)
 /.data/
 
+# wyniki skryptu ewaluacji (eksport CSV, krok 10, PR 10f)
+/eval-wyniki/
+
 # opisy PR i pomocnicze diffy w katalogu glownym (nowe opisy zapisujemy poza repozytorium)
 /pr-*-body.md
 /schema-diff.txt
