@@ -461,6 +461,7 @@ model EvalRun {
   casesChecksum       String
   maxOutputTokens     Int
   maxOutputTokensLong Int
+  reasoning           String? // poziom `reasoning` AI SDK ustawiony dla przebiegu (none | minimal | low | medium | high | xhigh | max; walidacja Zod w kodzie); null = domyślne myślenie modelu (provider-default)
   costLimitUsd        Decimal          @db.Decimal(12, 6)
   turnLimit           Int
   turnCount           Int? // liczba tur czatu wykonanych w przebiegu (BUILD: 6 + kontynuacje), także w przerwanym (wskazuje turę, w której zadziałał bezpiecznik); null tylko do końca przebiegu
