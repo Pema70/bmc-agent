@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { CHAT_MESSAGE_MAX_CHARS } from "@/lib/schemas/chat";
 
+// Poziomy ogólnego ustawienia `reasoning` AI SDK (bez `provider-default`: to samo co brak ustawienia). Dla Gemini 3 SDK mapuje je
+// na `thinkingLevel` (`@ai-sdk/google`); bez API specyficznego dla dostawcy.
+export const REASONING_LEVELS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export const ReasoningLevel = z.enum(REASONING_LEVELS);
+export type ReasoningLevel = z.infer<typeof ReasoningLevel>;
+
 // Pusta zmienna (np. `MAX_STEPS=` w .env) liczy się jak brak, żeby zadziałała wartość domyślna.
 const envInt = (defaultValue: number, min: number, max: number) =>
   z.preprocess(
@@ -21,6 +27,8 @@ const LimitsEnv = z.object({
   MAX_VARIANTS_PER_PROJECT: envInt(10, 1, 50),
   // Limit tokenów wyjścia dla operacji z dużym wynikiem (strategie, porównanie); osobny, żeby nie rozdymać czatu.
   LLM_MAX_OUTPUT_TOKENS_LONG: envInt(12_000, 1_000, 32_000),
+  // Poziom myślenia modelu `chat` (czat i operacje obiektowe); brak, pusta wartość albo `provider-default` = domyślne myślenie modelu.
+  LLM_REASONING: z.preprocess((value) => (value === "" || value === "provider-default" ? undefined : value), ReasoningLevel.optional()),
 });
 
 export type AiLimits = {
@@ -33,6 +41,8 @@ export type AiLimits = {
   maxPendingProposals: number;
   maxVariantsPerProject: number;
   maxOutputTokensLong: number;
+  /** Ustawienie `reasoning` dla modelu `chat`; `undefined` = pole nie jest przekazywane do SDK (zachowanie jak dotąd). */
+  reasoning?: ReasoningLevel;
 };
 
 export function loadAiLimits(env: Record<string, string | undefined> = process.env): AiLimits {
@@ -51,6 +61,7 @@ export function loadAiLimits(env: Record<string, string | undefined> = process.e
     maxPendingProposals: v.MAX_PENDING_PROPOSALS,
     maxVariantsPerProject: v.MAX_VARIANTS_PER_PROJECT,
     maxOutputTokensLong: v.LLM_MAX_OUTPUT_TOKENS_LONG,
+    reasoning: v.LLM_REASONING,
   };
 }
 

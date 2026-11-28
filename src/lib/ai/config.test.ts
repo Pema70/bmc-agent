@@ -16,6 +16,16 @@ describe("loadAiLimits", () => {
     });
   });
 
+  it("LLM_REASONING: brak, pusta wartość i provider-default to brak ustawienia; poprawne poziomy przechodzą; reszta to błąd", () => {
+    expect(loadAiLimits({}).reasoning).toBeUndefined();
+    expect(loadAiLimits({ LLM_REASONING: "" }).reasoning).toBeUndefined();
+    expect(loadAiLimits({ LLM_REASONING: "provider-default" }).reasoning).toBeUndefined();
+    for (const level of ["none", "minimal", "low", "medium", "high", "xhigh", "max"]) {
+      expect(loadAiLimits({ LLM_REASONING: level }).reasoning).toBe(level);
+    }
+    expect(() => loadAiLimits({ LLM_REASONING: "bardzo-mocno" })).toThrow("limitów AI");
+  });
+
   it("nadpisuje wartości z env", () => {
     const limits = loadAiLimits({ MAX_STEPS: "5", CHAT_MAX_REQUESTS_PER_HOUR: "10" });
     expect(limits.maxSteps).toBe(5);

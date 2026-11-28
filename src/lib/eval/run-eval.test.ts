@@ -362,6 +362,41 @@ describe("runEval: przypadek BUILD", () => {
   });
 });
 
+describe("runEval: poziom myślenia (--reasoning)", () => {
+  it("--reasoning low ustawia LLM_REASONING tylko w procesie skryptu i zapisuje poziom w EvalRun", async () => {
+    const { deps, db } = makeDeps();
+
+    await runEval(config({ reasoning: "low", models: ["gemini-3.8-flash"] }), deps);
+
+    expect(deps.env.LLM_REASONING).toBe("low");
+    expect(db.runs[0]).toMatchObject({ model: "gemini-3.8-flash", reasoning: "low" });
+  });
+
+  it("bez --reasoning myślenie jest domyślne: zmienna z konfiguracji procesu jest usuwana, a w EvalRun jest null", async () => {
+    const { deps, db } = makeDeps();
+    deps.env.LLM_REASONING = "high";
+
+    await runEval(config(), deps);
+
+    expect("LLM_REASONING" in deps.env).toBe(false);
+    expect(db.runs[0].reasoning).toBeNull();
+  });
+
+  it("tryb na sucho pokazuje poziom myślenia i niczego nie zmienia w env", async () => {
+    const { deps, logs } = makeDeps();
+    deps.env.LLM_REASONING = "high";
+
+    await runEval(config({ execute: false, reasoning: "low" }), deps);
+
+    expect(logs.join("\n")).toContain("Myślenie (reasoning): low");
+    expect(deps.env.LLM_REASONING).toBe("high");
+
+    const defaults = makeDeps();
+    await runEval(config({ execute: false }), defaults.deps);
+    expect(defaults.logs.join("\n")).toContain("Myślenie (reasoning): domyślne modelu (provider-default)");
+  });
+});
+
 describe("runEval: protokół kontynuacji BUILD", () => {
   /** Skrypt scenariusza: czy tura `t` (od 1) dodaje nową propozycję PENDING i ile bloków jest wypełnionych po niej. */
   function scenario(

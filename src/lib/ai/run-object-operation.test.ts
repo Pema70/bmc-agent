@@ -1,17 +1,24 @@
 import { APICallError } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import { z } from "zod";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   checkUserLimits: vi.fn(),
   getChatModel: vi.fn(),
   logLlmCall: vi.fn(),
+  generateText: vi.fn(),
 }));
 
 vi.mock("@/lib/ai/limits", () => ({ checkUserLimits: mocks.checkUserLimits }));
 vi.mock("@/lib/ai/models", () => ({ getChatModel: mocks.getChatModel }));
 vi.mock("@/lib/ai/log", () => ({ logLlmCall: mocks.logLlmCall }));
+vi.mock("ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("ai")>();
+  // Przepuszcza do prawdziwego generateText, ale pozwala sprawdzić opcje wywołania.
+  mocks.generateText.mockImplementation(actual.generateText);
+  return { ...actual, generateText: mocks.generateText };
+});
 
 import { runObjectOperation, type ObjectOperationSpec } from "@/lib/ai/run-object-operation";
 
@@ -76,6 +83,47 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
   mocks.checkUserLimits.mockResolvedValue({ ok: true });
   mocks.logLlmCall.mockResolvedValue("log-1");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("runObjectOperation: poziom myślenia (LLM_REASONING)", () => {
+  it("bez ustawienia opcje generateText nie mają pola reasoning, a model go nie dostaje (wywołanie jak dotąd)", async () => {
+    const model = generateModel('{"answer":"tak"}');
+    setModel(model);
+    mocks.generateText.mockClear();
+
+    await runObjectOperation(makeSpec(), ctx);
+
+    expect("reasoning" in mocks.generateText.mock.calls[0][0]).toBe(false);
+    expect(model.doGenerateCalls[0].reasoning).toBeUndefined();
+  });
+
+  it("z LLM_REASONING model chat dostaje reasoning", async () => {
+    vi.stubEnv("LLM_REASONING", "low");
+    const model = generateModel('{"answer":"tak"}');
+    setModel(model);
+    mocks.generateText.mockClear();
+
+    await runObjectOperation(makeSpec(), ctx);
+
+    expect(mocks.generateText.mock.calls[0][0].reasoning).toBe("low");
+    expect(model.doGenerateCalls[0].reasoning).toBe("low");
+  });
+
+  it("z LLM_REASONING sędzia (modelName judge) nie dostaje reasoning", async () => {
+    vi.stubEnv("LLM_REASONING", "high");
+    const model = generateModel('{"answer":"tak"}');
+    setModel(model);
+    mocks.generateText.mockClear();
+
+    await runObjectOperation(makeSpec({ modelName: "judge" }), ctx);
+
+    expect("reasoning" in mocks.generateText.mock.calls[0][0]).toBe(false);
+    expect(model.doGenerateCalls[0].reasoning).toBeUndefined();
+  });
 });
 
 describe("runObjectOperation", () => {
