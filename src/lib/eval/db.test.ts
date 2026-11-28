@@ -81,9 +81,9 @@ describe("createEvalDb", () => {
     await db.createRun({
       seriesId: "S1", caseId: "BUILD-01", kind: "BUILD", repetition: 1, attempt: 1, provider: "google", model: "gemini-3.5-flash-lite",
       judgeModel: null, chatPromptVersion: "chat-v6", casesChecksum: "abc", maxOutputTokens: 2000, maxOutputTokensLong: 12000,
-      costLimitUsd: 0.1, turnLimit: 8, projectId: "p1",
+      reasoning: null, costLimitUsd: 0.1, turnLimit: 8, projectId: "p1",
     });
-    expect(mocks.evalRunCreate.mock.calls[0][0].data).toMatchObject({ status: "RUNNING", architecture: "SINGLE", attempt: 1 });
+    expect(mocks.evalRunCreate.mock.calls[0][0].data).toMatchObject({ status: "RUNNING", architecture: "SINGLE", attempt: 1, reasoning: null });
   });
 
   it("finishRun zapisuje turnCount i endReason (walidacja Zod: powód spoza listy nie trafia do bazy)", async () => {
@@ -118,6 +118,22 @@ describe("createEvalDb", () => {
 
     mocks.variantFindFirst.mockResolvedValueOnce(null);
     expect(await createEvalDb().getMainVariant("p1")).toBeNull();
+  });
+
+  it("createRun zapisuje poziom reasoning, a poziom spoza listy odrzuca przed zapisem (Zod)", async () => {
+    mocks.evalRunCreate.mockResolvedValue({ id: "r2" });
+    const data = {
+      seriesId: "S1", caseId: "BUILD-01", kind: "BUILD" as const, repetition: 1, attempt: 1, provider: "google", model: "gemini-3.8-flash",
+      judgeModel: null, chatPromptVersion: "chat-v6", casesChecksum: "abc", maxOutputTokens: 8000, maxOutputTokensLong: 16000,
+      costLimitUsd: 0.1, turnLimit: 8, projectId: "p1",
+    };
+
+    await createEvalDb().createRun({ ...data, reasoning: "low" });
+    expect(mocks.evalRunCreate.mock.calls[0][0].data).toMatchObject({ reasoning: "low" });
+
+    mocks.evalRunCreate.mockClear();
+    await expect(createEvalDb().createRun({ ...data, reasoning: "bardzo-mocno" })).rejects.toThrow();
+    expect(mocks.evalRunCreate).not.toHaveBeenCalled();
   });
 
   it("listPendingProposalIds: tylko PENDING z wariantu projektu, od najstarszej", async () => {

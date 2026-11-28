@@ -164,6 +164,8 @@ export async function runObjectOperation<
       maxOutputTokens: spec.maxOutputTokens ? spec.maxOutputTokens(limits) : limits.maxOutputTokens,
       maxRetries: MAX_RETRIES,
       abortSignal: ctx.abortSignal,
+      // Poziom myślenia (LLM_REASONING) dotyczy tylko modelu `chat`; sędzia (`judge`, Anthropic) nigdy go nie dostaje.
+      ...((spec.modelName ?? "chat") === "chat" && limits.reasoning ? { reasoning: limits.reasoning } : {}),
     });
     usage = {
       inputTokens: result.usage.inputTokens,

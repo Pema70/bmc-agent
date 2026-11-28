@@ -1,3 +1,4 @@
+import { REASONING_LEVELS, type ReasoningLevel } from "@/lib/ai/config";
 import { ALLOWED_CHAT_MODELS } from "@/lib/ai/models";
 import { ALL_CASES } from "@/lib/eval/cases";
 import { isValidSeriesId } from "@/lib/eval/naming";
@@ -13,6 +14,8 @@ export type EvalConfig = {
   judge: boolean;
   maxOutputTokens?: number;
   maxOutputTokensLong?: number;
+  /** Poziom `reasoning` AI SDK dla modelu `chat`; `undefined` = domyślne myślenie modelu (provider-default). */
+  reasoning?: ReasoningLevel;
   pauseMs: number;
   retryInvalid: boolean;
   execute: boolean;
@@ -29,6 +32,7 @@ const VALUE_FLAGS = [
   "--powtorzenia",
   "--max-wyjscia",
   "--max-wyjscia-dlugie",
+  "--reasoning",
   "--przerwa-ms",
   "--max-koszt-usd",
   "--max-tur",
@@ -128,6 +132,17 @@ export function parseEvalArgs(argv: readonly string[], env: Record<string, strin
   const maxOutputTokensLong = values.has("--max-wyjscia-dlugie")
     ? parseInteger(values.get("--max-wyjscia-dlugie") ?? "", "--max-wyjscia-dlugie", 1_000, 32_000, errors)
     : undefined;
+  let reasoning: ReasoningLevel | undefined;
+  if (values.has("--reasoning")) {
+    const raw = values.get("--reasoning") ?? "";
+    if (raw === "provider-default") {
+      reasoning = undefined;
+    } else if ((REASONING_LEVELS as readonly string[]).includes(raw)) {
+      reasoning = raw as ReasoningLevel;
+    } else {
+      errors.push(`--reasoning: dozwolone ${REASONING_LEVELS.join(", ")} albo provider-default (podano „${raw}”).`);
+    }
+  }
   const maxTurns = values.has("--max-tur") ? parseInteger(values.get("--max-tur") ?? "", "--max-tur", 1, 10_000, errors) : undefined;
 
   let maxCostUsd: number | undefined;
@@ -162,6 +177,7 @@ export function parseEvalArgs(argv: readonly string[], env: Record<string, strin
       judge: flags.has("--sedzia"),
       maxOutputTokens,
       maxOutputTokensLong,
+      reasoning,
       pauseMs,
       retryInvalid: flags.has("--powtorz-niewazne"),
       execute,

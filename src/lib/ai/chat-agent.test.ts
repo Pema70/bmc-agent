@@ -411,3 +411,30 @@ describe("runChatTurn: finished rozwiązuje się w każdej ścieżce", () => {
     });
   });
 });
+
+describe("runChatTurn: poziom myślenia (LLM_REASONING)", () => {
+  it("bez ustawienia opcje streamText nie mają pola reasoning, a model go nie dostaje (wywołanie jak dotąd)", async () => {
+    const model = mockModel(modelWith("Cześć"));
+    mocks.streamText.mockClear();
+
+    const { stream, finished } = await runChatTurn(makeTurn());
+    await drain(stream);
+    await finished;
+
+    const options = mocks.streamText.mock.calls[0][0];
+    expect("reasoning" in options).toBe(false);
+    expect(model.doStreamCalls[0].reasoning).toBeUndefined();
+  });
+
+  it("z poziomem w limitach streamText i model dostają reasoning", async () => {
+    const model = mockModel(modelWith("Cześć"));
+    mocks.streamText.mockClear();
+
+    const { stream, finished } = await runChatTurn(makeTurn({ limits: { ...limits, reasoning: "low" } }));
+    await drain(stream);
+    await finished;
+
+    expect(mocks.streamText.mock.calls[0][0].reasoning).toBe("low");
+    expect(model.doStreamCalls[0].reasoning).toBe("low");
+  });
+});

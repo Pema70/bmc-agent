@@ -1,4 +1,5 @@
 import type { Prisma } from "@/generated/prisma/client";
+import { ReasoningLevel } from "@/lib/ai/config";
 import { prisma } from "@/lib/db/client";
 import { MAIN_VARIANT_NAME } from "@/lib/db/variants";
 import type { CostReading } from "@/lib/eval/budget";
@@ -60,7 +61,8 @@ export function createEvalDb(client: typeof prisma = prisma): EvalDb {
 
     async createRun(data: NewRunData) {
       const row = await client.evalRun.create({
-        data: { ...data, status: "RUNNING", architecture: "SINGLE" },
+        // Walidacja Zod: kolumna jest tekstem, więc poziom spoza listy nie trafi do bazy.
+        data: { ...data, reasoning: ReasoningLevel.nullish().parse(data.reasoning) ?? null, status: "RUNNING", architecture: "SINGLE" },
         select: { id: true },
       });
       return { id: row.id };

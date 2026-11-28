@@ -55,6 +55,8 @@ export type NewRunData = {
   casesChecksum: string;
   maxOutputTokens: number;
   maxOutputTokensLong: number;
+  /** Poziom `reasoning` (`null` = domyślne myślenie modelu). */
+  reasoning: string | null;
   costLimitUsd: number;
   turnLimit: number;
   projectId: string;
@@ -229,6 +231,9 @@ function applyRunEnv(env: Record<string, string | undefined>, config: EvalConfig
   env.LLM_MODEL = model;
   if (config.maxOutputTokens !== undefined) env.LLM_MAX_OUTPUT_TOKENS = String(config.maxOutputTokens);
   if (config.maxOutputTokensLong !== undefined) env.LLM_MAX_OUTPUT_TOKENS_LONG = String(config.maxOutputTokensLong);
+  // Bez --reasoning myślenie jest domyślne modelu: zmienna z konfiguracji procesu nie może po cichu zmienić serii.
+  if (config.reasoning) env.LLM_REASONING = config.reasoning;
+  else delete env.LLM_REASONING;
 }
 
 export async function runEval(config: EvalConfig, deps: EvalDeps): Promise<EvalSummary> {
@@ -342,6 +347,7 @@ export async function runEval(config: EvalConfig, deps: EvalDeps): Promise<EvalS
         casesChecksum: checksum,
         maxOutputTokens: limits.maxOutputTokens,
         maxOutputTokensLong: limits.maxOutputTokensLong,
+        reasoning: limits.reasoning ?? null,
         costLimitUsd: maxCostUsd,
         turnLimit: maxTurns,
         projectId: project.projectId,
@@ -680,6 +686,8 @@ async function dryRun(
     const existing = await db.listRuns(config.seriesId);
     const judgeModel = env.JUDGE_MODEL;
     const limitsEnv = { ...env };
+    if (config.reasoning) limitsEnv.LLM_REASONING = config.reasoning;
+    else delete limitsEnv.LLM_REASONING;
     if (config.maxOutputTokens !== undefined) limitsEnv.LLM_MAX_OUTPUT_TOKENS = String(config.maxOutputTokens);
     if (config.maxOutputTokensLong !== undefined) limitsEnv.LLM_MAX_OUTPUT_TOKENS_LONG = String(config.maxOutputTokensLong);
     const limits = loadAiLimits(limitsEnv);
@@ -703,6 +711,7 @@ async function dryRun(
     }
     log(`Seria: ${config.seriesId}; modele: ${config.models.join(", ")}; sędzia: ${config.judge ? (judgeModel ?? "brak JUDGE_MODEL") : "wyłączony"}`);
     log(`Limity wyjścia: ${limits.maxOutputTokens} (czat), ${limits.maxOutputTokensLong} (długie); kroków na turę: ${limits.maxSteps}`);
+    log(`Myślenie (reasoning): ${limits.reasoning ?? "domyślne modelu (provider-default)"}`);
     log(`Powtórzenia: ${config.repetitions}; przypadki: ${config.caseIds.join(", ")}`);
 
     const total = { turnsMin: 0, turnsMax: 0, callsMin: 0, callsMax: 0, costMin: 0 as number | null, costMax: 0 as number | null };

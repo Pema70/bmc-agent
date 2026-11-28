@@ -37,6 +37,7 @@ pomiarowe) oraz, z `--sedzia`, `JUDGE_PROVIDER`, `JUDGE_MODEL` i `ANTHROPIC_API_
 | `--modele` | lista modeli generujących, **tylko z `ALLOWED_CHAT_MODELS`** (`models.ts`, modele z cennikiem); domyślnie `LLM_MODEL` |
 | `--powtorzenia N` | liczba powtórzeń (1–10, domyślnie 1) |
 | `--sedzia` | po zbudowaniu (BUILD) i dla EVAL: 3 sądy sędziego (`trigger = SCRIPT`); model sędziego z `JUDGE_*`, stały w serii |
+| `--reasoning POZIOM` | poziom myślenia modelu czatu (ogólne ustawienie `reasoning` AI SDK: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max`; `provider-default` lub brak argumentu = domyślne myślenie modelu). Ustawiany tylko w procesie skryptu (nadpisuje i bez argumentu usuwa `LLM_REASONING`), dotyczy modelu czatu i jego operacji, nie sędziego; zapisywany w `EvalRun.reasoning` (`NULL` = domyślne). Dla Gemini 3: `none` i `minimal` to poziom minimalny modelu (`minimal` dla 3.6 i lite, `low` dla 3.8) |
 | `--max-wyjscia N`, `--max-wyjscia-dlugie N` | limity tokenów wyjścia (czat; operacje długie), zapisywane w `EvalRun` |
 | `--przerwa-ms N` | przerwa między przebiegami |
 | `--powtorz-niewazne` | powtarza przebiegi `INVALID` jako kolejną próbę |
@@ -82,7 +83,7 @@ zostają jako historia. Wiersz `RUNNING` po awarii procesu jest przy starcie ozn
 
 **Ważne:**
 
-- **Przebiegi z innym `--max-wyjscia` lub `--max-wyjscia-dlugie` muszą mieć inne `--serie`.** Limity nie są w kluczu unikalności
+- **Przebiegi z innym `--max-wyjscia`, `--max-wyjscia-dlugie` lub `--reasoning` powinny mieć inne `--serie`** (poziom myślenia jest zapisany w `EvalRun.reasoning`, ale nie wchodzi do klucza unikalności). Limity nie są w kluczu unikalności
   (`seriesId, caseId, model, repetition, architecture, attempt`), więc drugi przebieg w tej samej serii zostałby pominięty jako ukończony.
 - **Nie uruchamiaj dwóch procesów na tej samej serii naraz**: wznowienie oznacza `RUNNING` jako `CRASHED`, więc drugi proces
   zepsułby wiersze pierwszego.

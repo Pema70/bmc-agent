@@ -221,6 +221,8 @@ export async function runChatTurn(turn: ChatTurn, options: { signal?: AbortSigna
     maxOutputTokens: turn.limits.maxOutputTokens,
     maxRetries: MAX_RETRIES,
     abortSignal: options.signal,
+    // Tylko gdy ustawione (LLM_REASONING): bez ustawienia pola nie ma w opcjach, więc wywołanie jest takie jak dotąd.
+    ...(turn.limits.reasoning ? { reasoning: turn.limits.reasoning } : {}),
   });
 
   let settle: (value: ChatTurnResult) => void = () => {};

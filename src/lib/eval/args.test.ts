@@ -54,6 +54,18 @@ describe("parseEvalArgs", () => {
     expect(unknownFlag.ok).toBe(false);
   });
 
+  it("--reasoning: poprawne poziomy, provider-default to brak ustawienia, reszta odrzucona; domyślnie brak", () => {
+    const base = ["--serie", "S1", "--przypadki", "BUILD-01", "--modele", "gemini-3.8-flash"];
+    expect(parse(base)).toMatchObject({ ok: true, config: { reasoning: undefined } });
+    expect(parse([...base, "--reasoning", "low"])).toMatchObject({ ok: true, config: { reasoning: "low" } });
+    expect(parse([...base, "--reasoning", "high"])).toMatchObject({ ok: true, config: { reasoning: "high" } });
+    expect(parse([...base, "--reasoning", "provider-default"])).toMatchObject({ ok: true, config: { reasoning: undefined } });
+    const bad = parse([...base, "--reasoning", "bardzo-mocno"]);
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.errors.join(" ")).toContain("--reasoning");
+    expect(parse([...base, "--reasoning"]).ok).toBe(false);
+  });
+
   it("limity wyjścia, powtórzenia i przerwa: zakresy i typy", () => {
     const ok = parse([
       "--serie", "S1", "--przypadki", "BUILD-01", "--modele", "gemini-3.5-flash-lite",
