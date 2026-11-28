@@ -82,6 +82,18 @@ function reject(
  * (pilnują jej testy charakteryzujące w `route.test.ts`). Sesję, rolę i walidację żądania sprawdza wywołujący.
  */
 export async function prepareChatTurn(input: PrepareChatTurnInput): Promise<{ ok: true; turn: ChatTurn } | ChatTurnRejection> {
+  // Brak opcji pominięcia limitów w typie wejścia: trasa HTTP nie ma jak ich ominąć.
+  return prepareChatTurnCore(input, { enforceUserLimits: true });
+}
+
+/**
+ * Wspólny rdzeń `prepareChatTurn` i `prepareChatTurnWithoutUserLimits` (skrypt ewaluacji, `chat-agent-script.ts`).
+ * Eksportowany tylko dla tego modułu; trasy go nie importują (pilnuje tego test skanujący `src/app`).
+ */
+export async function prepareChatTurnCore(
+  input: PrepareChatTurnInput,
+  options: { enforceUserLimits: boolean },
+): Promise<{ ok: true; turn: ChatTurn } | ChatTurnRejection> {
   const { projectId, userId, limits } = input;
 
   // Wariant musi należeć do projektu, do którego sprawdzono uprawnienia.
@@ -99,9 +111,11 @@ export async function prepareChatTurn(input: PrepareChatTurnInput): Promise<{ ok
     return reject(409, "VARIANT_NOT_MAIN", "Czat działa na wariancie głównym.");
   }
 
-  const limitCheck = await checkUserLimits(userId, new Date(), limits);
-  if (!limitCheck.ok) {
-    return reject(429, "LIMIT", limitCheck.message, { "Retry-After": String(limitCheck.retryAfterSec) });
+  if (options.enforceUserLimits) {
+    const limitCheck = await checkUserLimits(userId, new Date(), limits);
+    if (!limitCheck.ok) {
+      return reject(429, "LIMIT", limitCheck.message, { "Retry-After": String(limitCheck.retryAfterSec) });
+    }
   }
 
   // Konfiguracja modelu przed zapisem wiadomości, żeby błąd konfiguracji nie zostawiał osieroconej wiadomości.

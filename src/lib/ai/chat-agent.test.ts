@@ -148,6 +148,15 @@ describe("prepareChatTurn", () => {
     expect(mocks.saveChatMessage).toHaveBeenCalledTimes(1);
   });
 
+  it("limity użytkownika są zawsze egzekwowane: brak pola pominięcia w typie, a dodatkowe pole podane mimo to niczego nie omija", async () => {
+    mocks.checkUserLimits.mockResolvedValue({ ok: false, message: "Za dużo żądań.", retryAfterSec: 60 });
+    // @ts-expect-error `prepareChatTurn` nie przyjmuje opcji pominięcia limitów (tylko skrypt przez chat-agent-script.ts).
+    const result = await prepareChatTurn({ ...input, enforceUserLimits: false, skipUserLimits: true });
+    expect(result).toMatchObject({ ok: false, status: 429, error: "LIMIT" });
+    expect(mocks.checkUserLimits).toHaveBeenCalledTimes(1);
+    expect(mocks.saveChatMessage).not.toHaveBeenCalled();
+  });
+
   it("nie ma wariantu: 404 bez limitów i bez zapisu", async () => {
     mocks.getVariantForProject.mockResolvedValue(null);
     const result = await prepareChatTurn(input);
