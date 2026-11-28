@@ -66,6 +66,6 @@ Pierwszeństwo mają dokumenty spółek (SEC, strony pomocy firmy), potem prasa 
 ## Rozstrzygnięcia właściciela (stan po przeglądzie)
 
 - Lata założenia zostają: Netflix 1997, Airbnb 2008, Spotify 2006 (2006 to założenie spółki w Sztokholmie, usługa ruszyła w 2008). Britannica i wyszukiwanie są zgodne co do Spotify; **lat Netflixa i Airbnb nie potwierdziłem w odczytanych wynikach** (sprawdź w Britannice, 10-K i S-1).
-- Juicero: opis mówi o paczkach „kupowanych osobno i pasujących tylko do tego urządzenia” (zamiast subskrypcji); wpisy bez zmian.
+- Juicero: opis mówi o paczkach „kupowanych osobno i pasujących tylko do tego urządzenia” (zamiast subskrypcji); wpisy bez zmian, poza usunięciem duplikatu w segmentach klientów (2026-11-28: zostaje jeden segment „Klienci gotowi zapłacić więcej za wygodę i świeży sok w domu”; źródła powyżej nie opisują innej grupy klientów).
 - Quibi i Blockbuster: wpisy bez zmian; dodatkowe źródła powyżej. **Niepotwierdzone nadal:** karta członkowska Blockbustera w prasie z epoki oraz przekąski przy kasie (patrz uwaga pod tabelą Blockbustera).
 - Źródła słabsze zastąpione: Harvard RCTOM, Strategyzer (zostały zastąpione dokumentami SEC i stroną pomocy Airbnb); pozostają popularne Mental Floss i Yahoo Lifestyle, wyraźnie oznaczone jako słabsze.

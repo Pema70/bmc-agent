@@ -240,7 +240,6 @@ const RAW_COMPANIES: SeedCompany[] = [
     state: {
       customer_segments: [
         "Klienci gotowi zapłacić więcej za wygodę i świeży sok w domu",
-        "Osoby ceniące wygodę przygotowania świeżego soku w domu",
       ],
       value_propositions: [
         "Świeży sok z jednej paczki, bez mycia sprzętu",

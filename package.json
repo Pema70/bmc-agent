@@ -10,7 +10,9 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "eval": "node --env-file=.env scripts/eval/run.mjs",
+    "eval:importy": "node scripts/eval/check-imports.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.89",

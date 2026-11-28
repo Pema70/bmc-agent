@@ -91,3 +91,9 @@ export const MODEL_PRICING: Record<string, { inputPerMTok: number; outputPerMTok
   "google/gemini-3.8-flash": { inputPerMTok: 0.75, outputPerMTok: 3.75 },
   "anthropic/claude-haiku-5-5": { inputPerMTok: 0.1, outputPerMTok: 0.5 },
 };
+
+// Modele generujące dozwolone w skrypcie ewaluacji (argument `--modele`): klucze cennika dostawcy `google`.
+// Jedno źródło prawdy z `MODEL_PRICING`: model bez ceny nie przejdzie, bo koszt byłby nieznany.
+export const ALLOWED_CHAT_MODELS: readonly string[] = Object.keys(MODEL_PRICING)
+  .filter((key) => key.startsWith("google/"))
+  .map((key) => key.slice("google/".length));
