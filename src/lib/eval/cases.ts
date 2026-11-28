@@ -236,7 +236,7 @@ const RAW_BUILD_CASES: BuildCase[] = [
       "Prowadzę sprzedaż domowego urządzenia do wyciskania świeżych soków wraz z paczkami składników kupowanymi osobno i pasującymi tylko do tego urządzenia.",
     messages: [
       "Pomóż mi zbudować model biznesowy. Prowadzę sprzedaż domowego urządzenia do wyciskania świeżych soków wraz z paczkami składników kupowanymi osobno i pasującymi tylko do tego urządzenia.",
-      "Klienci to osoby gotowe zapłacić więcej za wygodę i świeży sok w domu oraz osoby ceniące wygodę przygotowania świeżego soku w domu. Mają konto klienta w aplikacji i obsługę klienta przez internet.",
+      "Klienci to osoby gotowe zapłacić więcej za wygodę i świeży sok w domu. Mają konto klienta w aplikacji i obsługę klienta przez internet.",
       "Obiecujemy świeży sok z jednej paczki bez mycia sprzętu, regularną dostawę składników do domu oraz urządzenie połączone z aplikacją. Sprzedajemy przez internet urządzenie i paczki, a paczki dostarczają firmy kurierskie.",
       "Zarabiamy na sprzedaży urządzenia i na sprzedaży paczek ze składnikami. Najważniejsze działania to projektowanie i produkcja urządzenia, pakowanie i dostawa świeżych paczek oraz rozwój aplikacji.",
       "Kluczowe zasoby to zaprojektowane urządzenie z prasą, sieć dostawców świeżych składników i własny system paczek dopasowanych do urządzenia. Partnerzy to rolnicy i dostawcy owoców i warzyw, producent urządzenia oraz firmy kurierskie. Koszty to produkcja zaawansowanego urządzenia, chłodzona logistyka paczek oraz rozwój produktu i marketing.",
@@ -317,6 +317,41 @@ export const BUILD_CASES: readonly BuildCase[] = RAW_BUILD_CASES.map((c) => Buil
 export const EVAL_CASES: readonly EvalCase[] = RAW_EVAL_CASES.map((c) => EvalCase.parse(c));
 export const CHAT_CASES: readonly ChatCase[] = RAW_CHAT_CASES.map((c) => ChatCase.parse(c));
 export const ALL_CASES: readonly EvalCaseDefinition[] = [...BUILD_CASES, ...EVAL_CASES, ...CHAT_CASES];
+
+/**
+ * Suma kontrolna zamrożonego zestawu (właściciel zaakceptował treść przypadków 2026-11-28). Zmiana czegokolwiek w
+ * przypadkach albo w stanie firm z seeda użytych w EVAL i fixture'ach CHAT zmienia `casesChecksum()` i wymaga świadomej
+ * decyzji właściciela, nowej serii pomiarów i wpisania tu nowej wartości. `null` oznacza zestaw niezamrożony.
+ */
+export const FROZEN_CASES_CHECKSUM: string | null = "89a97464ee8579a1116791913c2241204386ea613437922d51705171928af083";
+
+export type CasesFreezeCheck =
+  | { frozen: true }
+  | { frozen: false; reason: "NOT_FROZEN" | "MISMATCH"; message: string };
+
+/** Czy zestaw jest zamrożony i zgodny z zapisaną sumą; prawdziwy przebieg skryptu wymaga `frozen: true`. */
+export function checkCasesFrozen(
+  current: string = casesChecksum(),
+  frozen: string | null = FROZEN_CASES_CHECKSUM,
+): CasesFreezeCheck {
+  if (frozen === null) {
+    return {
+      frozen: false,
+      reason: "NOT_FROZEN",
+      message: "Zestaw przypadków nie jest zamrożony (FROZEN_CASES_CHECKSUM w cases.ts jest pusty). Zamroź go po akceptacji treści.",
+    };
+  }
+  if (current !== frozen) {
+    return {
+      frozen: false,
+      reason: "MISMATCH",
+      message:
+        "Zestaw przypadków różni się od zamrożonego: suma kontrolna przypadków nie zgadza się z FROZEN_CASES_CHECKSUM. " +
+        "Cofnij zmianę albo świadomie zamroź nowy zestaw przed nową serią.",
+    };
+  }
+  return { frozen: true };
+}
 
 /** Wariant minimalny na start (D13): Kawiarnia Ziarno, Spotify, Quibi, Airbnb. */
 export const MINIMAL_BUILD_CASE_IDS: readonly string[] = ["BUILD-01", "BUILD-02", "BUILD-03", "BUILD-04"];

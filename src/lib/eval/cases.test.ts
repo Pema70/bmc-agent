@@ -8,16 +8,16 @@ import {
   CHAT_CASES,
   EVAL_CASES,
   MINIMAL_BUILD_CASE_IDS,
+  FROZEN_CASES_CHECKSUM,
   casesChecksum,
+  checkCasesFrozen,
   coveredBlocks,
   forbiddenTokens,
   getCase,
 } from "@/lib/eval/cases";
 
-// Suma kontrolna zamrożonego zestawu. Zmiana treści przypadków (albo stanu firm z seeda użytych w EVAL i fixture'ach CHAT)
-// zmienia ją i wymaga świadomej decyzji właściciela oraz nowej serii pomiarów; nie aktualizuj jej "dla zielonych testów".
-// `null` do czasu akceptacji treści przez właściciela (po niej wpisujemy tu sumę i zestaw jest zamrożony).
-const FROZEN_CHECKSUM: string | null = null;
+// Zmiana treści przypadków (albo stanu firm z seeda użytych w EVAL i fixture'ach CHAT) zmienia sumę kontrolną i wymaga
+// świadomej decyzji właściciela oraz nowej serii pomiarów; nie aktualizuj FROZEN_CASES_CHECKSUM "dla zielonych testów".
 
 describe("zestaw przypadków ewaluacji", () => {
   it("ma 7 przypadków BUILD, 7 EVAL i 5 CHAT z unikalnymi identyfikatorami", () => {
@@ -33,8 +33,25 @@ describe("zestaw przypadków ewaluacji", () => {
     ]);
   });
 
-  it.runIf(FROZEN_CHECKSUM !== null)("jest zamrożony: suma kontrolna zgadza się z zapisaną", () => {
-    expect(casesChecksum()).toBe(FROZEN_CHECKSUM);
+  it("jest zamrożony: suma kontrolna zgadza się z zapisaną w FROZEN_CASES_CHECKSUM", () => {
+    expect(FROZEN_CASES_CHECKSUM).not.toBeNull();
+    expect(casesChecksum()).toBe(FROZEN_CASES_CHECKSUM);
+    expect(checkCasesFrozen()).toEqual({ frozen: true });
+  });
+
+  it("checkCasesFrozen: pusta suma to NOT_FROZEN, inna suma to MISMATCH, komunikaty po polsku", () => {
+    expect(checkCasesFrozen("abc", null)).toMatchObject({ frozen: false, reason: "NOT_FROZEN", message: expect.stringContaining("nie jest zamrożony") });
+    expect(checkCasesFrozen("abc", "def")).toMatchObject({ frozen: false, reason: "MISMATCH", message: expect.stringContaining("różni się od zamrożonego") });
+    expect(checkCasesFrozen("abc", "abc")).toEqual({ frozen: true });
+  });
+
+  it("BUILD-07: jeden segment klientów (bez duplikatu z seeda) i stan EVAL-07 zgodny z poprawionym seedem", () => {
+    const juicero = SEED_COMPANIES.find((c) => c.key === "juicero");
+    expect(juicero?.state.customer_segments).toEqual(["Klienci gotowi zapłacić więcej za wygodę i świeży sok w domu"]);
+    expect(BUILD_CASES.find((c) => c.id === "BUILD-07")?.messages[1]).toBe(
+      "Klienci to osoby gotowe zapłacić więcej za wygodę i świeży sok w domu. Mają konto klienta w aplikacji i obsługę klienta przez internet.",
+    );
+    expect(EVAL_CASES.find((c) => c.id === "EVAL-07")?.companyKey).toBe("juicero");
   });
 
   it("suma kontrolna to SHA-256 w zapisie szesnastkowym", () => {
@@ -52,6 +69,7 @@ describe("zestaw przypadków ewaluacji", () => {
       (BUILD_CASES[0].messages as string[])[1] = original;
     }
     expect(casesChecksum()).toBe(before);
+    expect(casesChecksum()).toBe(FROZEN_CASES_CHECKSUM);
   });
 
   it("wariant minimalny BUILD: Kawiarnia Ziarno, Spotify, Quibi, Airbnb", () => {
