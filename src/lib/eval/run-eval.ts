@@ -90,7 +90,7 @@ export type EvalDeps = {
     proposalId: string;
     expectedVersion: number;
     userId: string;
-  }) => Promise<{ ok: boolean }>;
+  }) => Promise<{ ok: boolean; error?: string }>;
   runEvaluation: (ctx: RunEvaluationContext) => Promise<RunEvaluationResult>;
   runJudge: (ctx: RunJudgeContext) => Promise<RunJudgeResult>;
   runImpact: (ctx: RunImpactContext) => Promise<RunImpactResult>;
@@ -109,6 +109,10 @@ export type EvalSummary = {
   skipped: number;
   turns: number;
   costUsd: number;
+  /** Propozycje agenta w przypadkach BUILD: zaakceptowane przez skrypt i niezaakceptowane (z powodami). */
+  proposalsAccepted: number;
+  proposalsNotAccepted: number;
+  proposalsNotAcceptedReasons: Record<string, number>;
 };
 
 const DONE_STATUSES: readonly RunStatus[] = ["OK", "FAILED"];
@@ -118,7 +122,17 @@ type Unit = { cases: EvalCaseDefinition[]; model: string; repetition: number };
 type StopInfo = { code: string; message: string };
 
 function emptySummary(outcome: EvalSummary["outcome"], message?: string): EvalSummary {
-  return { outcome, message, counts: { OK: 0, FAILED: 0, INVALID: 0, STOPPED: 0 }, skipped: 0, turns: 0, costUsd: 0 };
+  return {
+    outcome,
+    message,
+    counts: { OK: 0, FAILED: 0, INVALID: 0, STOPPED: 0 },
+    skipped: 0,
+    turns: 0,
+    costUsd: 0,
+    proposalsAccepted: 0,
+    proposalsNotAccepted: 0,
+    proposalsNotAcceptedReasons: {},
+  };
 }
 
 function buildUnits(config: EvalConfig): Unit[] {
@@ -187,6 +201,11 @@ async function drain(stream: ReadableStream): Promise<void> {
   } catch {
     // Strumień z błędem też jest „odczytany do końca”; wynik opisuje `finished`.
   }
+}
+
+function formatReasons(reasons: Record<string, number>): string {
+  const entries = Object.entries(reasons);
+  return entries.length === 0 ? "" : ` (${entries.map(([reason, count]) => `${reason}: ${count}`).join(", ")})`;
 }
 
 function applyRunEnv(env: Record<string, string | undefined>, config: EvalConfig, model: string): void {
@@ -260,6 +279,9 @@ export async function runEval(config: EvalConfig, deps: EvalDeps): Promise<EvalS
     log(
       `Podsumowanie: OK ${summary.counts.OK}, FAILED ${summary.counts.FAILED}, INVALID ${summary.counts.INVALID}, STOPPED ${summary.counts.STOPPED}, pominięto ${summary.skipped}; tury ${summary.turns}; koszt ${summary.costUsd.toFixed(6)} USD.`,
     );
+    if (summary.proposalsAccepted + summary.proposalsNotAccepted > 0) {
+      log(`Propozycje agenta (BUILD): zaakceptowano ${summary.proposalsAccepted}, niezaakceptowano ${summary.proposalsNotAccepted}${formatReasons(summary.proposalsNotAcceptedReasons)}.`);
+    }
     if (summary.message) log(summary.message);
     return summary;
   };
@@ -309,6 +331,7 @@ export async function runEval(config: EvalConfig, deps: EvalDeps): Promise<EvalS
         projectId: project.projectId,
       });
 
+      const proposals: ProposalCounters = { accepted: 0, notAccepted: 0, reasons: {} };
       let result: CaseResult;
       if (previous && previous.status !== "OK") {
         result = { status: "INVALID", errorCode: "PREVIOUS_CASE_NOT_OK" };
@@ -317,6 +340,7 @@ export async function runEval(config: EvalConfig, deps: EvalDeps): Promise<EvalS
           deps,
           config,
           budget,
+          proposals,
           userId,
           projectId: project.projectId,
           variantId: project.variantId,
@@ -330,6 +354,14 @@ export async function runEval(config: EvalConfig, deps: EvalDeps): Promise<EvalS
       await db.finishRun(run.id, { status: result.status, errorCode: result.errorCode ?? null });
       summary.counts[result.status] += 1;
       log(`  ${def.id}: ${result.status}${result.errorCode ? ` (${result.errorCode})` : ""}`);
+      if (proposals.accepted + proposals.notAccepted > 0) {
+        log(`    propozycje: zaakceptowano ${proposals.accepted}, niezaakceptowano ${proposals.notAccepted}${formatReasons(proposals.reasons)}`);
+        summary.proposalsAccepted += proposals.accepted;
+        summary.proposalsNotAccepted += proposals.notAccepted;
+        for (const [reason, count] of Object.entries(proposals.reasons)) {
+          summary.proposalsNotAcceptedReasons[reason] = (summary.proposalsNotAcceptedReasons[reason] ?? 0) + count;
+        }
+      }
       previous = result;
       if (result.fatal) {
         state.fatal = result.fatal;
@@ -346,10 +378,14 @@ export async function runEval(config: EvalConfig, deps: EvalDeps): Promise<EvalS
 
 type CaseResult = { status: FinalRunStatus; errorCode?: string; fatal?: string };
 
+/** Liczniki propozycji agenta w jednym przypadku: odtwarzalne też z tabeli `Proposal` po `projectId` (patrz README). */
+type ProposalCounters = { accepted: number; notAccepted: number; reasons: Record<string, number> };
+
 type CaseContext = {
   deps: EvalDeps;
   config: EvalConfig;
   budget: RunBudget;
+  proposals: ProposalCounters;
   userId: string;
   projectId: string;
   variantId: string;
@@ -385,8 +421,9 @@ async function chatTurn(ctx: CaseContext, text: string): Promise<CaseResult | nu
     await drain(turn.stream);
     finishedResult = await turn.finished;
   } catch (error) {
+    // Awaria techniczna, nie wynik agenta: INVALID (powtarzalny przez --powtorz-niewazne), a nie FAILED.
     deps.log(`  Wyjątek w turze: ${error instanceof Error ? error.name : "nieznany błąd"}`);
-    return { status: "FAILED", errorCode: "TURN_EXCEPTION" };
+    return { status: "INVALID", errorCode: "TURN_EXCEPTION" };
   }
 
   switch (finishedResult.status) {
@@ -436,7 +473,14 @@ async function acceptAllPending(ctx: CaseContext): Promise<void> {
       expectedVersion: variant.version,
       userId: ctx.userId,
     });
-    if (!result.ok) ctx.deps.log("  Nie udało się zaakceptować propozycji (pomijam).");
+    if (result.ok) {
+      ctx.proposals.accepted += 1;
+    } else {
+      const reason = result.error ?? "UNKNOWN";
+      ctx.proposals.notAccepted += 1;
+      ctx.proposals.reasons[reason] = (ctx.proposals.reasons[reason] ?? 0) + 1;
+      ctx.deps.log(`  Nie udało się zaakceptować propozycji (${reason}); liczona jako niezaakceptowana.`);
+    }
   }
 }
 

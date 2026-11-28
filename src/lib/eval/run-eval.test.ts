@@ -92,7 +92,7 @@ function makeDeps(db = new FakeDb(), overrides: Partial<EvalDeps> = {}) {
   const spies = {
     prepareTurn: vi.fn<EvalDeps["prepareTurn"]>(async () => ({ ok: true as const, turn: { messages: [] } as unknown as ChatTurn })),
     runTurn: vi.fn(async (): Promise<RunChatTurnResult> => turnResult({ status: "completed" })),
-    acceptProposal: vi.fn(async () => ({ ok: true })),
+    acceptProposal: vi.fn<EvalDeps["acceptProposal"]>(async () => ({ ok: true })),
     runEvaluation: vi.fn(async () => ({ ok: true as const, evaluation: {} as never })),
     runJudge: vi.fn(async () => ({ ok: true as const, evaluation: {} as never })),
     runImpact: vi.fn(async () => ({ ok: true as const, analysis: {} as never })),
@@ -285,6 +285,42 @@ describe("runEval: przypadek BUILD", () => {
     expect(deps.env).toMatchObject({ LLM_PROVIDER: "google", LLM_MODEL: MODEL, LLM_MAX_OUTPUT_TOKENS: "8000", CHAT_MAX_REQUESTS_PER_HOUR: "10000", CHAT_MAX_TOKENS_PER_DAY: "100000000" });
   });
 
+  it("niezaakceptowane propozycje są liczone (z powodami) w wypisie przebiegu i w podsumowaniu", async () => {
+    const { deps, db, logs, spies } = makeDeps();
+    let turn = 0;
+    spies.prepareTurn.mockImplementation(async () => {
+      turn += 1;
+      if (turn === 1) db.pending.push("ok-1", "zly-1", "ok-2", "zly-2", "zly-3");
+      return { ok: true as const, turn: {} as ChatTurn };
+    });
+    spies.acceptProposal.mockImplementation(async ({ proposalId }) =>
+      proposalId.startsWith("ok")
+        ? { ok: true }
+        : { ok: false, error: proposalId === "zly-3" ? "VERSION_CONFLICT" : "ALREADY_RESOLVED" },
+    );
+
+    const summary = await runEval(config(), deps);
+
+    expect(summary).toMatchObject({
+      outcome: "DONE",
+      proposalsAccepted: 2,
+      proposalsNotAccepted: 3,
+      proposalsNotAcceptedReasons: { ALREADY_RESOLVED: 2, VERSION_CONFLICT: 1 },
+    });
+    const output = logs.join("\n");
+    expect(output).toContain("propozycje: zaakceptowano 2, niezaakceptowano 3 (ALREADY_RESOLVED: 2, VERSION_CONFLICT: 1)");
+    expect(output).toContain("Propozycje agenta (BUILD): zaakceptowano 2, niezaakceptowano 3");
+  });
+
+  it("bez propozycji agenta w podsumowaniu nie ma linii o propozycjach", async () => {
+    const { deps, logs } = makeDeps();
+
+    const summary = await runEval(config(), deps);
+
+    expect(summary).toMatchObject({ proposalsAccepted: 0, proposalsNotAccepted: 0 });
+    expect(logs.join("\n")).not.toContain("Propozycje agenta");
+  });
+
   it("z --sedzia po turach trzy sądy z triggerem SCRIPT, model sędziego zapisany w EvalRun", async () => {
     const { deps, db, spies } = makeDeps();
 
@@ -373,14 +409,14 @@ describe("runEval: bezpieczniki bieżącego uruchomienia", () => {
 });
 
 describe("runEval: błędy tur", () => {
-  it("wyjątek z runChatTurn: tura FAILED (TURN_EXCEPTION), przebieg idzie dalej do następnego przypadku", async () => {
+  it("wyjątek z runChatTurn to awaria techniczna: INVALID (TURN_EXCEPTION), a nie FAILED; przebieg idzie dalej", async () => {
     const { deps, db, spies } = makeDeps();
     spies.runTurn.mockRejectedValueOnce(new Error("błąd createChatTools"));
 
     const summary = await runEval(config({ caseIds: ["BUILD-01", "BUILD-02"] }), deps);
 
-    expect(summary).toMatchObject({ outcome: "DONE", counts: { FAILED: 1, OK: 1 } });
-    expect(db.finished[0]).toMatchObject({ status: "FAILED", errorCode: "TURN_EXCEPTION" });
+    expect(summary).toMatchObject({ outcome: "DONE", counts: { INVALID: 1, FAILED: 0, OK: 1 } });
+    expect(db.finished[0]).toMatchObject({ status: "INVALID", errorCode: "TURN_EXCEPTION" });
     expect(db.projects.map((p) => p.name)).toEqual(["EV-T1-BUILD-01-p1", "EV-T1-BUILD-02-p1"]);
     expect(spies.prepareTurn).toHaveBeenCalledTimes(1 + 6);
   });
@@ -542,6 +578,7 @@ describe("runEval: przypadki EVAL i CHAT", () => {
     const summary = await runEval(config({ caseIds: ["CHAT-S4"] }), deps);
 
     expect(summary.counts.OK).toBe(1);
+    // Trigger analizy wpływu to `UI`: enum `ImpactTrigger` (baza i Zod) nie ma `SCRIPT`; rozpoznanie po projekcie EV-… i EvalRun.
     expect(spies.runImpact).toHaveBeenCalledWith(expect.objectContaining({ trigger: "UI", change: { kind: "PROPOSAL", proposalId: "pr-1" } }));
     expect(spies.prepareTurn).toHaveBeenCalledTimes(2);
     expect(spies.acceptProposal).not.toHaveBeenCalled();
