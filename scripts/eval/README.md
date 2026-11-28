@@ -98,6 +98,7 @@ tylko w `src/lib/eval/cases.ts`. Przypadki `EVAL` zostają z nazwami (ocena goto
 - `BUILD` używa wprost terminów BMC i mierzy głównie przenoszenie informacji do bloków; wydobywanie ich z luźnej rozmowy pokrywają
   scenariusze `CHAT`.
 - Skrypt **akceptuje wszystkie propozycje** agenta (BUILD), więc mierzy zdolność budowy, nie dialog z użytkownikiem.
+- **Stała kontynuacja BUILD** (protokół kontynuacji, `BUILD_CONTINUATION_MESSAGE` w `cases.ts`): po 6 wiadomościach skrypt wysyła „Tak, zaproponuj kolejne wpisy na podstawie tego, co już napisałem.” (najwyżej 8 razy, do 14 tur) aż do wypełnienia 9 bloków (`ALL_BLOCKS`), dwóch kolejnych tur bez nowych propozycji (`NO_NEW_PROPOSALS`) albo limitu kontynuacji (`CONTINUATION_LIMIT`); `EvalRun.turnCount` i `EvalRun.endReason` zapisują liczbę tur i powód. Kontynuacja jest zawsze taka sama i **nie odpowiada na pytania agenta**, więc BUILD mierzy tempo zamiany opisu na wpisy, a nie prowadzenie dialogu. Kontynuacje liczą się do `--max-tur`. Powód protokołu: agent `chat-v6` prowadzi wywiad blok po bloku (`docs/plan-krok-10.md`, punkt 22).
 - Analiza wpływu w `CHAT-S4` zapisuje trigger `UI` (enum `ImpactTrigger` nie ma `SCRIPT`); rozpoznanie po projekcie `EV-…` i `EvalRun`.
   Narzędzia czatu (`evaluate_bmc`) zapisują `trigger = CHAT`; ocena `EVAL` i sędzia ze skryptu: `SCRIPT`.
 - Szacunek kosztu w trybie na sucho jest niezmierzony (rozrzut ±50%); ceny z `MODEL_PRICING` (stan z `MODEL_PRICING_CHECKED_AT`).
