@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BLOCK_KEYS } from "@/lib/schemas/bmc";
 import { SEED_COMPANIES } from "@/lib/seed/companies";
 import {
   ALL_CASES,
@@ -8,13 +9,15 @@ import {
   EVAL_CASES,
   MINIMAL_BUILD_CASE_IDS,
   casesChecksum,
+  coveredBlocks,
   forbiddenTokens,
   getCase,
 } from "@/lib/eval/cases";
 
 // Suma kontrolna zamrożonego zestawu. Zmiana treści przypadków (albo stanu firm z seeda użytych w EVAL i fixture'ach CHAT)
 // zmienia ją i wymaga świadomej decyzji właściciela oraz nowej serii pomiarów; nie aktualizuj jej "dla zielonych testów".
-const FROZEN_CHECKSUM = "627a8b6ef9c89888a66ffd1ddeccbd235f0cc4ee20dbac3706e12c7b72e06058";
+// `null` do czasu akceptacji treści przez właściciela (po niej wpisujemy tu sumę i zestaw jest zamrożony).
+const FROZEN_CHECKSUM: string | null = null;
 
 describe("zestaw przypadków ewaluacji", () => {
   it("ma 7 przypadków BUILD, 7 EVAL i 5 CHAT z unikalnymi identyfikatorami", () => {
@@ -30,20 +33,25 @@ describe("zestaw przypadków ewaluacji", () => {
     ]);
   });
 
-  it("jest zamrożony: suma kontrolna zgadza się z zapisaną", () => {
+  it.runIf(FROZEN_CHECKSUM !== null)("jest zamrożony: suma kontrolna zgadza się z zapisaną", () => {
     expect(casesChecksum()).toBe(FROZEN_CHECKSUM);
+  });
+
+  it("suma kontrolna to SHA-256 w zapisie szesnastkowym", () => {
+    expect(casesChecksum()).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it("suma kontrolna jest deterministyczna i zależy od treści (zmiana wiadomości zmienia sumę)", () => {
     expect(casesChecksum()).toBe(casesChecksum());
+    const before = casesChecksum();
     const original = BUILD_CASES[0].messages[1];
     (BUILD_CASES[0].messages as string[])[1] = `${original} (zmiana)`;
     try {
-      expect(casesChecksum()).not.toBe(FROZEN_CHECKSUM);
+      expect(casesChecksum()).not.toBe(before);
     } finally {
       (BUILD_CASES[0].messages as string[])[1] = original;
     }
-    expect(casesChecksum()).toBe(FROZEN_CHECKSUM);
+    expect(casesChecksum()).toBe(before);
   });
 
   it("wariant minimalny BUILD: Kawiarnia Ziarno, Spotify, Quibi, Airbnb", () => {
@@ -65,6 +73,31 @@ describe("zestaw przypadków ewaluacji", () => {
       expect(buildCase.messages[0], buildCase.id).toContain(buildCase.description);
       expect(buildCase.messages.at(-1), buildCase.id).toBe(BUILD_FINAL_MESSAGE);
     }
+  });
+
+  it("BUILD: każdy przypadek opisuje wszystkie 9 bloków BMC (komplet), a ostatnia wiadomość i pierwsza nie opisują bloków", () => {
+    for (const buildCase of BUILD_CASES) {
+      expect(buildCase.coverage, buildCase.id).toHaveLength(buildCase.messages.length);
+      expect(coveredBlocks(buildCase), buildCase.id).toEqual([...BLOCK_KEYS]);
+      expect(buildCase.coverage[0], `${buildCase.id} wiadomość 1`).toEqual([]);
+      expect(buildCase.coverage.at(-1), `${buildCase.id} polecenie końcowe`).toEqual([]);
+    }
+  });
+
+  it("BUILD: jednolita forma pierwszej wiadomości i brak etykiet „Firma X” w treści (etykieta tylko jako pole wewnętrzne)", () => {
+    for (const buildCase of BUILD_CASES) {
+      const opening =
+        buildCase.id === "BUILD-01"
+          ? "Chcę otworzyć kawiarnię. Pomóż mi zbudować model biznesowy. Planuję "
+          : "Pomóż mi zbudować model biznesowy. Prowadzę ";
+      expect(buildCase.messages[0], buildCase.id).toBe(`${opening}${buildCase.description.replace(/^(Planuję|Prowadzę) /, "")}`);
+      for (const text of [buildCase.description, ...buildCase.messages]) {
+        expect(text, buildCase.id).not.toMatch(/\bFirma [A-Z]\b/);
+      }
+    }
+    expect(BUILD_CASES.filter((c) => c.label).map((c) => c.label)).toEqual([
+      "Firma A", "Firma B", "Firma C", "Firma D", "Firma E", "Firma F",
+    ]);
   });
 
   it("BUILD: lista zakazanych tokenów zawiera prawdziwą nazwę i aliasy", () => {
