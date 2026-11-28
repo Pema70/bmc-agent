@@ -24,6 +24,12 @@ const modules = [
   "@/lib/ai/chat-agent",
   "@/lib/ai/chat-agent-script",
   "@/lib/eval/script-limits",
+  "@/lib/eval/cases",
+  "@/lib/eval/args",
+  "@/lib/eval/estimate",
+  "@/lib/eval/budget",
+  "@/lib/eval/db",
+  "@/lib/eval/run-eval",
 ];
 
 let failed = 0;

@@ -20,7 +20,8 @@ export type RunEvaluationContext = {
   projectId: string;
   variantId: string;
   userId: string;
-  trigger: "UI" | "CHAT";
+  // `SCRIPT`: bezpośrednie wywołanie ze skryptu ewaluacji (krok 10, PR 10f); narzędzie czatu zawsze zapisuje `CHAT`.
+  trigger: "UI" | "CHAT" | "SCRIPT";
   abortSignal?: AbortSignal;
 };
 
